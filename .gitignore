@@ -1,0 +1,22 @@
+# Python temp files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Vim temp files
+*.swp
+*.swo
+
+*.egg-info/
+dist/
+
+.coverage
+.coverage.*
+
+# Windows-specific build files
+build/
+
+# Pycharm files
+.idea/
+
+venv/

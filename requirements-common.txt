@@ -1,0 +1,20 @@
+# api generation
+namex>=0.0.8
+
+# formatting and linting
+black>=22
+flake8
+isort
+mypy
+
+# testing
+absl-py
+pytest
+pytest-cov
+numpy
+
+# pip build
+build
+
+# keras
+keras
