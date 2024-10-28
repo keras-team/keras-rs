@@ -11,6 +11,28 @@ This library is an extension of the core Keras API; all high-level modules
 receive that same level of polish as core Keras. If you are familiar with Keras,
 congratulations! You already understand most of Keras Recommenders.
 
+## Installation
+
+Keras Recommenders is available on PyPI as `keras-rs`:
+
+```bash
+pip install keras-rs
+```
+
+To try out the latest version of Keras Recommenders, you can use our nightly
+package:
+
+```bash
+pip install keras-rs-nightly
+```
+
+Read [Getting started with Keras](https://keras.io/getting_started/) for more
+information on installing Keras 3 and compatibility with different frameworks.
+
+> [!IMPORTANT]
+> We recommend using Keras Recommenders with TensorFlow 2.16 or later, as
+> TF 2.16 packages Keras 3 by default.
+
 ## Configuring your backend
 
 If you have Keras 3 installed in your environment (see installation above), you
@@ -27,7 +49,7 @@ Or in Colab, with:
 import os
 os.environ["KERAS_BACKEND"] = "jax"
 
-import keras_recommenders
+import keras_rs
 ```
 
 > [!IMPORTANT]
