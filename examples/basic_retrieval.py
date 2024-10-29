@@ -13,6 +13,11 @@ Recommender systems are often composed of two stages:
    narrow down the set of items the user may be interested in to a shortlist of
    likely candidates.
 
+In this tutorial, we're going to focus on the first stage, retrieval. If you are
+interested in the ranking stage, have a look at our
+[ranking](https://github.com/keras-team/keras-rs/blob/main/examples/basic_ranking.py)
+tutorial.
+
 Retrieval models are often composed of two sub-models:
 
 1. A query tower computing the query representation (normally a
@@ -93,9 +98,11 @@ for data in ratings.take(1).as_numpy_iterator():
     print(str(data).replace(", '", ",\n '"))
 
 """
-User ids are integers (represented as strings) between 1 and 943. We'll use the
-user id as an index in our model, in particular to lookup the user embedding
-from the user embedding table. So we need do know the number of users.
+In the Movielens dataset, user ids are integers (represented as strings)
+starting at 1 and with no gap. Normally, you would need to create a lookup table
+to map user ids to integers from 0 to N-1. But as a simplication, we'll use the
+user id directly as an index in our model, in particular to lookup the user
+embedding from the user embedding table. So we need do know the number of users.
 """
 
 users_count = (
@@ -113,8 +120,10 @@ for data in movies.take(1).as_numpy_iterator():
     print(str(data).replace(", '", ",\n '"))
 
 """
-Movie ids are integers (represented as strings) between 1 and 1682. We'll use
-the movie id as an index in our model, in particular to lookup the movie
+In the Movielens dataset, movie ids are integers (represented as strings)
+starting at 1 and with no gap. Normally, you would need to create a lookup table
+to map movie ids to integers from 0 to N-1. But as a simplication, we'll use the
+movie id directly as an index in our model, in particular to lookup the movie
 embedding from the movie embedding table. So we need do know the number of
 movies.
 """
@@ -220,18 +229,19 @@ class RetrievalModel(keras.Model):
 
     def __init__(
         self,
-        user_embeddings_count,
-        candidate_embeddings_count,
+        num_users,
+        num_candidates,
         embedding_dimension=32,
+        **kwargs,
     ):
-        super().__init__()
+        super().__init__(**kwargs)
         # Our query tower, simply an embedding table.
         self.user_embedding = keras.layers.Embedding(
-            user_embeddings_count, embedding_dimension
+            num_users, embedding_dimension
         )
         # Our candidate tower, simply an embedding table.
         self.candidate_embedding = keras.layers.Embedding(
-            candidate_embeddings_count, embedding_dimension
+            num_candidates, embedding_dimension
         )
         # The layer that performs the retrieval.
         self.retrieval = keras_rs.layers.BruteForceRetrieval(
@@ -283,8 +293,8 @@ After defining the model, we can use the standard Keras `model.fit()` to train
 and evaluate the model.
 
 Let's first instantiate the model. Note that we add `+ 1` to the number of users
-and movies to account for the fact that id zero is not used, but still take a
-row in the embedding tables.
+and movies to account for the fact that id zero is not used for either (ids
+start at 1), but still takes a row in the embedding tables.
 """
 
 model = RetrievalModel(users_count + 1, movies_count + 1)
