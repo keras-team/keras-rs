@@ -1,13 +1,20 @@
-[tool.black]
+[tool.ruff]
 line-length = 80
 
-[tool.isort]
-profile = "black"
-force_single_line = "True"
-single_line_exclusions = ["typing"]
-known_first_party = ["keras_rs"]
-default_section = "THIRDPARTY"
-line_length = 80
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle error
+    "F",  # Pyflakes
+    "I",  # isort
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["F401"]  # imported but unused
+
+[tool.ruff.lint.isort]
+force-single-line = true
+single-line-exclusions = ["typing"]
+known-first-party = ["keras_rs"]
 
 [tool.mypy]
 strict = "True"

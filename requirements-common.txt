@@ -2,10 +2,8 @@
 namex>=0.0.8
 
 # formatting and linting
-black>=22
-flake8
-isort
 mypy
+ruff
 
 # testing
 absl-py

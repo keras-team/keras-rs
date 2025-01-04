@@ -27,9 +27,7 @@ In this tutorial, we're going to:
 """
 
 import keras
-
-# Needed for the dataset
-import tensorflow as tf
+import tensorflow as tf  # Needed for the dataset
 import tensorflow_datasets as tfds
 
 """
@@ -113,7 +111,6 @@ architecture for ranking tasks. We can implement it as follows:
 
 
 class RankingModel(keras.Model):
-
     def __init__(
         self,
         num_users,

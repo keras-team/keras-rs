@@ -1,10 +1,9 @@
 #!/bin/bash
-set -Eeuo pipefail
+set -Euo pipefail
 
 base_dir=$(dirname $(dirname $0))
 targets="${base_dir}"
 
-isort --sp "${base_dir}/pyproject.toml" ${targets}
-black --config "${base_dir}/pyproject.toml" ${targets}
-flake8 --config "${base_dir}/setup.cfg" ${targets}
+ruff check --config "${base_dir}/pyproject.toml" --fix ${targets}
+ruff format --config "${base_dir}/pyproject.toml" ${targets}
 mypy --config-file "${base_dir}/pyproject.toml" ${targets}

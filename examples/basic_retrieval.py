@@ -62,9 +62,7 @@ catalogue. We will therefore use the explicit rating data.
 """
 
 import keras
-
-# Needed for the dataset
-import tensorflow as tf
+import tensorflow as tf  # Needed for the dataset
 import tensorflow_datasets as tfds
 
 import keras_rs
