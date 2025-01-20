@@ -8,4 +8,4 @@ echo "Generating api directory with public APIs..."
 python3 "${base_dir}"/api_gen.py
 # Format code because `api_gen.py` might order
 # imports differently.
-pre-commit run --all-files || true
+pre-commit run --files $(find "${base_dir}"/keras_rs/api -type f) || true
