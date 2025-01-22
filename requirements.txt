@@ -10,5 +10,8 @@ torchvision>=0.16.0
 # Jax.
 jax[cpu]
 
+# pre-commit checks (formatting, linting, etc.)
+pre-commit
+
 # Common dependencies.
 -r requirements-common.txt
