@@ -4,8 +4,8 @@ import os
 from keras_rs.api import *  # noqa: F403
 
 # Import * ignores names starting with "_", and `__version__` comes from
-# `version_utils` anyway.
-from keras_rs.src.version_utils import __version__
+# `version` anyway.
+from keras_rs.src.version import __version__
 
 # Add everything in /api/ to the module search path.
 __path__.append(os.path.join(os.path.dirname(__file__), "api"))  # noqa: F405

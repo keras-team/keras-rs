@@ -25,7 +25,7 @@ import shutil
 package = "keras_rs"
 build_directory = "tmp_build_dir"
 dist_directory = "dist"
-to_copy = ["setup.py", "README.md"]
+to_copy = ["pyproject.toml", "README.md"]
 
 
 def ignore_files(path: str, filenames: list[str]) -> list[str]:
@@ -34,40 +34,41 @@ def ignore_files(path: str, filenames: list[str]) -> list[str]:
     return [f for f in filenames if f.endswith("_test.py")]
 
 
-def update_version(
-    build_path: pathlib.Path, version: str, is_nightly: bool
-) -> None:
+def update_version_for_nightly(build_path: pathlib.Path, version: str) -> str:
     """Export Version and Package Name."""
-    if is_nightly:
-        date = datetime.datetime.now()
-        version += f".dev{date.strftime('%Y%m%d%H')}"
-        # Replaces `name="keras-rs"` in `setup.py` with `keras-rs-nightly`
-        with open(build_path / "setup.py") as f:
-            setup_contents = f.read()
-        with open(build_path / "setup.py", "w") as f:
-            setup_contents = setup_contents.replace(
-                'name="keras-rs"', 'name="keras-rs-nightly"'
-            )
-            f.write(setup_contents)
+    date = datetime.datetime.now()
+    version += f".dev{date:%Y%m%d%H}"
+    # Update `name = "keras-rs"` with "keras-rs-nightly"
+    pyproj_pth = build_path / "pyproject.toml"
+    pyproj_str_before = pyproj_pth.read_text()
+    pyproj_str_after = pyproj_str_before.replace(
+        'name = "keras-rs"', 'name = "keras-rs-nightly"'
+    )
+    if pyproj_str_before == pyproj_str_after:
+        raise ValueError("Package name replacement failed")
+    pyproj_pth.write_text(pyproj_str_after)
 
     # Make sure to export the __version__ string
-    version_utils = build_path / package / "src" / "version_utils.py"
-    with open(version_utils) as f:
-        contents = f.read()
-    with open(version_utils, "w") as f:
-        contents = re.sub(
-            "\n__version__ = .*\n",
-            f'\n__version__ = "{version}"\n',
-            contents,
-        )
-        f.write(contents)
+    version_py = build_path / package / "src" / "version.py"
+    version_str_before = version_py.read_text()
+    version_str_after = re.sub(
+        "\n__version__ = .*\n",
+        f'\n__version__ = "{version}"\n',
+        version_str_before,
+    )
+    if version_str_before == version_str_after:
+        raise ValueError("Version replacement failed")
+    version_py.write_text(version_str_after)
+    return version
 
 
-def copy_source_to_build_directory(root_path: pathlib.Path) -> None:
+def copy_source_to_build_directory(
+    root_path: pathlib.Path, build_path: pathlib.Path
+) -> None:
     # Copy sources (`keras_rs/` directory and setup files) to build directory
     shutil.copytree(
         root_path / package,
-        root_path / build_directory / package,
+        build_path / package,
         ignore=ignore_files,
     )
     for fname in to_copy:
@@ -97,23 +98,27 @@ def build_wheel(
 
 
 def build(root_path: pathlib.Path, is_nightly: bool) -> pathlib.Path:
-    if os.path.exists(build_directory):
-        raise ValueError(f"Directory already exists: {build_directory}")
-
     try:
         build_path = root_path / build_directory
         dist_path = root_path / dist_directory
+
+        if os.path.exists(build_path):
+            raise ValueError(f"Directory already exists: {build_path}")
         os.mkdir(build_path)
 
-        from keras_rs.src.version_utils import __version__  # noqa: E402
+        from keras_rs.src import version
 
-        copy_source_to_build_directory(root_path)
-        update_version(build_path, __version__, is_nightly)
-        return build_wheel(build_path, dist_path, __version__)
+        keras_rs_version = version.__version__
+        copy_source_to_build_directory(root_path, build_path)
+        if is_nightly:
+            keras_rs_version = update_version_for_nightly(
+                build_path, keras_rs_version
+            )
+        return build_wheel(build_path, dist_path, keras_rs_version)
     finally:
         # Clean up: remove the build directory (no longer needed)
         os.chdir(root_path)
-        shutil.rmtree(root_path / build_directory)
+        shutil.rmtree(build_path)
 
 
 def install_whl(whl_fpath: pathlib.Path) -> None:
