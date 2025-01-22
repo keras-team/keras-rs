@@ -71,6 +71,6 @@ jobs:
           pip install -r requirements.txt --progress-bar off
           pip install --no-deps -e "." --progress-bar off
       - name: Install pre-commit
-        run: pip install pre-commit
+        run: pip install pre-commit && pre-commit install
       - name: Run pre-commit
         run: pre-commit run --all-files --hook-stage manual
