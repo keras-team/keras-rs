@@ -14,10 +14,9 @@ class FeatureCross(keras.layers.Layer):
 
     A layer that creates explicit and bounded-degree feature interactions
     efficiently. The `call` method accepts two inputs: `x0` contains the
-    original features (usually the output of an embedding layer); the
-    second input `xi` is the output of the previous `FeatureCross` layer
-    in the stack, i.e., the i-th `FeatureCross` layer. For the first
-    `FeatureCross` layer in the stack, `x0 = xi`.
+    original features; the second input `xi` is the output of the previous
+    `FeatureCross` layer in the stack, i.e., the i-th `FeatureCross` layer.
+    For the first `FeatureCross` layer in the stack, `x0 = xi`.
 
     The output is `x_{i+1} = x0 .* (W * x_i + bias + diag_scale * x_i) + x_i`,
     where .* denotes element-wise multiplication. W could be a full-rank
@@ -33,8 +32,8 @@ class FeatureCross(keras.layers.Layer):
 
         ```python
         # after embedding layer in a functional model
-        input = keras.Input(shape=(None,), name='index', dtype="int64")
-        x0 = keras.layers.Embedding(input_dim=32, output_dim=6)
+        input = keras.Input(shape=(), name='indices', dtype="int64")
+        x0 = keras.layers.Embedding(input_dim=32, output_dim=6)(x0)
         x1 = FeatureCross()(x0, x0)
         x2 = FeatureCross()(x0, x1)
         logits = keras.layers.Dense(units=10)(x2)
@@ -68,7 +67,7 @@ class FeatureCross(keras.layers.Layer):
         kernel_regularizer: string or `keras.regularizer` regularizer.
             Regularizer to use for the kernel matrix.
         bias_regularizer: string or `keras.regularizer` regularizer.
-            Regularizer to use for bias vector.
+            Regularizer to use for the bias vector.
     """
 
     def __init__(
