@@ -74,7 +74,7 @@ class FeatureCrossTest(testing.TestCase, parameterized.TestCase):
         )
         output = layer(self.x0, self.x)
 
-        self.assertAllClose(np.asarray([[0.59, 0.9, 1.23]]), output)
+        self.assertAllClose(ops.array([[0.59, 0.9, 1.23]]), output)
 
     def test_pre_activation(self):
         x0 = np.asarray([[0.1, 0.2, 0.3]]).astype(np.float32)
