@@ -8,28 +8,27 @@ from keras_rs.src.api_export import keras_rs_export
 from keras_rs.src.utils.keras_utils import clone_initializer
 
 
-@keras_rs_export("keras_rs.layers.CrossFeatureInteraction")
-class CrossFeatureInteraction(keras.layers.Layer):
-    """Cross feature interaction layer in Deep & Cross Network (DCN).
+@keras_rs_export("keras_rs.layers.FeatureCross")
+class FeatureCross(keras.layers.Layer):
+    """FeatureCross layer in Deep & Cross Network (DCN).
 
     A layer that creates explicit and bounded-degree feature interactions
     efficiently. The `call` method accepts `inputs` as a tuple of size 2
     tensors. The first input `x0` is the base layer that contains the original
     features (usually the embedding layer); the second input `xi` is the output
-    of the previous `CrossFeatureInteraction` layer in the stack, i.e., the
-    i-th `CrossFeatureInteraction` layer. For the first
-    `CrossFeatureInteraction` layer in the stack, `x0 = xi`.
+    of the previous `FeatureCross` layer in the stack, i.e., the i-th
+    `FeatureCross` layer. For the first `FeatureCross` layer in the stack,
+    `x0 = xi`.
 
     The output is `x_{i+1} = x0 .* (W * x_i + bias + diag_scale * x_i) + x_i`,
     where .* designates elementwise multiplication, W could be a full-rank
-    matrix, or a low-rank matrix U*V to reduce the computational cost, and
+    matrix, or a low-rank matrix `U*V` to reduce the computational cost, and
     diag_scale increases the diagonal of W to improve training stability (
     especially for the low-rank case).
 
     References:
-        1. [R. Wang et al.](https://arxiv.org/pdf/2008.13535.pdf)
-          See Eq. (1) for full-rank and Eq. (2) for low-rank version.
-        2. [R. Wang et al.](https://arxiv.org/pdf/1708.05123.pdf)
+        - [R. Wang et al.](https://arxiv.org/abs/2008.13535)
+        - [R. Wang et al.](https://arxiv.org/abs/1708.05123)
 
     Example:
 
@@ -37,8 +36,8 @@ class CrossFeatureInteraction(keras.layers.Layer):
         # after embedding layer in a functional model:
         input = keras.Input(shape=(None,), name='index', dtype="int64")
         x0 = keras.layers.Embedding(input_dim=32, output_dim=6)
-        x1 = CrossFeatureInteraction()(x0, x0)
-        x2 = CrossFeatureInteraction()(x0, x1)
+        x1 = FeatureCross()(x0, x0)
+        x2 = FeatureCross()(x0, x1)
         logits = keras.layers.Dense(units=10)(x2)
         model = keras.Model(input, logits)
         ```
@@ -121,23 +120,19 @@ class CrossFeatureInteraction(keras.layers.Layer):
             "bias_regularizer": self.bias_regularizer,
         }
 
-        dense_layers = []
         if self.projection_dim is not None:
-            dense_u = keras.layers.Dense(
+            self.down_proj_dense = keras.layers.Dense(
                 units=self.projection_dim,
                 use_bias=False,
                 kernel_initializer=clone_initializer(self.kernel_initializer),
                 kernel_regularizer=self.kernel_regularizer,
                 dtype=self.dtype_policy,
             )
-            dense_layers += [dense_u]
 
-        dense_v = keras.layers.Dense(
+        self.dense = keras.layers.Dense(
             **dense_layer_args,
             dtype=self.dtype_policy,
         )
-        dense_layers += [dense_v]
-        self.dense_layers = dense_layers
 
         self.built = True
 
@@ -147,7 +142,7 @@ class CrossFeatureInteraction(keras.layers.Layer):
         """Forward pass of the cross layer.
 
         Args:
-            x0: a Tensor. The input to the cross layer. N-D tensor
+            x0: a Tensor. The input to the cross layer. N-rank tensor
                 with shape `(batch_size, ..., input_dim)`.
             x: a Tensor. Optional. If provided, the layer will compute
                 crosses between x0 and x. Otherwise, the layer will
@@ -170,8 +165,13 @@ class CrossFeatureInteraction(keras.layers.Layer):
                 f"`x.shape` = {x.shape}, `x0.shape` = {x0.shape}"
             )
 
-        for dense_layer in self.dense_layers:
-            output = dense_layer(x)
+        # Project to a lower dimension.
+        if self.projection_dim is None:
+            output = x
+        else:
+            output = self.down_proj_dense(x)
+
+        output = self.dense(output)
 
         output = ops.cast(output, self.compute_dtype)
 
