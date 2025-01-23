@@ -13,17 +13,16 @@ class FeatureCross(keras.layers.Layer):
     """FeatureCross layer in Deep & Cross Network (DCN).
 
     A layer that creates explicit and bounded-degree feature interactions
-    efficiently. The `call` method accepts `inputs` as a tuple of size 2
-    tensors. The first input `x0` is the base layer that contains the original
-    features (usually the embedding layer); the second input `xi` is the output
-    of the previous `FeatureCross` layer in the stack, i.e., the i-th
-    `FeatureCross` layer. For the first `FeatureCross` layer in the stack,
-    `x0 = xi`.
+    efficiently. The `call` method accepts two inputs: `x0` contains the
+    original features (usually the output of an embedding layer); the
+    second input `xi` is the output of the previous `FeatureCross` layer
+    in the stack, i.e., the i-th `FeatureCross` layer. For the first
+    `FeatureCross` layer in the stack, `x0 = xi`.
 
     The output is `x_{i+1} = x0 .* (W * x_i + bias + diag_scale * x_i) + x_i`,
-    where .* designates elementwise multiplication, W could be a full-rank
+    where .* denotes element-wise multiplication. W could be a full-rank
     matrix, or a low-rank matrix `U*V` to reduce the computational cost, and
-    diag_scale increases the diagonal of W to improve training stability (
+    `diag_scale` increases the diagonal of W to improve training stability (
     especially for the low-rank case).
 
     References:
@@ -33,7 +32,7 @@ class FeatureCross(keras.layers.Layer):
     Example:
 
         ```python
-        # after embedding layer in a functional model:
+        # after embedding layer in a functional model
         input = keras.Input(shape=(None,), name='index', dtype="int64")
         x0 = keras.layers.Embedding(input_dim=32, output_dim=6)
         x1 = FeatureCross()(x0, x0)
@@ -43,29 +42,33 @@ class FeatureCross(keras.layers.Layer):
         ```
 
     Args:
-        projection_dim: project dimension to reduce the computational cost.
-          Default is `None` such that a full (`input_dim` by `input_dim`) matrix
-          W is used. If enabled, a low-rank matrix W = U*V will be used, where U
-          is of size `input_dim` by `projection_dim` and V is of size
-          `projection_dim` by `input_dim`. `projection_dim` need to be smaller
-          than `input_dim`/2 to improve the model efficiency. In practice, we've
-          observed that `projection_dim` = d/4 consistently preserved the
-          accuracy of a full-rank version.
-        diag_scale: a non-negative float used to increase the diagonal of the
-          kernel W by `diag_scale`, that is, W + diag_scale * I, where I is an
-          identity matrix.
-        use_bias: whether to add a bias term for this layer. If set to False,
-          no bias term will be used.
-        pre_activation: Activation applied to output matrix of the layer, before
-          multiplication with the input. Can be used to control the scale of the
-          layer's outputs and improve stability.
-        kernel_initializer: Initializer to use on the kernel matrix.
-        bias_initializer: Initializer to use on the bias vector.
-        kernel_regularizer: Regularizer to use on the kernel matrix.
-        bias_regularizer: Regularizer to use on bias vector.
-
-    Input shape: A tuple of 2 (batch_size, `input_dim`) dimensional inputs.
-    Output shape: A single (batch_size, `input_dim`) dimensional output.
+        projection_dim: int. Dimension for down-projecting the input to reduce
+            computational cost. If `None` (default), the full matrix, `W`
+            (with shape `(input_dim, input_dim)`) is used. Otherwise, a low-rank
+            matrix `W = U*V` will be used, where `U` is of shape
+            `(input_dim, projection_dim)` and `V` is of shape
+            `(projection_dim, input_dim)`. `projection_dim` need to be smaller
+            than `input_dim//2` to improve the model efficiency. In practice,
+            we've observed that `projection_dim = d/4` consistently preserved
+            the accuracy of a full-rank version.
+        diag_scale: non-negative float. Used to increase the diagonal of the
+            kernel W by `diag_scale`, i.e., `W + diag_scale * I`, where I is the
+            identity matrix. Defaults to `None`.
+        use_bias: bool. Whether to add a bias term for this layer. Defaults to
+            `True`.
+        pre_activation: string or `keras.activations`. Activation applied to
+            output matrix of the layer, before multiplication with the input.
+            Can be used to control the scale of the layer's outputs and
+            improve stability. Defaults to `None`.
+        kernel_initializer: string or `keras.initializers` initializer.
+            Initializer to use for the kernel matrix. Defaults to
+            `"glorot_uniform"`.
+        bias_initializer: string or `keras.initializers` initializer.
+            Initializer to use for the bias vector. Defaults to `"ones"`.
+        kernel_regularizer: string or `keras.regularizer` regularizer.
+            Regularizer to use for the kernel matrix.
+        bias_regularizer: string or `keras.regularizer` regularizer.
+            Regularizer to use for bias vector.
     """
 
     def __init__(
