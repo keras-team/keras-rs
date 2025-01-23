@@ -1,5 +1,4 @@
 import keras
-import numpy as np
 from absl.testing import parameterized
 from keras import ops
 from keras.layers import deserialize
@@ -77,13 +76,10 @@ class FeatureCrossTest(testing.TestCase, parameterized.TestCase):
         self.assertAllClose(ops.array([[0.59, 0.9, 1.23]]), output)
 
     def test_pre_activation(self):
-        x0 = np.asarray([[0.1, 0.2, 0.3]]).astype(np.float32)
-        x = np.asarray([[0.4, 0.5, 0.6]]).astype(np.float32)
-
         layer = FeatureCross(projection_dim=None, pre_activation=ops.zeros_like)
-        output = layer(x0, x)
+        output = layer(self.x0, self.x)
 
-        self.assertAllClose(x, output)
+        self.assertAllClose(self.x, output)
 
     def test_saved_model(self):
         def get_model():
