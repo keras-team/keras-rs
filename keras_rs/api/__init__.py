@@ -5,5 +5,5 @@ since your modifications would be overwritten.
 """
 
 from keras_rs.api import layers
-from keras_rs.src.version_utils import __version__
-from keras_rs.src.version_utils import version
+from keras_rs.src.version import __version__
+from keras_rs.src.version import version
