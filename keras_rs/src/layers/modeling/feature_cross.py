@@ -5,6 +5,7 @@ from keras import ops
 
 from keras_rs.src import types
 from keras_rs.src.api_export import keras_rs_export
+from keras_rs.src.utils.keras_utils import clone_initializer
 
 
 @keras_rs_export("keras_rs.layers.FeatureCross")
@@ -115,7 +116,7 @@ class FeatureCross(keras.layers.Layer):
             self.down_proj_dense = keras.layers.Dense(
                 units=self.projection_dim,
                 use_bias=False,
-                kernel_initializer=self.kernel_initializer,
+                kernel_initializer=clone_initializer(self.kernel_initializer),
                 kernel_regularizer=self.kernel_regularizer,
                 dtype=self.dtype_policy,
             )
@@ -124,8 +125,8 @@ class FeatureCross(keras.layers.Layer):
             units=last_dim,
             activation=self.pre_activation,
             use_bias=self.use_bias,
-            kernel_initializer=self.kernel_initializer,
-            bias_initializer=self.bias_initializer,
+            kernel_initializer=clone_initializer(self.kernel_initializer),
+            bias_initializer=clone_initializer(self.bias_initializer),
             kernel_regularizer=self.kernel_regularizer,
             bias_regularizer=self.bias_regularizer,
             dtype=self.dtype_policy,
