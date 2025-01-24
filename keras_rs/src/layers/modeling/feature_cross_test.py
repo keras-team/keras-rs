@@ -81,7 +81,7 @@ class FeatureCrossTest(testing.TestCase, parameterized.TestCase):
 
         self.assertAllClose(self.x, output)
 
-    def test_saved_model(self):
+    def test_model_saving(self):
         def get_model():
             x0 = keras.layers.Input(shape=(3,))
             x1 = FeatureCross(projection_dim=None)(x0, x0)
@@ -91,7 +91,6 @@ class FeatureCrossTest(testing.TestCase, parameterized.TestCase):
             return model
 
         self.run_model_saving_test(
-            cls=get_model,
-            init_kwargs={},
+            model=get_model(),
             input_data=self.x0,
         )

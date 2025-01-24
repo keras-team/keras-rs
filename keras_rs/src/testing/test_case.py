@@ -1,15 +1,15 @@
 import os
+import tempfile
 import unittest
-from typing import Any, Dict
+from typing import Any
 
 import keras
 import numpy as np
-import tensorflow as tf
 
 from keras_rs.src import types
 
 
-class TestCase(tf.test.TestCase, unittest.TestCase):
+class TestCase(unittest.TestCase):
     """TestCase class for all Keras Recommenders tests."""
 
     def setUp(self) -> None:
@@ -60,18 +60,18 @@ class TestCase(tf.test.TestCase, unittest.TestCase):
 
     def run_model_saving_test(
         self,
-        cls: Any,
-        init_kwargs: Dict[Any, Any],
+        model: Any,
         input_data: Any,
         atol: float = 1e-6,
         rtol: float = 1e-6,
     ) -> None:
         """Save and load a model from disk and assert output is unchanged."""
-        model = cls(**init_kwargs)
         model_output = model(input_data)
-        path = os.path.join(self.get_temp_dir(), "model.keras")
-        model.save(path, save_format="keras_v3")
-        restored_model = keras.models.load_model(path)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = os.path.join(temp_dir, "model.keras")
+            model.save(path, save_format="keras_v3")
+            restored_model = keras.models.load_model(path)
 
         # # Check that output matches.
         restored_output = restored_model(input_data)
