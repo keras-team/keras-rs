@@ -22,6 +22,10 @@ class BruteForceRetrieval(keras.layers.Layer):
     The identifiers for the candidates can be specified as a tensor. If not
     provided, the IDs used are simply the candidate indices.
 
+    Note that the serialization of this layer does not preserve the candidates
+    and only saves the `k` and `return_scores` arguments. One has to call
+    `update_candidates` after deserializing the layers.
+
     Args:
         candidate_embeddings: The candidate embeddings. If `None`,
             candidates must be provided using `update_candidates` before
@@ -32,7 +36,6 @@ class BruteForceRetrieval(keras.layers.Layer):
         return_scores: When `True`, this layer returns a tuple with the top
             scores and the top identifiers. When `False`, this layer returns
             a single tensor with the top identifiers.
-        name: Name of the layer.
         **kwargs: Args to pass to the base class.
 
     Example:
@@ -55,10 +58,9 @@ class BruteForceRetrieval(keras.layers.Layer):
         candidate_ids: Optional[types.Tensor] = None,
         k: int = 10,
         return_scores: bool = True,
-        name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(name=name, **kwargs)
+        super().__init__(**kwargs)
         self.candidate_embeddings = None
         self.candidate_ids = None
         self.k = k
@@ -183,3 +185,13 @@ class BruteForceRetrieval(keras.layers.Layer):
         return keras.ops.matmul(
             query_embedding, keras.ops.transpose(candidate_embedding)
         )
+
+    def get_config(self) -> dict[str, Any]:
+        config: dict[str, Any] = super().get_config()
+        config.update(
+            {
+                "k": self.k,
+                "return_scores": self.compute_score,
+            }
+        )
+        return config
