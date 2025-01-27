@@ -49,7 +49,7 @@ using a 1D `DeviceMesh` object, like so:
 
 ```
 mesh_1d = keras.distribution.DeviceMesh(
-    shape=(8,), axis_names=["data"], devices=devices
+    shape=(len(devices),), axis_names=["data"], devices=devices
 )
 data_parallel = keras.distribution.DataParallel(device_mesh=mesh_1d)
 ```
