@@ -1,18 +1,27 @@
-from typing import Text, Union
+from typing import Union
 
 import keras
 
 
 def clone_initializer(
-    initializer: Union[Text, keras.initializers.Initializer],
+    initializer: Union[str, keras.initializers.Initializer],
 ) -> keras.initializers.Initializer:
     """Clones an initializer to ensure a new seed.
+
+    Args:
+        initializer: The initializer to clone.
+
+    Returns:
+        A cloned initializer if it is clonable, otherwise the original one.
 
     As of tensorflow 2.10, we need to clone user passed initializers when
     invoking them twice to avoid creating the same randomized initialization.
     """
+    if isinstance(initializer, keras.initializers.Initializer):
+        config = initializer.get_config()
+        initializer_class: type[keras.initializers.Initializer] = (
+            initializer.__class__
+        )
+        return initializer_class.from_config(config)
     # If we get a string or dict, just return as we cannot and should not clone.
-    if not isinstance(initializer, keras.initializers.Initializer):
-        return initializer
-    config = initializer.get_config()
-    return initializer.__class__.from_config(config)
+    return initializer
