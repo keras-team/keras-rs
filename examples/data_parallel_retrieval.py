@@ -188,7 +188,7 @@ and evaluate the model.
 """
 
 model = RetrievalModel(users_count + 1, movies_count + 1)
-model.compile(optimizer=keras.optimizers.Adagrad(learning_rate=1.0))
+model.compile(optimizer=keras.optimizers.Adagrad(learning_rate=0.1))
 
 """
 Let's train the model. Evaluation takes a bit of time, so we only evaluate the

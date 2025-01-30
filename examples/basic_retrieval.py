@@ -296,7 +296,7 @@ start at 1), but still takes a row in the embedding tables.
 """
 
 model = RetrievalModel(users_count + 1, movies_count + 1)
-model.compile(optimizer=keras.optimizers.Adagrad(learning_rate=1.0))
+model.compile(optimizer=keras.optimizers.Adagrad(learning_rate=0.1))
 
 """
 Then train the model. Evaluation takes a bit of time, so we only evaluate the
