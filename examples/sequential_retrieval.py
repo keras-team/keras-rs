@@ -56,6 +56,8 @@ MIN_RATING = 2
 BATCH_SIZE = 2048
 TEST_BATCH_SIZE = 2048
 EMBEDDING_DIM = 128
+NUM_EPOCHS = 10
+LEARNING_RATE = 0.05
 
 """
 ## Dataset
@@ -372,8 +374,8 @@ model = SequentialRetrievalModel(
 
 # Compile.
 learning_rate = keras.optimizers.schedules.PolynomialDecay(
-    0.05,
-    decay_steps=10 * 30,
+    LEARNING_RATE,
+    decay_steps=train_ds.cardinality() * NUM_EPOCHS,
     end_learning_rate=0.0,
 )
 model.compile(optimizer=keras.optimizers.AdamW(learning_rate=learning_rate))
@@ -382,7 +384,7 @@ model.compile(optimizer=keras.optimizers.AdamW(learning_rate=learning_rate))
 model.fit(
     train_ds,
     validation_data=test_ds,
-    epochs=30,
+    epochs=NUM_EPOCHS,
 )
 
 """
