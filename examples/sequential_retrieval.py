@@ -12,11 +12,8 @@ Let's begin by importing all the necessary libraries, and setting the
 random seed for reproducibility.
 """
 
-import os
-
-os.environ["KERAS_BACKEND"] = "jax"
-
 import collections
+import os
 import random
 
 import keras
