@@ -22,7 +22,6 @@ import random
 import keras
 import pandas as pd
 import tensorflow as tf  # Needed only for the dataset
-from keras import ops
 
 import keras_rs
 
@@ -170,7 +169,7 @@ with training the model:
    will have multiple sequences corresponding to it.
 2. Get labels, i.e., Given a sequence of length `n`, the first
    `n-1` tokens will be fed to the model as input, and the label
-   with be the last token.
+   will be the last token.
 3. Remove all user sequences with less than `MIN_SEQUENCE_LENGTH`
    movies.
 4. Pad all sequences to `MAX_CONTEXT_LENGTH`.
@@ -352,14 +351,16 @@ class SequentialRetrievalModel(keras.Model):
         query_embeddings = y_pred["query_embeddings"]
         candidate_embeddings = self.candidate_model(candidate_id)
 
-        num_queries = ops.shape(query_embeddings)[0]
-        num_candidates = ops.shape(candidate_embeddings)[0]
+        num_queries = keras.ops.shape(query_embeddings)[0]
+        num_candidates = keras.ops.shape(candidate_embeddings)[0]
 
         # One-hot vectors for labels.
         labels = keras.ops.eye(num_queries, num_candidates)
 
         # Compute the affinity score by multiplying the two embeddings.
-        scores = ops.matmul(query_embeddings, candidate_embeddings.T)
+        scores = keras.ops.matmul(
+            query_embeddings, keras.ops.transpose(candidate_embeddings)
+        )
 
         return self.loss_fn(labels, scores, sample_weight)
 
