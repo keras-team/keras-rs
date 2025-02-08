@@ -10,9 +10,9 @@ features might include a customer's past purchase history (e.g.,
 `purchased_bananas`, `purchased_cooking_books`) or geographic location. However,
 a customer who has purchased both bananas and cooking books is more likely to be
 interested in a blender than someone who purchased only one or the other. The
-combination of purchased_bananas and purchased_cooking_books is a feature cross.
-Feature crosses capture interaction information between individual features,
-providing richer context than the individual features alone.
+combination of `purchased_bananas` and `purchased_cooking_books` is a feature
+cross. Feature crosses capture interaction information between individual
+features, providing richer context than the individual features alone.
 
 #TODO (abheesht): insert image.
 
@@ -32,7 +32,7 @@ implicit interactions.
 
 The cross network is the core of the DCN. It explicitly performs feature
 crossing at each layer, with the highest polynomial degree of feature
-interaction increasing with depth. The following figure shows the $(i+1)^{th}$
+interaction increasing with depth. The following figure shows the `(i+1)`-th
 cross layer.
 
 #TODO (abheesht): insert image.
@@ -66,7 +66,7 @@ Let's also define variables which will be reused throughout the example.
 """
 
 TOY_CONFIG = {
-    "learning_rate": 0.4,
+    "learning_rate": 0.01,
     "num_epochs": 100,
     "batch_size": 1024,
 }
@@ -89,7 +89,7 @@ MOVIELENS_CONFIG = {
     "projection_dim": 20,
     "dcn_num_units": [192, 192],
     # training
-    "learning_rate": 0.4,
+    "learning_rate": 0.01,
     "num_epochs": 10,
     "batch_size": 1024,
 }
@@ -120,31 +120,50 @@ def visualize_layer(matrix, features):
     ax.set_yticklabels([""] + features, fontsize=10)
 
 
-def train(learning_rate, epochs, train_data, test_data, model, model_name=None):
-    optimizer = keras.optimizers.AdamW(learning_rate=learning_rate)
-    loss = keras.losses.MeanSquaredError()
-    rmse = keras.metrics.RootMeanSquaredError()
-
-    model.compile(
-        optimizer=optimizer,
-        loss=loss,
-        metrics=[rmse],
-    )
-
+def train(
+    learning_rate,
+    epochs,
+    train_data,
+    test_data,
+    model,
+    model_name=None,
+    num_trials=1,
+):
     if model_name is not None:
-        print("\n=== Training", model_name, "===\n")
-    model.fit(
-        train_data,
-        epochs=epochs,
-        verbose=0,
-    )
+        print(model_name)
 
-    if model_name is not None:
-        print("\n=== Evaluating", model_name, "===\n")
-    results = model.evaluate(test_data, return_dict=True, verbose=0)
-    rmse_value = results["root_mean_squared_error"]
+    rmse_values = []
+    for _ in range(num_trials):
+        optimizer = keras.optimizers.AdamW(learning_rate=learning_rate)
+        loss = keras.losses.MeanSquaredError()
+        rmse = keras.metrics.RootMeanSquaredError()
+
+        model.compile(
+            optimizer=optimizer,
+            loss=loss,
+            metrics=[rmse],
+        )
+
+        model.fit(
+            train_data,
+            epochs=epochs,
+            verbose=0,
+        )
+
+        results = model.evaluate(test_data, return_dict=True, verbose=0)
+        rmse_value = results["root_mean_squared_error"]
+        rmse_values.append(rmse_value)
+
+    # Report metrics.
+    avg_rmse = np.mean(rmse_values)
+    std_rmse = np.std(rmse_values)
     num_params = model.count_params()
-    print(f"RMSE: {rmse_value:.4f}, #params: {num_params}")
+    if num_trials == 1:
+        print(f"RMSE = {avg_rmse}; #params = {num_params}")
+    else:
+        print(f"RMSE = {avg_rmse} ± {std_rmse}; #params = {num_params}")
+
+    print("===============")
 
 
 """
@@ -156,21 +175,21 @@ advertisement. The features and label are defined as follows:
 
 | **Features / Label** | **Description**                | **Range** |
 |:--------------------:|:------------------------------:|:--------:|
-| $x_1$ = country      | Customer's resident country    | [0, 199] |
-| $x_2$ = bananas      | # bananas purchased            | [0, 23]  |
-| $x_3$ = cookbooks    | # cooking books purchased      | [0, 5]   |
+| `x1` = country      | Customer's resident country    | [0, 199] |
+| `x2` = bananas      | # bananas purchased            | [0, 23]  |
+| `x3` = cookbooks    | # cooking books purchased      | [0, 5]   |
 | y                    | Blender ad click likelihood    | -        |
 
 Then, we let the data follow the following underlying distribution:
-$y = f(x_1, x_2, x_3) = 0.1x_1 + 0.4x_2 + 0.7x_3 + 0.1x_1x_2 +$  
-$3.1x_2x_3 + 0.1x_3^2$.
+`y = f(x1, x2, x3) = 0.1x1 + 0.4x2 + 0.7x3 + 0.1x1x2 +`  
+`3.1x2x3 + 0.1x3^2`.
 
-This distribution shows that the click likelihood ($y$) depends linearly on
-individual features ($x_i$) and on multiplicative interactions between them. In
-this scenario, the likelihood of purchasing a blender ($y$) is influenced not
-only by purchasing bananas ($x_2$) or cookbooks ($x_3$) individually, but also
+This distribution shows that the click likelihood (`y`) depends linearly on
+individual features (`xi`) and on multiplicative interactions between them. In
+this scenario, the likelihood of purchasing a blender (`y`) is influenced not
+only by purchasing bananas (`x2`) or cookbooks (`x3`) individually, but also
 significantly by the interaction of purchasing both bananas and cookbooks
-($x_2x_3$).
+(`x2x3`).
 
 ### Preparing the dataset
 
@@ -282,8 +301,8 @@ train(
 Since we already know which feature crosses are important in our data, it would
 be interesting to verify whether our model has indeed learned these key feature
 interactions. This can be done by visualizing the learned weight matrix in the
-cross network, where the weight $W_{ij}$ represents the learned importance of
-the interaction between features $x_i$ and $x_j$.
+cross network, where the weight `Wij` represents the learned importance of
+the interaction between features `xi` and `xj`.
 """
 
 visualize_layer(
@@ -430,7 +449,8 @@ We have three models - a deep cross network, an optimised deep cross
 network with a low-rank matrix (to reduce training and serving costs) and a
 normal deep network without cross layers. The deep cross network is a stacked
 DCN model, i.e., the inputs are fed to cross layers, followed by feedforward
-layers.
+layers.  Let's run each model 5 times, and report the average/standard deviation
+of the RMSE.
 """
 
 cross_network = get_model(
@@ -445,6 +465,7 @@ train(
     test_data=test_ds,
     model=cross_network,
     model_name="DCN",
+    num_trials=10,
 )
 
 opt_cross_network = get_model(
@@ -460,6 +481,7 @@ train(
     test_data=test_ds,
     model=opt_cross_network,
     model_name="DCN with low-rank matrix",
+    num_trials=10,
 )
 
 deep_network = get_model(
@@ -472,6 +494,7 @@ train(
     test_data=test_ds,
     model=deep_network,
     model_name="Feedforward network",
+    num_trials=10,
 )
 
 """
@@ -485,23 +508,21 @@ number of parameters without compromising accuracy.
 
 Like we did for the toy example, we will plot the weight matrix of the cross
 layer to see which feature crosses are important. In the previous example,
-the importance of interactions between the $i^{th}$ and $j^{th}$ features is
-captured by the $(i, j)^{th}$ element of the weight matrix.
+the importance of interactions between the `i`-th and `j-th` features is
+captured by the `(i, j)`-{th} element of the weight matrix.
 
 In this case, the feature embeddings are of size 32 rather than 1. Therefore,
-the importance of feature interactions is represented by the $(i, j)^{th}$
-block of the weight matrix, which has dimensions $32 x 32$. To quantify the
+the importance of feature interactions is represented by the `(i, j)`-th
+block of the weight matrix, which has dimensions `32 x 32`. To quantify the
 significance of these interactions, we use the Frobenius norm of each block. A
 larger value implies higher importance.
 """
 
-
-mat = deep_network.weights[6].numpy()
 features = list(vocabularies.keys())
+mat = cross_network.weights[len(features)].numpy()
 embedding_dim = MOVIELENS_CONFIG["embedding_dim"]
 
 block_norm = np.zeros([len(features), len(features)])
-
 
 # Compute the norms of the blocks.
 for i in range(len(features)):
