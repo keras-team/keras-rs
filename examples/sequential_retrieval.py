@@ -49,10 +49,10 @@ MOVIES_DATA_COLUMNS = ["MovieID", "Title", "Genres"]
 MIN_RATING = 2
 
 # Training/model args
-BATCH_SIZE = 2048
+BATCH_SIZE = 4096
 TEST_BATCH_SIZE = 2048
 EMBEDDING_DIM = 128
-NUM_EPOCHS = 10
+NUM_EPOCHS = 5
 LEARNING_RATE = 0.05
 
 """
@@ -371,12 +371,7 @@ model = SequentialRetrievalModel(
 )
 
 # Compile.
-learning_rate = keras.optimizers.schedules.PolynomialDecay(
-    LEARNING_RATE,
-    decay_steps=train_ds.cardinality() * NUM_EPOCHS,
-    end_learning_rate=0.0,
-)
-model.compile(optimizer=keras.optimizers.AdamW(learning_rate=learning_rate))
+model.compile(optimizer=keras.optimizers.AdamW(learning_rate=LEARNING_RATE))
 
 # Train.
 model.fit(
