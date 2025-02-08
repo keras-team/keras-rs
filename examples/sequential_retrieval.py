@@ -22,8 +22,6 @@ import tensorflow as tf  # Needed only for the dataset
 
 import keras_rs
 
-keras.utils.set_random_seed(42)
-
 """
 Let's also define all important variables/hyperparameters below.
 """
