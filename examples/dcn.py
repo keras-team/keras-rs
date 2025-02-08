@@ -449,8 +449,8 @@ We have three models - a deep cross network, an optimised deep cross
 network with a low-rank matrix (to reduce training and serving costs) and a
 normal deep network without cross layers. The deep cross network is a stacked
 DCN model, i.e., the inputs are fed to cross layers, followed by feedforward
-layers.  Let's run each model 5 times, and report the average/standard deviation
-of the RMSE.
+layers.  Let's run each model 10 times, and report the average/standard
+deviation of the RMSE.
 """
 
 cross_network = get_model(
