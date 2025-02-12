@@ -277,7 +277,7 @@ candidate tower for the candidate movie.
 
 Note: Take a look at how the labels are defined. The label tensor
 (of shape `(batch_size, batch_size)`) contains one-hot vectors. The idea
-is: for every sample, consider movieIDs corresponding to other samples in
+is: for every sample, consider movie IDs corresponding to other samples in
 the batch as negatives.
 """
 
@@ -384,7 +384,7 @@ model.fit(
 Now that we have a model, we would like to be able to make predictions.
 
 So far, we have only handled movies by id. Now is the time to create a mapping
-keyed by movie ids to be able to surface the titles.
+keyed by movie IDs to be able to surface the titles.
 """
 
 movie_id_to_movie_title = dict(zip(movies_df["MovieID"], movies_df["Title"]))

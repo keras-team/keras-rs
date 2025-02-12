@@ -72,9 +72,9 @@ movies_count = movies.cardinality().numpy()
 # Preprocess the dataset, by selecting only the relevant columns.
 def preprocess_rating(x):
     return (
-        # Input is the user ids
+        # Input is the user IDs
         tf.strings.to_number(x["user_id"], out_type=tf.int32),
-        # Labels are movie ids + ratings between 0 and 1.
+        # Labels are movie IDs + ratings between 0 and 1.
         {
             "movie_id": tf.strings.to_number(x["movie_id"], out_type=tf.int32),
             "rating": (x["user_rating"] - 1.0) / 4.0,

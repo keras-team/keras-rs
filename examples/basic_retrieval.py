@@ -96,9 +96,9 @@ for data in ratings.take(1).as_numpy_iterator():
     print(str(data).replace(", '", ",\n '"))
 
 """
-In the Movielens dataset, user ids are integers (represented as strings)
+In the Movielens dataset, user IDs are integers (represented as strings)
 starting at 1 and with no gap. Normally, you would need to create a lookup table
-to map user ids to integers from 0 to N-1. But as a simplication, we'll use the
+to map user IDs to integers from 0 to N-1. But as a simplication, we'll use the
 user id directly as an index in our model, in particular to lookup the user
 embedding from the user embedding table. So we need do know the number of users.
 """
@@ -118,9 +118,9 @@ for data in movies.take(1).as_numpy_iterator():
     print(str(data).replace(", '", ",\n '"))
 
 """
-In the Movielens dataset, movie ids are integers (represented as strings)
+In the Movielens dataset, movie IDs are integers (represented as strings)
 starting at 1 and with no gap. Normally, you would need to create a lookup table
-to map movie ids to integers from 0 to N-1. But as a simplication, we'll use the
+to map movie IDs to integers from 0 to N-1. But as a simplication, we'll use the
 movie id directly as an index in our model, in particular to lookup the movie
 embedding from the movie embedding table. So we need do know the number of
 movies.
@@ -143,9 +143,9 @@ The `rating` is a number between 1 and 5, we adapt it to be between 0 and 1.
 
 def preprocess_rating(x):
     return (
-        # Input is the user ids
+        # Input is the user IDs
         tf.strings.to_number(x["user_id"], out_type=tf.int32),
-        # Labels are movie ids + ratings between 0 and 1.
+        # Labels are movie IDs + ratings between 0 and 1.
         {
             "movie_id": tf.strings.to_number(x["movie_id"], out_type=tf.int32),
             "rating": (x["user_rating"] - 1.0) / 4.0,
@@ -290,7 +290,7 @@ After defining the model, we can use the standard Keras `model.fit()` to train
 and evaluate the model.
 
 Let's first instantiate the model. Note that we add `+ 1` to the number of users
-and movies to account for the fact that id zero is not used for either (ids
+and movies to account for the fact that id zero is not used for either (IDs
 start at 1), but still takes a row in the embedding tables.
 """
 
@@ -312,7 +312,7 @@ history = model.fit(
 Now that we have a model, we would like to be able to make predictions.
 
 So far, we have only handled movies by id. Now is the time to create a mapping
-keyed by movie ids to be able to surface the titles.
+keyed by movie IDs to be able to surface the titles.
 """
 
 movie_id_to_movie_title = {
