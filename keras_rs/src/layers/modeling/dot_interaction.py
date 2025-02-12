@@ -1,4 +1,4 @@
-from typing import Any, List, Tuple
+from typing import Any
 
 import keras
 from keras import ops
@@ -40,11 +40,11 @@ class DotInteraction(keras.layers.Layer):
     ) -> None:
         super().__init__(**kwargs)
 
-        # Passed args.
+        # Attributes.
         self.self_interaction = self_interaction
         self.skip_gather = skip_gather
 
-    def call(self, inputs: List[types.Tensor]) -> types.Tensor:
+    def call(self, inputs: list[types.Tensor]) -> types.Tensor:
         """Forward pass of the dot interaction layer.
 
         Args:
@@ -61,12 +61,24 @@ class DotInteraction(keras.layers.Layer):
             `num_features * (num_features - 1) / 2` if not.
         """
 
-        # A `ValueError` will be raised if the feature tensors inside the list
-        # are not of equal shape. So, we do not need to handle the error here.
-        features = ops.array(inputs)
+        # Check if all feature tensors have the same shape and are of rank 2.
+        shape = ops.shape(inputs[0])
+        for idx, tensor in enumerate(inputs):
+            if ops.shape(tensor) != shape:
+                raise ValueError(
+                    "All feature tensors in `inputs` should have the same "
+                    f"shape. Found at least one conflict: shape = {shape} at "
+                    f"index 0 and shape = {ops.shape(tensor)} at index {idx}"
+                )
 
-        # Rearrange axes so as to have `batch_size` as the 0th dimension.
-        features = ops.transpose(features, axes=(1, 0, 2))
+        if len(shape) != 2:
+            raise ValueError(
+                "All feature tensors inside `inputs` should have rank 2. "
+                f"Received rank {len(shape)}."
+            )
+
+        # `(batch_size, num_features, feature_dim)`
+        features = ops.stack(inputs, axis=1)
 
         batch_size, _, _ = ops.shape(features)
 
@@ -102,8 +114,8 @@ class DotInteraction(keras.layers.Layer):
         return activations
 
     def compute_output_shape(
-        self, input_shape: List[Tuple[int, int]]
-    ) -> Tuple[int, int]:
+        self, input_shape: list[types.TensorShape]
+    ) -> types.TensorShape:
         num_features = len(input_shape)
         batch_size = input_shape[0][0]
 
