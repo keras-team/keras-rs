@@ -95,11 +95,6 @@ class DotInteractionTest(testing.TestCase, parameterized.TestCase):
         with self.assertRaises(ValueError):
             layer(unequal_shape_input)
 
-    def test_serialization(self):
-        layer = DotInteraction()
-        restored = deserialize(serialize(layer))
-        self.assertDictEqual(layer.get_config(), restored.get_config())
-
     @parameterized.named_parameters(
         (
             "self_interaction_false_skip_gather_false",
@@ -132,7 +127,12 @@ class DotInteractionTest(testing.TestCase, parameterized.TestCase):
         x = keras.layers.Dense(units=1)(x)
         model = keras.Model([feature1, feature2, feature3], x)
 
-        model.predict(self.input)
+        model.predict(self.input, batch_size=2)
+
+    def test_serialization(self):
+        layer = DotInteraction()
+        restored = deserialize(serialize(layer))
+        self.assertDictEqual(layer.get_config(), restored.get_config())
 
     def test_model_saving(self):
         feature1 = keras.layers.Input(shape=(5,))

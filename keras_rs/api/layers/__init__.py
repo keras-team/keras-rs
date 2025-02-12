@@ -9,3 +9,6 @@ from keras_rs.src.layers.modeling.feature_cross import FeatureCross
 from keras_rs.src.layers.retrieval.brute_force_retrieval import (
     BruteForceRetrieval,
 )
+from keras_rs.src.layers.retrieval.hard_negative_mining import (
+    HardNegativeMining,
+)

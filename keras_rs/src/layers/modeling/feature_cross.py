@@ -52,6 +52,7 @@ class FeatureCross(keras.layers.Layer):
             Regularizer to use for the kernel matrix.
         bias_regularizer: string or `keras.regularizer` regularizer.
             Regularizer to use for the bias vector.
+        **kwargs: Args to pass to the base class.
 
     Example:
 

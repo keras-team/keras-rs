@@ -62,11 +62,6 @@ class FeatureCrossTest(testing.TestCase, parameterized.TestCase):
         with self.assertRaises(ValueError):
             FeatureCross(diag_scale=-1.0)
 
-    def test_serialization(self):
-        sampler = FeatureCross(projection_dim=None, pre_activation="swish")
-        restored = deserialize(serialize(sampler))
-        self.assertDictEqual(sampler.get_config(), restored.get_config())
-
     def test_diag_scale(self):
         layer = FeatureCross(
             projection_dim=None, diag_scale=1.0, kernel_initializer="ones"
@@ -81,16 +76,28 @@ class FeatureCrossTest(testing.TestCase, parameterized.TestCase):
 
         self.assertAllClose(self.x, output)
 
+    def test_predict(self):
+        x0 = keras.layers.Input(shape=(3,))
+        x1 = FeatureCross(projection_dim=None)(x0, x0)
+        x2 = FeatureCross(projection_dim=None)(x0, x1)
+        logits = keras.layers.Dense(units=1)(x2)
+        model = keras.Model(x0, logits)
+
+        model.predict(self.x0, batch_size=2)
+
+    def test_serialization(self):
+        sampler = FeatureCross(projection_dim=None, pre_activation="swish")
+        restored = deserialize(serialize(sampler))
+        self.assertDictEqual(sampler.get_config(), restored.get_config())
+
     def test_model_saving(self):
-        def get_model():
-            x0 = keras.layers.Input(shape=(3,))
-            x1 = FeatureCross(projection_dim=None)(x0, x0)
-            x2 = FeatureCross(projection_dim=None)(x0, x1)
-            logits = keras.layers.Dense(units=1)(x2)
-            model = keras.Model(x0, logits)
-            return model
+        x0 = keras.layers.Input(shape=(3,))
+        x1 = FeatureCross(projection_dim=None)(x0, x0)
+        x2 = FeatureCross(projection_dim=None)(x0, x1)
+        logits = keras.layers.Dense(units=1)(x2)
+        model = keras.Model(x0, logits)
 
         self.run_model_saving_test(
-            model=get_model(),
+            model=model,
             input_data=self.x0,
         )

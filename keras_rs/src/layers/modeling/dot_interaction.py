@@ -28,6 +28,7 @@ class DotInteraction(keras.layers.Layer):
             entries will be zeros. Otherwise, the output will be only the lower
             triangular part of the interaction matrix. The latter saves space
             but is much slower.
+        **kwargs: Args to pass to the base class.
 
     References:
     - [M. Naumov et al.](https://arxiv.org/abs/1906.00091)
