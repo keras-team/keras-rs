@@ -14,8 +14,8 @@ class DotInteraction(keras.layers.Layer):
     This layer computes distinct dot product ("feature interactions") for every
     pair of features. If `self_interaction` is True, we calculate dot products
     of the form `dot(e_i, e_j)` for `i <= j`, and `dot(e_i, e_j)` for `i < j`,
-    otherwise. `e_i` represents features. The layer can be used to build
-    the DLRM model.
+    otherwise. `e_i` denotes representation of feature `i`. The layer can be
+    used to build the DLRM model.
 
     Args:
         self_interaction: bool. Indicates whether features should
