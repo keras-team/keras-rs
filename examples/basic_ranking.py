@@ -111,6 +111,14 @@ architecture for ranking tasks. We can implement it as follows:
 
 
 class RankingModel(keras.Model):
+    """Create the ranking model with the provided parameters.
+
+    Args:
+      num_users: Number of entries in the user embedding table.
+      num_candidates: Number of entries in the candidate embedding table.
+      embedding_dimension: Output dimension for user and movie embedding tables.
+    """
+
     def __init__(
         self,
         num_users,

@@ -115,9 +115,8 @@ class RetrievalModel(keras.Model):
     """Create the retrieval model with the provided parameters.
 
     Args:
-      user_embeddings_count: Number of entries in the user embedding table.
-      candidate_embeddings_count: Number of entries in the candidate embedding
-          table.
+      num_users: Number of entries in the user embedding table.
+      num_candidates: Number of entries in the candidate embedding table.
       embedding_dimension: Output dimension for user and movie embedding tables.
     """
 
