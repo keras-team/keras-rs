@@ -121,50 +121,47 @@ def visualize_layer(matrix, features):
     ax.set_yticklabels([""] + features, fontsize=10)
 
 
-def train(
+def train_and_evaluate(
     learning_rate,
     epochs,
     train_data,
     test_data,
     model,
-    model_name=None,
-    num_trials=1,
 ):
-    if model_name is not None:
-        print(model_name)
+    optimizer = keras.optimizers.AdamW(learning_rate=learning_rate)
+    loss = keras.losses.MeanSquaredError()
+    rmse = keras.metrics.RootMeanSquaredError()
 
-    rmse_values = []
-    for _ in range(num_trials):
-        optimizer = keras.optimizers.AdamW(learning_rate=learning_rate)
-        loss = keras.losses.MeanSquaredError()
-        rmse = keras.metrics.RootMeanSquaredError()
+    model.compile(
+        optimizer=optimizer,
+        loss=loss,
+        metrics=[rmse],
+    )
 
-        model.compile(
-            optimizer=optimizer,
-            loss=loss,
-            metrics=[rmse],
-        )
+    model.fit(
+        train_data,
+        epochs=epochs,
+        verbose=0,
+    )
 
-        model.fit(
-            train_data,
-            epochs=epochs,
-            verbose=0,
-        )
+    results = model.evaluate(test_data, return_dict=True, verbose=0)
+    rmse_value = results["root_mean_squared_error"]
 
-        results = model.evaluate(test_data, return_dict=True, verbose=0)
-        rmse_value = results["root_mean_squared_error"]
-        rmse_values.append(rmse_value)
+    return rmse_value, model.count_params()
 
+
+def print_stats(rmse_list, num_params, model_name, num_trials=1):
     # Report metrics.
-    avg_rmse = np.mean(rmse_values)
-    std_rmse = np.std(rmse_values)
-    num_params = model.count_params()
-    if num_trials == 1:
-        print(f"RMSE = {avg_rmse}; #params = {num_params}")
-    else:
-        print(f"RMSE = {avg_rmse} ± {std_rmse}; #params = {num_params}")
+    avg_rmse = np.mean(rmse_list)
+    std_rmse = np.std(rmse_list)
 
-    print("===============")
+    if num_trials == 1:
+        print(f"{model_name}: RMSE = {avg_rmse}; #params = {num_params}")
+    else:
+        print(
+            f"{model_name}: RMSE = {avg_rmse} ± {std_rmse}; "
+            "#params = {num_params}"
+        )
 
 
 """
@@ -179,7 +176,7 @@ advertisement. The features and label are defined as follows:
 | `x1` = country      | Customer's resident country    | [0, 199] |
 | `x2` = bananas      | # bananas purchased            | [0, 23]  |
 | `x3` = cookbooks    | # cooking books purchased      | [0, 5]   |
-| y                    | Blender ad click likelihood    | -        |
+| `y`                 | Blender ad click likelihood    | -        |
 
 Then, we let the data follow the following underlying distribution:
 `y = f(x1, x2, x3) = 0.1x1 + 0.4x2 + 0.7x3 + 0.1x1x2 +`  
@@ -279,21 +276,30 @@ a ReLU-based DNN, while also using fewer parameters. This points to the
 efficiency of the cross network in learning feature interactions.
 """
 
-train(
+cross_network_rmse, cross_network_num_params = train_and_evaluate(
     learning_rate=TOY_CONFIG["learning_rate"],
     epochs=TOY_CONFIG["num_epochs"],
     train_data=train_ds,
     test_data=test_ds,
     model=cross_network,
-    model_name="DCN",
 )
-train(
+print_stats(
+    rmse_list=[cross_network_rmse],
+    num_params=cross_network_num_params,
+    model_name="Cross Network",
+)
+
+deep_network_rmse, deep_network_num_params = train_and_evaluate(
     learning_rate=TOY_CONFIG["learning_rate"],
     epochs=TOY_CONFIG["num_epochs"],
     train_data=train_ds,
     test_data=test_ds,
     model=deep_network,
-    model_name="Feedforward network",
+)
+print_stats(
+    rmse_list=[deep_network_rmse],
+    num_params=deep_network_num_params,
+    model_name="Deep Network",
 )
 
 """
@@ -454,47 +460,68 @@ layers.  Let's run each model 10 times, and report the average/standard
 deviation of the RMSE.
 """
 
-cross_network = get_model(
-    dense_num_units_lst=MOVIELENS_CONFIG["dcn_num_units"],
-    embedding_dim=MOVIELENS_CONFIG["embedding_dim"],
-    use_cross_layer=True,
-)
-train(
-    learning_rate=MOVIELENS_CONFIG["learning_rate"],
-    epochs=MOVIELENS_CONFIG["num_epochs"],
-    train_data=train_ds,
-    test_data=test_ds,
-    model=cross_network,
-    model_name="DCN",
+cross_network_rmse_list = []
+opt_cross_network_rmse_list = []
+deep_network_rmse_list = []
+
+for _ in range(10):
+    cross_network = get_model(
+        dense_num_units_lst=MOVIELENS_CONFIG["dcn_num_units"],
+        embedding_dim=MOVIELENS_CONFIG["embedding_dim"],
+        use_cross_layer=True,
+    )
+    rmse, cross_network_num_params = train_and_evaluate(
+        learning_rate=MOVIELENS_CONFIG["learning_rate"],
+        epochs=MOVIELENS_CONFIG["num_epochs"],
+        train_data=train_ds,
+        test_data=test_ds,
+        model=cross_network,
+    )
+    cross_network_rmse_list.append(rmse)
+
+    opt_cross_network = get_model(
+        dense_num_units_lst=MOVIELENS_CONFIG["dcn_num_units"],
+        embedding_dim=MOVIELENS_CONFIG["embedding_dim"],
+        use_cross_layer=True,
+        projection_dim=MOVIELENS_CONFIG["projection_dim"],
+    )
+    rmse, opt_cross_network_num_params = train_and_evaluate(
+        learning_rate=MOVIELENS_CONFIG["learning_rate"],
+        epochs=MOVIELENS_CONFIG["num_epochs"],
+        train_data=train_ds,
+        test_data=test_ds,
+        model=opt_cross_network,
+    )
+    opt_cross_network_rmse_list.append(rmse)
+
+    deep_network = get_model(
+        dense_num_units_lst=MOVIELENS_CONFIG["deep_net_num_units"]
+    )
+    rmse, deep_network_num_params = train_and_evaluate(
+        learning_rate=MOVIELENS_CONFIG["learning_rate"],
+        epochs=MOVIELENS_CONFIG["num_epochs"],
+        train_data=train_ds,
+        test_data=test_ds,
+        model=deep_network,
+    )
+    deep_network_rmse_list.append(rmse)
+
+print_stats(
+    rmse_list=cross_network_rmse_list,
+    num_params=cross_network_num_params,
+    model_name="Cross Network",
     num_trials=10,
 )
-
-opt_cross_network = get_model(
-    dense_num_units_lst=MOVIELENS_CONFIG["dcn_num_units"],
-    embedding_dim=MOVIELENS_CONFIG["embedding_dim"],
-    use_cross_layer=True,
-    projection_dim=MOVIELENS_CONFIG["projection_dim"],
-)
-train(
-    learning_rate=MOVIELENS_CONFIG["learning_rate"],
-    epochs=MOVIELENS_CONFIG["num_epochs"],
-    train_data=train_ds,
-    test_data=test_ds,
-    model=opt_cross_network,
-    model_name="DCN with low-rank matrix",
+print_stats(
+    rmse_list=opt_cross_network_rmse_list,
+    num_params=opt_cross_network_num_params,
+    model_name="Optimised Cross Network",
     num_trials=10,
 )
-
-deep_network = get_model(
-    dense_num_units_lst=MOVIELENS_CONFIG["deep_net_num_units"]
-)
-train(
-    learning_rate=MOVIELENS_CONFIG["learning_rate"],
-    epochs=MOVIELENS_CONFIG["num_epochs"],
-    train_data=train_ds,
-    test_data=test_ds,
-    model=deep_network,
-    model_name="Feedforward network",
+print_stats(
+    rmse_list=deep_network_rmse_list,
+    num_params=deep_network_num_params,
+    model_name="Deep Network",
     num_trials=10,
 )
 
