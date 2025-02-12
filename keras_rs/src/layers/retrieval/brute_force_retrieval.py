@@ -1,4 +1,4 @@
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 import keras
 
@@ -146,7 +146,7 @@ class BruteForceRetrieval(keras.layers.Layer):
 
     def call(
         self, inputs: types.Tensor
-    ) -> Union[types.Tensor, Tuple[types.Tensor, types.Tensor]]:
+    ) -> Union[types.Tensor, tuple[types.Tensor, types.Tensor]]:
         """Returns the top candidates for the query passed as input.
 
         Args:
