@@ -171,12 +171,12 @@ To illustrate the benefits of DCNs, let's consider a simple example. Suppose we
 have a dataset for modeling the likelihood of a customer clicking on a blender
 advertisement. The features and label are defined as follows:
 
-| **Features / Label** | **Description**                | **Range** |
+| **Features / Label** | **Description**                | **Range**|
 |:--------------------:|:------------------------------:|:--------:|
-| `x1` = country      | Customer's resident country    | [0, 199] |
-| `x2` = bananas      | # bananas purchased            | [0, 23]  |
-| `x3` = cookbooks    | # cooking books purchased      | [0, 5]   |
-| `y`                 | Blender ad click likelihood    | -        |
+| `x1` = country       | Customer's resident country    | [0, 199] |
+| `x2` = bananas       | # bananas purchased            | [0, 23]  |
+| `x3` = cookbooks     | # cooking books purchased      | [0, 5]   |
+| `y`                  | Blender ad click likelihood    | -        |
 
 Then, we let the data follow the following underlying distribution:
 `y = f(x1, x2, x3) = 0.1x1 + 0.4x2 + 0.7x3 + 0.1x1x2 +`  
