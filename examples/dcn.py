@@ -150,8 +150,9 @@ def train_and_evaluate(
     return rmse_value, model.count_params()
 
 
-def print_stats(rmse_list, num_params, model_name, num_trials=1):
+def print_stats(rmse_list, num_params, model_name):
     # Report metrics.
+    num_trials = len(rmse_list)
     avg_rmse = np.mean(rmse_list)
     std_rmse = np.std(rmse_list)
 
@@ -510,19 +511,16 @@ print_stats(
     rmse_list=cross_network_rmse_list,
     num_params=cross_network_num_params,
     model_name="Cross Network",
-    num_trials=10,
 )
 print_stats(
     rmse_list=opt_cross_network_rmse_list,
     num_params=opt_cross_network_num_params,
     model_name="Optimised Cross Network",
-    num_trials=10,
 )
 print_stats(
     rmse_list=deep_network_rmse_list,
     num_params=deep_network_num_params,
     model_name="Deep Network",
-    num_trials=10,
 )
 
 """
