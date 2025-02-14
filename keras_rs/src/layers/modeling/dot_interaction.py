@@ -5,6 +5,7 @@ from keras import ops
 
 from keras_rs.src import types
 from keras_rs.src.api_export import keras_rs_export
+from keras_rs.src.utils.keras_utils import check_shape
 
 
 @keras_rs_export("keras_rs.layers.DotInteraction")
@@ -64,18 +65,20 @@ class DotInteraction(keras.layers.Layer):
         # Check if all feature tensors have the same shape and are of rank 2.
         shape = ops.shape(inputs[0])
         for idx, tensor in enumerate(inputs):
-            if ops.shape(tensor) != shape:
+            other_shape = ops.shape(tensor)
+
+            if len(shape) != 2:
+                raise ValueError(
+                    "All feature tensors inside `inputs` should have rank 2. "
+                    f"Received rank {len(shape)} at index {idx}."
+                )
+
+            if not check_shape(shape, other_shape):
                 raise ValueError(
                     "All feature tensors in `inputs` should have the same "
                     f"shape. Found at least one conflict: shape = {shape} at "
-                    f"index 0 and shape = {ops.shape(tensor)} at index {idx}"
+                    f"index 0 and shape = {ops.shape(tensor)} at index {idx}."
                 )
-
-        if len(shape) != 2:
-            raise ValueError(
-                "All feature tensors inside `inputs` should have rank 2. "
-                f"Received rank {len(shape)}."
-            )
 
         # `(batch_size, num_features, feature_dim)`
         features = ops.stack(inputs, axis=1)
@@ -93,6 +96,11 @@ class DotInteraction(keras.layers.Layer):
         if self.self_interaction:
             k = 0
 
+        # Typecast k from Python int to tensor, because `ops.tril` uses
+        # `tf.cond` (which requires tensors).
+        # TODO (abheesht): Remove typecast once fix is merged in core Keras.
+        if keras.config.backend() == "tensorflow":
+            k = ops.array(k)
         tril_mask = ops.tril(
             ops.ones_like(pairwise_interaction_matrix, dtype=bool),
             k=k,
