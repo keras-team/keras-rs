@@ -1,5 +1,5 @@
 """
-# Multi-task Recommenders
+# Multi-task Recommenders: Retrieval + Ranking
 
 In the
 [basic retrieval](https://github.com/keras-team/keras-rs/blob/main/examples/basic_retrieval.py)
