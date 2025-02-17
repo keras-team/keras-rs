@@ -1,5 +1,5 @@
 """
-# Faster retrieval with ScANN
+# Faster retrieval with Scalable Nearest Neighbours (ScANN)
 
 Retrieval models are designed to quickly identify a small set of highly relevant
 candidates from vast pools of data, often comprising millions or even hundreds
