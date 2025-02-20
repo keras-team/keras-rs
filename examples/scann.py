@@ -179,8 +179,6 @@ candidate_embeddings = keras.ops.concatenate(
 
 user_embedding = model.user_embedding(keras.ops.array([10, 5, 42, 345]))
 
-print(f"{candidate_embeddings.shape=}", f"{user_embedding.shape=}")
-
 # Define the brute force retrieval layer.
 brute_force_layer = keras_rs.layers.BruteForceRetrieval(
     candidate_embeddings=candidate_embeddings,
