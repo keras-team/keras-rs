@@ -20,7 +20,7 @@ strikes an optimal balance between speed and accuracy. As a result, it can
 significantly outperform brute-force search methods, delivering fast retrieval
 with minimal loss in accuracy.
 
-We will start with copying over code from the
+We will start with the same code as the
 [basic retrieval example](https://github.com/keras-team/keras-rs/blob/main/examples/basic_retrieval.py).
 Data processing, model building, and training remain exactly the same. Feel free
 to skip this part if you have gone over the basic retrieval example before.
