@@ -45,6 +45,44 @@ class DotInteraction(keras.layers.Layer):
         self.self_interaction = self_interaction
         self.skip_gather = skip_gather
 
+    def _generate_tril_mask(
+        self, pairwise_interaction_matrix: types.Tensor
+    ) -> types.Tensor:
+        """Generates lower triangular mask."""
+
+        # If `self.self_interaction` is `True`, keep the main diagonal.
+        k = -1
+        if self.self_interaction:
+            k = 0
+
+        # Typecast k from Python int to tensor, because `ops.tril` uses
+        # `tf.cond` (which requires tensors).
+        # TODO (abheesht): Remove typecast once fix is merged in core Keras.
+        if keras.config.backend() == "tensorflow":
+            k = ops.array(k)
+        tril_mask = ops.tril(
+            ops.ones_like(pairwise_interaction_matrix, dtype=bool),
+            k=k,
+        )
+
+        return tril_mask
+
+    def _get_lower_triangular_indices(self, num_features: int) -> list[int]:
+        """Python function which generates indices to get the lower triangular
+        matrix as if it were flattened.
+        """
+        flattened_indices = []
+        for i in range(num_features):
+            k = i
+            # if `self.self_interaction` is `True`, keep the main diagonal.
+            if self.self_interaction:
+                k += 1
+            for j in range(k):
+                flattened_index = i * num_features + j
+                flattened_indices.append(flattened_index)
+
+        return flattened_indices
+
     def call(self, inputs: list[types.Tensor]) -> types.Tensor:
         """Forward pass of the dot interaction layer.
 
@@ -83,41 +121,33 @@ class DotInteraction(keras.layers.Layer):
         # `(batch_size, num_features, feature_dim)`
         features = ops.stack(inputs, axis=1)
 
-        batch_size, _, _ = ops.shape(features)
+        batch_size, num_features, _ = ops.shape(features)
 
         # Compute the dot product to get feature interactions. The shape here is
         # `(batch_size, num_features, num_features)`.
         pairwise_interaction_matrix = ops.matmul(
             features, ops.transpose(features, axes=(0, 2, 1))
         )
-
-        # if `self.self_interaction` is `True`, keep the main diagonal.
-        k = -1
-        if self.self_interaction:
-            k = 0
-
-        # Typecast k from Python int to tensor, because `ops.tril` uses
-        # `tf.cond` (which requires tensors).
-        # TODO (abheesht): Remove typecast once fix is merged in core Keras.
-        if keras.config.backend() == "tensorflow":
-            k = ops.array(k)
-        tril_mask = ops.tril(
-            ops.ones_like(pairwise_interaction_matrix, dtype=bool),
-            k=k,
-        )
+        print(pairwise_interaction_matrix)
 
         # Set the upper triangle entries to 0, if `self.skip_gather` is True.
         # Else, "pick" only the lower triangle entries.
         if self.skip_gather:
+            tril_mask = self._generate_tril_mask(pairwise_interaction_matrix)
+
             activations = ops.multiply(
                 pairwise_interaction_matrix,
                 ops.cast(tril_mask, dtype=pairwise_interaction_matrix.dtype),
             )
+            # Rank-2 tensor.
+            activations = ops.reshape(activations, (batch_size, -1))
         else:
-            activations = pairwise_interaction_matrix[tril_mask]
-
-        # Rank-2 tensor.
-        activations = ops.reshape(activations, (batch_size, -1))
+            flattened_indices = self._get_lower_triangular_indices(num_features)
+            activations = ops.take(
+                ops.reshape(pairwise_interaction_matrix, (batch_size, -1)),
+                flattened_indices,
+                axis=-1,
+            )
 
         return activations
 

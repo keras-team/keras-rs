@@ -75,6 +75,8 @@ class DotInteractionTest(testing.TestCase, parameterized.TestCase):
         ),
     )
     def test_call(self, self_interaction, skip_gather, exp_output_idx):
+        print(self.input)
+        self.assertEqual(0, 1)
         layer = DotInteraction(
             self_interaction=self_interaction, skip_gather=skip_gather
         )
