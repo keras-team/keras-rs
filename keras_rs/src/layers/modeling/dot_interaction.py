@@ -128,7 +128,6 @@ class DotInteraction(keras.layers.Layer):
         pairwise_interaction_matrix = ops.matmul(
             features, ops.transpose(features, axes=(0, 2, 1))
         )
-        print(pairwise_interaction_matrix)
 
         # Set the upper triangle entries to 0, if `self.skip_gather` is True.
         # Else, "pick" only the lower triangle entries.
