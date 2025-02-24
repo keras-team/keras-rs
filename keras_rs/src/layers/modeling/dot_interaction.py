@@ -5,7 +5,7 @@ from keras import ops
 
 from keras_rs.src import types
 from keras_rs.src.api_export import keras_rs_export
-from keras_rs.src.utils.keras_utils import check_shape
+from keras_rs.src.utils.keras_utils import check_shapes_compatible
 
 
 @keras_rs_export("keras_rs.layers.DotInteraction")
@@ -111,7 +111,7 @@ class DotInteraction(keras.layers.Layer):
                     f"Received rank {len(shape)} at index {idx}."
                 )
 
-            if not check_shape(shape, other_shape):
+            if not check_shapes_compatible(shape, other_shape):
                 raise ValueError(
                     "All feature tensors in `inputs` should have the same "
                     f"shape. Found at least one conflict: shape = {shape} at "
@@ -139,11 +139,17 @@ class DotInteraction(keras.layers.Layer):
                 ops.cast(tril_mask, dtype=pairwise_interaction_matrix.dtype),
             )
             # Rank-2 tensor.
-            activations = ops.reshape(activations, (batch_size, -1))
+            activations = ops.reshape(
+                activations, (batch_size, num_features * num_features)
+            )
         else:
             flattened_indices = self._get_lower_triangular_indices(num_features)
+            pairwise_interaction_matrix_flattened = ops.reshape(
+                pairwise_interaction_matrix,
+                (batch_size, num_features * num_features),
+            )
             activations = ops.take(
-                ops.reshape(pairwise_interaction_matrix, (batch_size, -1)),
+                pairwise_interaction_matrix_flattened,
                 flattened_indices,
                 axis=-1,
             )

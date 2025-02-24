@@ -29,7 +29,9 @@ def clone_initializer(
     return initializer
 
 
-def check_shape(shape1: types.TensorShape, shape2: types.TensorShape) -> bool:
+def check_shapes_compatible(
+    shape1: types.TensorShape, shape2: types.TensorShape
+) -> bool:
     # Check rank first.
     if len(shape1) != len(shape2):
         return False
