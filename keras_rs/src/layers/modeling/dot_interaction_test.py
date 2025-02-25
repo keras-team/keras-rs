@@ -100,6 +100,40 @@ class DotInteractionTest(testing.TestCase, parameterized.TestCase):
         restored = deserialize(serialize(layer))
         self.assertDictEqual(layer.get_config(), restored.get_config())
 
+    @parameterized.named_parameters(
+        (
+            "self_interaction_false_skip_gather_false",
+            False,
+            False,
+        ),
+        (
+            "self_interaction_false_skip_gather_true",
+            False,
+            True,
+        ),
+        (
+            "self_interaction_true_skip_gather_false",
+            True,
+            False,
+        ),
+        (
+            "self_interaction_true_skip_gather_true",
+            True,
+            True,
+        ),
+    )
+    def test_predict(self, self_interaction, skip_gather):
+        feature1 = keras.layers.Input(shape=(5,))
+        feature2 = keras.layers.Input(shape=(5,))
+        feature3 = keras.layers.Input(shape=(5,))
+        x = DotInteraction(
+            self_interaction=self_interaction, skip_gather=skip_gather
+        )([feature1, feature2, feature3])
+        x = keras.layers.Dense(units=1)(x)
+        model = keras.Model([feature1, feature2, feature3], x)
+
+        model.predict(self.input)
+
     def test_model_saving(self):
         feature1 = keras.layers.Input(shape=(5,))
         feature2 = keras.layers.Input(shape=(5,))

@@ -71,7 +71,7 @@ Here is the BibTeX entry:
 ```bibtex
 @misc{kerasrecommenders2024,
   title={KerasRecommenders},
-  author={Hertschuh, Fabien and  Chollet, Fran\c{c}ois and others},
+  author={Hertschuh, Fabien and  Chollet, Fran\c{c}ois and Sharma, Abheesht and others},
   year={2024},
   howpublished={\url{https://github.com/keras-team/keras-rs}},
 }
