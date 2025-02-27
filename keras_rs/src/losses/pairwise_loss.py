@@ -37,15 +37,18 @@ class PairwiseLoss(keras.losses.Loss):
         logits: types.Tensor,
         mask: Optional[types.Tensor] = None,
     ) -> tuple[types.Tensor, types.Tensor]:
-        # If `mask` is not passed, mask all values less than 0 (since less than
-        # 0 implies invalid labels).
+        # Mask all values less than 0 (since less than 0 implies invalid
+        # labels).
         valid_mask = ops.greater_equal(labels, ops.cast(0.0, labels.dtype))
 
         if mask is not None:
-            mask = ops.logical_and(valid_mask, mask)
+            valid_mask = ops.logical_and(valid_mask, mask)
 
         pairwise_labels, pairwise_logits = pairwise_comparison(
-            labels=labels, logits=logits, mask=mask, logits_op=ops.subtract
+            labels=labels,
+            logits=logits,
+            mask=valid_mask,
+            logits_op=ops.subtract,
         )
 
         return self.pairwise_loss(pairwise_logits), pairwise_labels

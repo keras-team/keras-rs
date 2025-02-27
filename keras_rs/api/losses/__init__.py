@@ -6,6 +6,9 @@ since your modifications would be overwritten.
 
 from keras_rs.src.losses.pairwise_hinge_loss import PairwiseHingeLoss
 from keras_rs.src.losses.pairwise_logistic_loss import PairwiseLogisticLoss
+from keras_rs.src.losses.pairwise_mean_squared_error import (
+    PairwiseMeanSquaredError,
+)
 from keras_rs.src.losses.pairwise_soft_zero_one_loss import (
     PairwiseSoftZeroOneLoss,
 )
