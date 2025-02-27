@@ -47,7 +47,7 @@ class PairwiseHingeLossTest(testing.TestCase, parameterized.TestCase):
     def test_loss_reduction(self):
         loss = PairwiseHingeLoss(reduction="sum_over_batch_size")
         output = loss(y_true=self.batched_labels, y_pred=self.batched_scores)
-        self.assertAlmostEqual(output.numpy(), 1.44, places=5)
+        self.assertAlmostEqual(ops.convert_to_numpy(output), 1.44, places=5)
 
     def test_scalar_sample_weight(self):
         sample_weight = ops.array(5.0)
