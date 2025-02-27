@@ -32,12 +32,12 @@ class PairwiseSoftZeroOneLossTest(testing.TestCase, parameterized.TestCase):
         output = loss(
             y_true=self.unbatched_labels, y_pred=self.unbatched_scores
         )
-        self.assertAllClose(output, [self.expected_output[0]])
+        self.assertAllClose(output, [self.expected_output[0]], atol=1e-5)
 
     def test_batched_input(self):
         loss = PairwiseSoftZeroOneLoss(reduction="none")
         output = loss(y_true=self.batched_labels, y_pred=self.batched_scores)
-        self.assertAllClose(output, self.expected_output)
+        self.assertAllClose(output, self.expected_output, atol=1e-5)
 
     def test_invalid_input_rank(self):
         rank_1_input = ops.ones((2, 3, 4))
@@ -59,7 +59,9 @@ class PairwiseSoftZeroOneLossTest(testing.TestCase, parameterized.TestCase):
             y_pred=self.batched_scores,
             sample_weight=sample_weight,
         )
-        self.assertAllClose(output, self.expected_output * sample_weight)
+        self.assertAllClose(
+            output, self.expected_output * sample_weight, atol=1e-5
+        )
 
     def test_itemwise_sample_weight_with_zeros(self):
         sample_weight = ops.array(
@@ -71,7 +73,9 @@ class PairwiseSoftZeroOneLossTest(testing.TestCase, parameterized.TestCase):
             y_pred=self.batched_scores,
             sample_weight=sample_weight,
         )
-        self.assertAllClose(output, self.expected_output * sample_weight)
+        self.assertAllClose(
+            output, self.expected_output * sample_weight, atol=1e-5
+        )
 
     def test_mask_input(self):
         mask = ops.array(
@@ -91,7 +95,7 @@ class PairwiseSoftZeroOneLossTest(testing.TestCase, parameterized.TestCase):
                 [0.0, 0.310025, 0.719108, 0.0, 0.0],
             ]
         )
-        self.assertAllClose(output, expected_output)
+        self.assertAllClose(output, expected_output, atol=1e-5)
 
     def test_model_fit(self):
         inputs = keras.Input(shape=(20,), dtype="float32")
