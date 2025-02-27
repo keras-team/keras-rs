@@ -41,35 +41,25 @@ def pairwise_comparison(
 def process_loss_call_inputs(
     y_true: types.Tensor,
     y_pred: types.Tensor,
-    sample_weight: Optional[types.Tensor] = None,
-) -> tuple[types.Tensor, types.Tensor, types.Tensor]:
+    mask: Optional[types.Tensor] = None,
+) -> tuple[types.Tensor, types.Tensor, Optional[types.Tensor]]:
     """
     This utility function does three things:
 
-    - Checks that `y_true`, `y_pred` are of rank 1 or 2. `sample_weight` can be
-      of ranks 0, 1, 2.
-    - Check that `y_true` and `y_pred` have the same shape.
+    - Checks that `y_true`, `y_pred` are of rank 1 or 2.
+    - Check that `y_true`, `y_pred`, `mask` have the same shape.
     - Add batch dimension if rank = 1.
     """
 
-    def get_shape(
-        x: types.Tensor, convert_to_tensor: bool = False
-    ) -> tuple[types.Tensor, types.TensorShape, int]:
-        if convert_to_tensor and isinstance(x, (list, float, int)):
-            x = ops.array(x)
+    def get_shape(x: types.Tensor) -> tuple[types.TensorShape, int]:
         shape = ops.shape(x)
         rank = len(shape)
-        return x, shape, rank
+        return shape, rank
 
-    # These are typecast to tensors in `keras.losses.Loss.__call__()`. So,
-    # not need to convert them to tensors.
-    y_true, y_true_shape, y_true_rank = get_shape(y_true)
-    y_pred, y_pred_shape, y_pred_rank = get_shape(y_pred)
-    # `keras.losses.Loss.__call__()` does not convert `sample_weight` to tensor.
-    if sample_weight is not None:
-        sample_weight, sample_weight_shape, sample_weight_rank = get_shape(
-            sample_weight, convert_to_tensor=True
-        )
+    y_true_shape, y_true_rank = get_shape(y_true)
+    y_pred_shape, y_pred_rank = get_shape(y_pred)
+    if mask is not None:
+        mask_shape, mask_rank = get_shape(mask)
 
     # Check ranks and shapes.
     def check_rank(
@@ -85,22 +75,26 @@ def process_loss_call_inputs(
 
     check_rank(y_true_rank, tensor_name="y_true")
     check_rank(y_pred_rank, tensor_name="y_pred")
+    if mask is not None:
+        check_rank(mask_rank, tensor_name="mask")
     if not check_shapes_compatible(y_true_shape, y_pred_shape):
         raise ValueError(
             "`y_true` and `y_pred` should have the same shape. Received: "
             f"`y_true.shape` = {y_true_shape}, `y_pred.shape` = {y_pred_shape}."
         )
-    if sample_weight is not None:
-        check_rank(
-            sample_weight_rank,
-            allowed_ranks=tuple(range(y_true_rank + 1)),
-            tensor_name="sample_weight",
+    if mask is not None and not check_shapes_compatible(
+        y_true_shape, mask_shape
+    ):
+        raise ValueError(
+            "`y_true['labels']` and `y_true['mask']` should have the same "
+            f"shape. Received: `y_true['labels'].shape` = {y_true_shape}, "
+            f"`y_true['mask'].shape` = {mask_shape}."
         )
 
     if y_true_rank == 1:
-        # Do not need to modify sample_weight. `keras.losses.Loss` takes care of
-        # it.
         y_true = ops.expand_dims(y_true, axis=0)
         y_pred = ops.expand_dims(y_pred, axis=0)
+        if mask is not None:
+            mask = ops.expand_dims(mask, axis=0)
 
-    return y_true, y_pred, sample_weight
+    return y_true, y_pred, mask

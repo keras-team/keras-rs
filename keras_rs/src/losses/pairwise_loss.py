@@ -50,40 +50,25 @@ class PairwiseLoss(keras.losses.Loss):
 
         return self.pairwise_loss(pairwise_logits), pairwise_labels
 
-    def __call__(
-        self,
-        y_true: types.Tensor,
-        y_pred: types.Tensor,
-        sample_weight: Optional[types.Tensor] = None,
-    ) -> types.Tensor:
-        """
-        Args:
-            y_true: tensor. Ground truth values, of shape `(list_size)` for
-                unbatched inputs or `(batch_size, list_size)` for batched
-                inputs.
-            y_pred: tensor. The predicted values, of shape `(list_size)` for
-                unbatched inputs or `(batch_size, list_size)` for batched
-                inputs. Should be of the same shape as `y_true`.
-            sample_weight: tensor. Optional sample weight acts as reduction
-                weighting coefficient for the per-sample losses. If a scalar is
-                provided, then the loss is simply scaled by the given value. If
-                `sample_weight` is a tensor of size `(batch_size)`, then the
-                total loss for each sample of the batch is rescaled by the
-                corresponding element in the `sample_weight` vector.
-                If the shape of sample_weight is the same as `y_true`, i.e,
-                item-wise sample weight, then each item of `y_pred` is scaled by
-                the corresponding value of `sample_weight`.
-        """
-        y_true, y_pred, sample_weight = process_loss_call_inputs(
-            y_true, y_pred, sample_weight
-        )
-        super().__call__(y_true, y_pred, sample_weight)
-
     def call(
         self,
         y_true: types.Tensor,
         y_pred: types.Tensor,
     ) -> types.Tensor:
+        """
+        Args:
+            y_true: tensor or dict. Ground truth values. If tensor, of shape
+                `(list_size)` for unbatched inputs or `(batch_size, list_size)`
+                for batched inputs. If an item has a label of -1, it is ignored
+                in loss computation.If it is a dictionary, it should have two
+                keys: `"labels"` and `"mask"`. `"mask"` can be used to ignore
+                elements in loss computation, i.e., pairs will not be formed
+                with those items. Note that the final mask is an and of the
+                passed mask, and `labels == -1`.
+            y_pred: tensor. The predicted values, of shape `(list_size)` for
+                unbatched inputs or `(batch_size, list_size)` for batched
+                inputs. Should be of the same shape as `y_true`.
+        """
         mask = None
         if isinstance(y_true, dict):
             if "labels" not in y_true:
@@ -94,6 +79,8 @@ class PairwiseLoss(keras.losses.Loss):
 
             mask = y_true.get("mask", None)
             y_true = y_true["labels"]
+
+        y_true, y_pred, mask = process_loss_call_inputs(y_true, y_pred, mask)
 
         losses, weights = self.compute_unreduced_loss(
             labels=y_true, logits=y_pred, mask=mask
