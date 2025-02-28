@@ -12,3 +12,6 @@ from keras_rs.src.layers.retrieval.brute_force_retrieval import (
 from keras_rs.src.layers.retrieval.hard_negative_mining import (
     HardNegativeMining,
 )
+from keras_rs.src.layers.retrieval.sampling_probability_correction import (
+    SamplingProbabilityCorrection,
+)
