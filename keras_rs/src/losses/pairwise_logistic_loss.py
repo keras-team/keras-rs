@@ -24,19 +24,17 @@ PairwiseLogisticLoss.__doc__ = (
     pairwise_loss_subclass_doc_string.replace(
         "{{formula}}",
         """
-    ```
-    loss = sum_{i} sum_{j} I(y_i > y_j) * log(1 + exp(-(s_i - s_j)))
-    ```
-    """,
+        loss = sum_{i} sum_{j} I(y_i > y_j) * log(1 + exp(-(s_i - s_j)))
+        """,
     )
     .replace(
         "{{explanation}}",
-        """
+        """\033[A
       - `log(1 + exp(-(s_i - s_j)))` is the logistic loss, which penalizes cases
         where the score difference `s_i - s_j` is not sufficiently large when
         `y_i > y_j`. This function provides a smooth approximation of the
         ideal step function, making it suitable for gradient-based optimization.
-    """,
+        """,
     )
     .replace(
         "{{extra_args}}",

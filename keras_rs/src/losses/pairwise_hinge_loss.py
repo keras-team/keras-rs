@@ -16,18 +16,16 @@ PairwiseHingeLoss.__doc__ = (
     pairwise_loss_subclass_doc_string.replace(
         "{{formula}}",
         """
-        ```
         loss = sum_{i} sum_{j} I(y_i > y_j) * max(0, 1 - (s_i - s_j))
-        ```
         """,
     )
     .replace(
         "{{explanation}}",
-        """
+        """\033[A
       - `max(0, 1 - (s_i - s_j))` is the hinge loss, which penalizes cases where
         the score difference `s_i - s_j` is not sufficiently large when
         `y_i > y_j`.
-    """,
+        """,
     )
     .replace(
         "{{extra_args}}",
