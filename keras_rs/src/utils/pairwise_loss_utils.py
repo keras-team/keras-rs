@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Callable, Optional
 
 from keras import ops
 
@@ -17,7 +17,7 @@ def pairwise_comparison(
     labels: types.Tensor,
     logits: types.Tensor,
     mask: types.Tensor,
-    logits_op: ops,
+    logits_op: Callable[[types.Tensor, types.Tensor], types.Tensor],
 ) -> tuple[types.Tensor, types.Tensor]:
     # Compute the difference for all pairs in a list. The output is a tensor
     # with shape `(batch_size, list_size, list_size)`, where `[:, i, j]` stores
@@ -44,22 +44,22 @@ def process_loss_call_inputs(
     mask: Optional[types.Tensor] = None,
 ) -> tuple[types.Tensor, types.Tensor, Optional[types.Tensor]]:
     """
+    Utility function for processing inputs for pairwise losses.
+
     This utility function does three things:
 
-    - Checks that `y_true`, `y_pred` are of rank 1 or 2.
-    - Check that `y_true`, `y_pred`, `mask` have the same shape.
-    - Add batch dimension if rank = 1.
+    - Checks that `y_true`, `y_pred` are of rank 1 or 2;
+    - Checks that `y_true`, `y_pred`, `mask` have the same shape;
+    - Adds batch dimension if rank = 1.
     """
 
-    def get_shape(x: types.Tensor) -> tuple[types.TensorShape, int]:
-        shape = ops.shape(x)
-        rank = len(shape)
-        return shape, rank
-
-    y_true_shape, y_true_rank = get_shape(y_true)
-    y_pred_shape, y_pred_rank = get_shape(y_pred)
+    y_true_shape = ops.shape(y_true)
+    y_true_rank = len(y_true_shape)
+    y_pred_shape = ops.shape(y_pred)
+    y_pred_rank = len(y_pred_shape)
     if mask is not None:
-        mask_shape, mask_rank = get_shape(mask)
+        mask_shape = ops.shape(mask)
+        mask_rank = len(mask_shape)
 
     # Check ranks and shapes.
     def check_rank(
