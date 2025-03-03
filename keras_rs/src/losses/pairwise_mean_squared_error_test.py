@@ -1,6 +1,8 @@
 import keras
 from absl.testing import parameterized
 from keras import ops
+from keras.losses import deserialize
+from keras.losses import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.losses.pairwise_mean_squared_error import (
@@ -104,3 +106,8 @@ class PairwiseMeanSquaredErrorTest(testing.TestCase, parameterized.TestCase):
             x=keras.random.normal((2, 20)),
             y=keras.random.randint((2, 5), minval=0, maxval=2),
         )
+
+    def test_serialization(self):
+        loss = PairwiseMeanSquaredError()
+        restored = deserialize(serialize(loss))
+        self.assertDictEqual(loss.get_config(), restored.get_config())

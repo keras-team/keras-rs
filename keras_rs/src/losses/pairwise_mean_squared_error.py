@@ -57,23 +57,15 @@ class PairwiseMeanSquaredError(PairwiseLoss):
         return pairwise_mse, pairwise_weights
 
 
-PairwiseMeanSquaredError.__doc__ = (
-    pairwise_loss_subclass_doc_string.replace(
-        "{{formula}}",
-        """
-        loss = sum_{i} sum_{j} I(y_i > y_j) * (s_i - s_j)^2
-        """,
-    )
-    .replace(
-        "{{explanation}}",
-        """\033[A
+formula = "loss = sum_{i} sum_{j} I(y_i > y_j) * (s_i - s_j)^2"
+explanation = """\033[A
       - `(s_i - s_j)^2` is the squared difference between the predicted scores
         of items `i` and `j`, which penalizes discrepancies between the
         predicted order of items relative to their true order.
-        """,
-    )
-    .replace(
-        "{{extra_args}}",
-        "\033[A",
-    )
+        \033[A"""
+extra_args = "\033[A"
+PairwiseMeanSquaredError.__doc__ = pairwise_loss_subclass_doc_string.format(
+    formula=formula,
+    explanation=explanation,
+    extra_args=extra_args,
 )

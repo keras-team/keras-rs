@@ -12,23 +12,15 @@ class PairwiseHingeLoss(PairwiseLoss):
         return ops.relu(ops.subtract(ops.array(1), pairwise_logits))
 
 
-PairwiseHingeLoss.__doc__ = (
-    pairwise_loss_subclass_doc_string.replace(
-        "{{formula}}",
-        """
-        loss = sum_{i} sum_{j} I(y_i > y_j) * max(0, 1 - (s_i - s_j))
-        """,
-    )
-    .replace(
-        "{{explanation}}",
-        """\033[A
+formula = "loss = sum_{i} sum_{j} I(y_i > y_j) * max(0, 1 - (s_i - s_j))"
+explanation = """\033[A
       - `max(0, 1 - (s_i - s_j))` is the hinge loss, which penalizes cases where
         the score difference `s_i - s_j` is not sufficiently large when
         `y_i > y_j`.
-        """,
-    )
-    .replace(
-        "{{extra_args}}",
-        "\033[A",
-    )
+    \033[A"""
+extra_args = "\033[A"
+PairwiseHingeLoss.__doc__ = pairwise_loss_subclass_doc_string.format(
+    formula=formula,
+    explanation=explanation,
+    extra_args=extra_args,
 )

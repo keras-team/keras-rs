@@ -63,7 +63,7 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
             y_true: tensor or dict. Ground truth values. If tensor, of shape
                 `(list_size)` for unbatched inputs or `(batch_size, list_size)`
                 for batched inputs. If an item has a label of -1, it is ignored
-                in loss computation.If it is a dictionary, it should have two
+                in loss computation. If it is a dictionary, it should have two
                 keys: `"labels"` and `"mask"`. `"mask"` can be used to ignore
                 elements in loss computation, i.e., pairs will not be formed
                 with those items. Note that the final mask is an and of the
@@ -94,9 +94,8 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
 
 
 pairwise_loss_subclass_doc_string = (
-    "    Computes pairwise hinge loss between true labels and predicted scores."
+    "Computes pairwise hinge loss between true labels and predicted scores."
     """
-
     This loss function is designed for ranking tasks, where the goal is to
     correctly order items within each list. It computes the loss by comparing
     pairs of items within each list, penalizing cases where an item with a
@@ -106,7 +105,9 @@ pairwise_loss_subclass_doc_string = (
     For each list of predicted scores `s` in `y_pred` and the corresponding list
     of true labels `y` in `y_true`, the loss is computed as follows:
 
-    {{formula}}
+    ```
+    {formula}
+    ```
 
     where:
       - `y_i` and `y_j` are the true labels of items `i` and `j`, respectively.
@@ -114,10 +115,10 @@ pairwise_loss_subclass_doc_string = (
         respectively.
       - `I(y_i > y_j)` is an indicator function that equals 1 if `y_i > y_j`,
         and 0 otherwise.
-    {{explanation}}
+      {explanation}
 
     Args:
-        {{extra_args}}
+        {extra_args}
         reduction: Type of reduction to apply to the loss. In almost all cases
             this should be `"sum_over_batch_size"`. Supported options are
             `"sum"`, `"sum_over_batch_size"`, `"mean"`,
