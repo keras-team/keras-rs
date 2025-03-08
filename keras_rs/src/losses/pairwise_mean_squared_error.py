@@ -58,12 +58,12 @@ class PairwiseMeanSquaredError(PairwiseLoss):
 
 
 formula = "loss = sum_{i} sum_{j} I(y_i > y_j) * (s_i - s_j)^2"
-explanation = """\033[A
+explanation = """
       - `(s_i - s_j)^2` is the squared difference between the predicted scores
         of items `i` and `j`, which penalizes discrepancies between the
         predicted order of items relative to their true order.
-        \033[A"""
-extra_args = "\033[A"
+"""
+extra_args = ""
 PairwiseMeanSquaredError.__doc__ = pairwise_loss_subclass_doc_string.format(
     formula=formula,
     explanation=explanation,

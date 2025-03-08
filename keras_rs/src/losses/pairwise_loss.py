@@ -114,11 +114,8 @@ pairwise_loss_subclass_doc_string = (
       - `s_i` and `s_j` are the predicted scores of items `i` and `j`,
         respectively.
       - `I(y_i > y_j)` is an indicator function that equals 1 if `y_i > y_j`,
-        and 0 otherwise.
-      {explanation}
-
-    Args:
-        {extra_args}
+        and 0 otherwise.{explanation}
+    Args:{extra_args}
         reduction: Type of reduction to apply to the loss. In almost all cases
             this should be `"sum_over_batch_size"`. Supported options are
             `"sum"`, `"sum_over_batch_size"`, `"mean"`,

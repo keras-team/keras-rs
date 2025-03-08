@@ -13,12 +13,12 @@ class PairwiseHingeLoss(PairwiseLoss):
 
 
 formula = "loss = sum_{i} sum_{j} I(y_i > y_j) * max(0, 1 - (s_i - s_j))"
-explanation = """\033[A
+explanation = """
       - `max(0, 1 - (s_i - s_j))` is the hinge loss, which penalizes cases where
         the score difference `s_i - s_j` is not sufficiently large when
         `y_i > y_j`.
-    \033[A"""
-extra_args = "\033[A"
+"""
+extra_args = ""
 PairwiseHingeLoss.__doc__ = pairwise_loss_subclass_doc_string.format(
     formula=formula,
     explanation=explanation,
