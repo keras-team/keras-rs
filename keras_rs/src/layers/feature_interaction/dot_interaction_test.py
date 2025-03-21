@@ -5,7 +5,9 @@ from keras.layers import deserialize
 from keras.layers import serialize
 
 from keras_rs.src import testing
-from keras_rs.src.layers.modeling.dot_interaction import DotInteraction
+from keras_rs.src.layers.feature_interaction.dot_interaction import (
+    DotInteraction,
+)
 
 
 class DotInteractionTest(testing.TestCase, parameterized.TestCase):

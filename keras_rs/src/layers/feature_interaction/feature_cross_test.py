@@ -5,7 +5,7 @@ from keras.layers import deserialize
 from keras.layers import serialize
 
 from keras_rs.src import testing
-from keras_rs.src.layers.modeling.feature_cross import FeatureCross
+from keras_rs.src.layers.feature_interaction.feature_cross import FeatureCross
 
 
 class FeatureCrossTest(testing.TestCase, parameterized.TestCase):
