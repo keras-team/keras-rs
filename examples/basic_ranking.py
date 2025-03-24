@@ -13,8 +13,8 @@ Recommender systems are often composed of two stages:
    narrow down the set of items the user may be interested in to a shortlist of
    likely candidates.
 
-In this tutorial, we're going to focus on the first stage, retrieval. If you are
-interested in the ranking stage, have a look at our
+In this tutorial, we're going to focus on the second stage, ranking. If you are
+interested in the retrieval stage, have a look at our
 [retrieval](https://github.com/keras-team/keras-rs/blob/main/examples/basic_retrieval.py)
 tutorial.
 
