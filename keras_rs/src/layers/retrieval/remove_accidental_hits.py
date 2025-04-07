@@ -1,12 +1,12 @@
 import keras
-import numpy as np
+import ml_dtypes
 from keras import ops
 
 from keras_rs.src import types
 from keras_rs.src.api_export import keras_rs_export
 from keras_rs.src.utils import keras_utils
 
-SMALLEST_FLOAT = np.finfo(np.float32).smallest_normal / 100.0
+SMALLEST_FLOAT = ml_dtypes.finfo("float32").smallest_normal / 100.0
 
 
 @keras_rs_export("keras_rs.layers.RemoveAccidentalHits")

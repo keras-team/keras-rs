@@ -1,13 +1,13 @@
 from typing import Any
 
 import keras
-import numpy as np
+import ml_dtypes
 from keras import ops
 
 from keras_rs.src import types
 from keras_rs.src.api_export import keras_rs_export
 
-MAX_FLOAT = np.finfo(np.float32).max / 100.0
+MAX_FLOAT = ml_dtypes.finfo("float32").max / 100.0
 
 
 def _gather_elements_along_row(
