@@ -10,23 +10,24 @@ from keras_rs.src.layers.retrieval import remove_accidental_hits
 
 class RemoveAccidentalHitsTest(testing.TestCase, parameterized.TestCase):
     def create_inputs(self, logits_rank=2, candidate_ids_rank=1):
-        num_candidates = 10
-        shape_3d = (15, 20, num_candidates)
+        shape_3d = (15, 20, 10)
         shape = shape_3d[-logits_rank:]
         candidate_ids_shape = shape_3d[-candidate_ids_rank:]
-        rng = keras.random.SeedGenerator(42)
+        num_candidates = shape[-1]
 
+        rng = keras.random.SeedGenerator(42)
+        logits = keras.random.uniform(shape, seed=rng)
         labels = keras.ops.one_hot(
             keras.random.randint(
                 shape[:-1], minval=0, maxval=num_candidates, seed=rng
             ),
             num_candidates,
         )
-        logits = keras.random.uniform(shape, seed=rng)
         candidate_ids = keras.random.randint(
             candidate_ids_shape, minval=0, maxval=num_candidates, seed=rng
         )
-        return labels, logits, candidate_ids
+
+        return logits, labels, candidate_ids
 
     @parameterized.named_parameters(
         [
@@ -63,12 +64,12 @@ class RemoveAccidentalHitsTest(testing.TestCase, parameterized.TestCase):
         ]
     )
     def test_call(self, logits_rank, candidate_ids_rank):
-        labels, logits, candidate_ids = self.create_inputs(
+        logits, labels, candidate_ids = self.create_inputs(
             logits_rank=logits_rank, candidate_ids_rank=candidate_ids_rank
         )
 
         out_logits = remove_accidental_hits.RemoveAccidentalHits()(
-            labels, logits, candidate_ids
+            logits, labels, candidate_ids
         )
 
         # Logits of labels are unchanged.
@@ -148,18 +149,18 @@ class RemoveAccidentalHitsTest(testing.TestCase, parameterized.TestCase):
 
     def test_predict(self):
         # Note: for predict, we test with probabilities that have a batch dim.
-        labels, logits, candidate_ids = self.create_inputs(candidate_ids_rank=2)
+        logits, labels, candidate_ids = self.create_inputs(candidate_ids_rank=2)
 
         layer = remove_accidental_hits.RemoveAccidentalHits()
-        in_labels = keras.layers.Input(labels.shape[1:])
         in_logits = keras.layers.Input(logits.shape[1:])
+        in_labels = keras.layers.Input(labels.shape[1:])
         in_candidate_ids = keras.layers.Input(labels.shape[1:])
-        out_logits = layer(in_labels, in_logits, in_candidate_ids)
+        out_logits = layer(in_logits, in_labels, in_candidate_ids)
         model = keras.Model(
-            [in_labels, in_logits, in_candidate_ids], out_logits
+            [in_logits, in_labels, in_candidate_ids], out_logits
         )
 
-        model.predict([labels, logits, candidate_ids], batch_size=8)
+        model.predict([logits, labels, candidate_ids], batch_size=8)
 
     def test_serialization(self):
         layer = remove_accidental_hits.RemoveAccidentalHits()
@@ -167,17 +168,17 @@ class RemoveAccidentalHitsTest(testing.TestCase, parameterized.TestCase):
         self.assertDictEqual(layer.get_config(), restored.get_config())
 
     def test_model_saving(self):
-        labels, logits, candidate_ids = self.create_inputs()
+        logits, labels, candidate_ids = self.create_inputs()
 
         layer = remove_accidental_hits.RemoveAccidentalHits()
-        in_labels = keras.layers.Input(labels.shape[1:])
         in_logits = keras.layers.Input(logits.shape[1:])
+        in_labels = keras.layers.Input(labels.shape[1:])
         in_candidate_ids = keras.layers.Input(batch_shape=candidate_ids.shape)
-        out_logits = layer(in_labels, in_logits, in_candidate_ids)
+        out_logits = layer(in_logits, in_labels, in_candidate_ids)
         model = keras.Model(
-            [in_labels, in_logits, in_candidate_ids], out_logits
+            [in_logits, in_labels, in_candidate_ids], out_logits
         )
 
         self.run_model_saving_test(
-            model=model, input_data=[labels, logits, candidate_ids]
+            model=model, input_data=[logits, labels, candidate_ids]
         )

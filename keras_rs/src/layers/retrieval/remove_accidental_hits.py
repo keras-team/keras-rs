@@ -19,8 +19,8 @@ class RemoveAccidentalHits(keras.layers.Layer):
 
     def call(
         self,
-        labels: types.Tensor,
         logits: types.Tensor,
+        labels: types.Tensor,
         candidate_ids: types.Tensor,
     ) -> types.Tensor:
         """Zeroes selected logits.
@@ -29,16 +29,16 @@ class RemoveAccidentalHits(keras.layers.Layer):
         have the same ID as the positive candidate in that row.
 
         Args:
-          labels: one-hot labels tensor, typically
-              `[batch_size, num_candidates]` but can have more dimensions or be
-              1D as `[num_candidates]`.
-          logits: logits tensor. Must have the same shape as `labels`.
-          candidate_ids: candidate identifiers tensor, can be `[num_candidates]`
-              or `[batch_size, num_candidates]` or have more dimensions as long
-              as they match the last dimensions of `labels`.
+            logits: logits tensor, typically `[batch_size, num_candidates]` but
+                can have more dimensions or be 1D as `[num_candidates]`.
+            labels: one-hot labels tensor, must be the same shape as `logits`.
+            candidate_ids: candidate identifiers tensor, can be
+                `[num_candidates]` or `[batch_size, num_candidates]` or have
+                more dimensions as long as they match the last dimensions of
+                `labels`.
 
         Returns:
-          logits: Modified logits.
+            logits: Modified logits with the same shape as the input logits.
         """
         # A more principled way is to implement
         # `softmax_cross_entropy_with_logits` with a input mask. Here we
