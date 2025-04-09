@@ -50,7 +50,7 @@ def sort_by_scores(
     # Set values corresponding to `mask = False` to the minimum value so that
     # they are last when we sort.
     if mask is not None:
-        y_pred = ops.where(mask, y_pred, ops.minimum(y_pred))
+        y_pred = ops.where(mask, y_pred, ops.amin(y_pred))
 
     # Shuffle ties randomly, and push masked values to the beginning.
     shuffled_indices = None
