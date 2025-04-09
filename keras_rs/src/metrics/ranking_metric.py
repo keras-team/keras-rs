@@ -47,7 +47,7 @@ class RankingMetric(keras.metrics.Mean):
         check_rank(y_true_rank, allowed_ranks=(1, 2), tensor_name="y_true")
 
         check_rank(
-            sample_weight,
+            sample_weight_rank,
             allowed_ranks=tuple(range(y_true_rank + 1)),
             tensor_name="sample_weight",
         )

@@ -34,7 +34,7 @@ class MeanReciprocalRank(RankingMetric):
         )
         reciprocal_rank = ops.divide(
             ops.cast(1, dtype="float32"),
-            ops.range(1, list_length + 1, dtype="float32"),
+            ops.arange(1, list_length + 1, dtype="float32"),
         )
 
         # `mrr` should be of shape `(batch_size, 1)`.
