@@ -22,6 +22,7 @@ class MeanReciprocalRank(RankingMetric):
             mask=mask,
             k=self.k,
         )
+        print(f"{sorted_y_true=}")
 
         list_length = ops.shape(sorted_y_true)[1]
 
@@ -32,10 +33,12 @@ class MeanReciprocalRank(RankingMetric):
             ),
             dtype="float32",
         )
+        print(f"{relevance=}")
         reciprocal_rank = ops.divide(
             ops.cast(1, dtype="float32"),
             ops.arange(1, list_length + 1, dtype="float32"),
         )
+        print(f"reciprocal_rank={reciprocal_rank}")
 
         # `mrr` should be of shape `(batch_size, 1)`.
         mrr = ops.amax(
@@ -43,6 +46,7 @@ class MeanReciprocalRank(RankingMetric):
             axis=1,
             keepdims=True,
         )
+        print(f"{mrr=}")
 
         # Get weights.
         overall_relevance = ops.cast(
@@ -52,5 +56,6 @@ class MeanReciprocalRank(RankingMetric):
         per_list_weights = get_list_weights(
             weights=sample_weight, relevance=overall_relevance
         )
+        print(f"{per_list_weights=}")
 
         return mrr, per_list_weights

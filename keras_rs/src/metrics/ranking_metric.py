@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-import keras
+import tensorflow as tf
 from keras import ops
 
 from keras_rs.src import types
@@ -9,8 +9,8 @@ from keras_rs.src.utils.keras_utils import check_shapes_compatible
 from keras_rs.src.utils.loss_and_metric_utils import process_inputs
 
 
-class RankingMetric(keras.metrics.Mean):
-    def __init__(self, k: int, **kwargs: Any) -> None:
+class RankingMetric(tf.keras.metrics.Mean):
+    def __init__(self, k: Optional[int] = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
         self.k = k
@@ -33,6 +33,14 @@ class RankingMetric(keras.metrics.Mean):
         y_pred: types.Tensor,
         sample_weight: Optional[types.Tensor] = None,
     ) -> None:
+        # === Convert to tensors, if list ===
+        if isinstance(y_true, list):
+            y_true = ops.convert_to_tensor(y_true)
+        if isinstance(y_pred, list):
+            y_pred = ops.convert_to_tensor(y_pred)
+        if isinstance(sample_weight, (list, float)):
+            sample_weight = ops.convert_to_tensor(sample_weight)
+
         # === Process `sample_weight` ===
         if sample_weight is None:
             sample_weight = ops.cast(1, dtype=y_pred.dtype)
@@ -72,11 +80,22 @@ class RankingMetric(keras.metrics.Mean):
             mask=mask,
             check_y_true_rank=False,
         )
+        print(f"{y_true=}, {y_pred=}, {mask=}, {sample_weight=}")
+
+        # === Fix y_true, y_pred based on mask ===
+        y_true = ops.where(mask, y_true, ops.zeros_like(y_true))
+        y_pred = ops.where(
+            mask,
+            y_pred,
+            -1e-6 * ops.ones_like(y_pred)
+            + ops.amin(y_pred, axis=1, keepdims=True),
+        )
 
         # === Actual computation ===
         per_list_metric_values, per_list_metric_weights = self.compute_metric(
             y_true=y_true, y_pred=y_pred, mask=mask, sample_weight=sample_weight
         )
+        print(f"{per_list_metric_values=}, {per_list_metric_weights=}")
 
         super().update_state(
             per_list_metric_values, sample_weight=per_list_metric_weights
