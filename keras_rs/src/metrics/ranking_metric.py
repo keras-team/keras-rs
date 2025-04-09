@@ -80,7 +80,6 @@ class RankingMetric(tf.keras.metrics.Mean):
             mask=mask,
             check_y_true_rank=False,
         )
-        print(f"{y_true=}, {y_pred=}, {mask=}, {sample_weight=}")
 
         # === Fix y_true, y_pred based on mask ===
         y_true = ops.where(mask, y_true, ops.zeros_like(y_true))
@@ -95,7 +94,6 @@ class RankingMetric(tf.keras.metrics.Mean):
         per_list_metric_values, per_list_metric_weights = self.compute_metric(
             y_true=y_true, y_pred=y_pred, mask=mask, sample_weight=sample_weight
         )
-        print(f"{per_list_metric_values=}, {per_list_metric_weights=}")
 
         super().update_state(
             per_list_metric_values, sample_weight=per_list_metric_weights
