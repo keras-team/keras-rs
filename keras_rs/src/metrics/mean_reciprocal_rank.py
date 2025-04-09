@@ -38,8 +38,11 @@ class MeanReciprocalRank(RankingMetric):
         )
 
         # `mrr` should be of shape `(batch_size, 1)`.
-        mrr = ops.maximum(ops.multiply(relevance, reciprocal_rank), axis=1)
-        mrr = ops.expand_dims(mrr, axis=1)
+        mrr = ops.amax(
+            ops.multiply(relevance, reciprocal_rank),
+            axis=1,
+            keepdims=True,
+        )
 
         # Get weights.
         overall_relevance = ops.cast(
