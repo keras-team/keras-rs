@@ -14,8 +14,8 @@ class TestCase(unittest.TestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        keras.config.disable_traceback_filtering()
         keras.utils.clear_session()
+        keras.config.disable_traceback_filtering()
 
     def assertAllClose(
         self,
