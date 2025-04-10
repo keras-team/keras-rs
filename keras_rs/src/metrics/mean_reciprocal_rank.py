@@ -1,5 +1,3 @@
-from typing import Optional
-
 from keras import ops
 
 from keras_rs.src import types
@@ -13,11 +11,11 @@ class MeanReciprocalRank(RankingMetric):
         self,
         y_true: types.Tensor,
         y_pred: types.Tensor,
-        mask: Optional[types.Tensor] = None,
-        sample_weight: Optional[types.Tensor] = None,
+        mask: types.Tensor,
+        sample_weight: types.Tensor,
     ) -> types.Tensor:
-        sorted_y_true = sort_by_scores(
-            y_true=y_true,
+        (sorted_y_true,) = sort_by_scores(
+            tensors_to_sort=[y_true],
             y_pred=y_pred,
             mask=mask,
             k=self.k,

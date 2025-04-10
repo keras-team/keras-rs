@@ -19,8 +19,8 @@ class RankingMetric(tf.keras.metrics.Mean):
         self,
         y_true: types.Tensor,
         y_pred: types.Tensor,
-        mask: Optional[types.Tensor] = None,
-        sample_weight: Optional[types.Tensor] = None,
+        mask: types.Tensor,
+        sample_weight: types.Tensor,
     ) -> types.Tensor:
         raise NotImplementedError(
             "All subclasses of the `keras_rs.losses.metrics.RankingMetric`"

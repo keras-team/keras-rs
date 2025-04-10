@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Callable, Optional
 
 import keras
 from keras import ops
@@ -34,7 +34,7 @@ def get_shuffled_and_masked_indices(
 
 
 def sort_by_scores(
-    y_true: types.Tensor,
+    tensors_to_sort: list[types.Tensor],
     y_pred: types.Tensor,
     mask: Optional[types.Tensor] = None,
     k: Optional[int] = None,
@@ -67,8 +67,10 @@ def sort_by_scores(
     if shuffled_indices is not None:
         indices = ops.take_along_axis(shuffled_indices, indices, axis=1)
 
-    sorted_y_true = ops.take_along_axis(y_true, indices, axis=1)
-    return sorted_y_true
+    return [
+        ops.take_along_axis(tensor_to_sort, indices, axis=1)
+        for tensor_to_sort in tensors_to_sort
+    ]
 
 
 def get_list_weights(
@@ -191,3 +193,31 @@ def get_list_weights(
     )  # Shape: [batch_size, 1]
 
     return final_weights
+
+
+def default_gain_fn(label: types.Tensor) -> types.Tensor:
+    return ops.subtract(ops.power(2.0, label), 1.0)
+
+
+def default_rank_discount_fn(rank: types.Tensor) -> types.Tensor:
+    return ops.divide(ops.log(2.0), ops.log1p(rank))
+
+
+def compute_dcg(
+    y_true: types.Tensor,
+    sample_weight: types.Tensor,
+    gain_fn: Callable[[types.Tensor], types.Tensor] = default_gain_fn,
+    rank_discount_fn: Callable[
+        [types.Tensor], types.Tensor
+    ] = default_rank_discount_fn,
+) -> types.Tensor:
+    list_size = ops.shape(y_true)[1]
+    positions = ops.arange(1, list_size + 1, dtype="float32")
+    gain = gain_fn(y_true)
+    discount = rank_discount_fn(positions)
+
+    return ops.sum(
+        ops.multiply(sample_weight, ops.multiply(gain, discount)),
+        axis=1,
+        keepdims=True,
+    )
