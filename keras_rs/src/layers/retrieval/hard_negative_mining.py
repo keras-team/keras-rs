@@ -10,41 +10,6 @@ from keras_rs.src.api_export import keras_rs_export
 MAX_FLOAT = ml_dtypes.finfo("float32").max / 100.0
 
 
-def _gather_elements_along_row(
-    data: types.Tensor, column_indices: types.Tensor
-) -> types.Tensor:
-    """Gathers elements from a 2D tensor given the column indices of each row.
-
-    First, gets the flat 1D indices to gather from. Then flattens the data to 1D
-    and uses `ops.take()` to generate 1D output and finally reshapes the output
-    back to 2D.
-
-    Args:
-        data: A [N, M] 2D `Tensor`.
-        column_indices: A [N, K] 2D `Tensor` denoting for each row, the K column
-            indices to gather elements from the data `Tensor`.
-
-    Returns:
-        A [N, K] `Tensor` including output elements gathered from data `Tensor`.
-
-    Raises:
-        ValueError: if the first dimensions of data and column_indices don't
-            match.
-    """
-    num_row, num_column, *_ = ops.shape(data)
-    num_gathered = ops.shape(column_indices)[1]
-    row_indices = ops.tile(
-        ops.expand_dims(ops.arange(num_row), -1), [1, num_gathered]
-    )
-    flat_data = ops.reshape(data, [-1])
-    flat_indices = ops.reshape(
-        ops.add(ops.multiply(row_indices, num_column), column_indices), [-1]
-    )
-    return ops.reshape(
-        ops.take(flat_data, flat_indices), [num_row, num_gathered]
-    )
-
-
 @keras_rs_export("keras_rs.layers.HardNegativeMining")
 class HardNegativeMining(keras.layers.Layer):
     """Transforms logits and labels to return hard negatives.
@@ -68,21 +33,21 @@ class HardNegativeMining(keras.layers.Layer):
         negatives as well as the positive candidate.
 
         Args:
-            logits: `[batch_size, number_of_candidates]` tensor of logits.
-            labels: `[batch_size, number_of_candidates]` one-hot tensor of
-                labels.
+            logits: logits tensor, typically `[batch_size, num_candidates]` but
+                can have more dimensions or be 1D as `[num_candidates]`.
+            labels: one-hot labels tensor, must be the same shape as `logits`.
 
         Returns:
-            tuple containing:
-            - logits: `[batch_size, num_hard_negatives + 1]` tensor of logits.
-            - labels: `[batch_size, num_hard_negatives + 1]` one-hot tensor of
-                  labels.
+            tuple containing two tensors with the last dimension of
+            `num_candidates` replaced with `num_hard_negatives + 1`.
+            - logits: `[..., num_hard_negatives + 1]` tensor of logits.
+            - labels: `[..., num_hard_negatives + 1]` one-hot tensor of labels.
         """
 
         # Number of sampled logits, i.e, the number of hard negatives to be
         # sampled (k) + number of true logit (1) per query, capped by batch
         # size.
-        num_logits = ops.shape(logits)[1]
+        num_logits = ops.shape(logits)[-1]
         if isinstance(num_logits, int):
             num_sampled = min(self._num_hard_negatives + 1, num_logits)
         else:
@@ -98,14 +63,14 @@ class HardNegativeMining(keras.layers.Layer):
         # For each query, get the indices of the logits which have the highest
         # k + 1 logit values, including the highest k negative logits and one
         # true logit.
-        _, col_indices = ops.top_k(
+        _, indices = ops.top_k(
             ops.add(logits, ops.multiply(labels, MAX_FLOAT)),
             k=num_sampled,
             sorted=False,
         )
 
         # Gather sampled logits and corresponding labels.
-        logits = _gather_elements_along_row(logits, col_indices)
-        labels = _gather_elements_along_row(labels, col_indices)
+        logits = ops.take_along_axis(logits, indices, axis=-1)
+        labels = ops.take_along_axis(labels, indices, axis=-1)
 
         return logits, labels
