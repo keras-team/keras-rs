@@ -6,7 +6,9 @@ from keras_rs.src import types
 from keras_rs.src.utils.keras_utils import check_shapes_compatible
 
 
-def apply_pairwise_op(x: types.Tensor, op: ops) -> types.Tensor:
+def apply_pairwise_op(
+    x: types.Tensor, op: Callable[[types.Tensor, types.Tensor], types.Tensor]
+) -> types.Tensor:
     return op(
         ops.expand_dims(x, axis=-1),
         ops.expand_dims(x, axis=-2),
