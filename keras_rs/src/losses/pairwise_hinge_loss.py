@@ -20,6 +20,7 @@ explanation = """
 """
 extra_args = ""
 PairwiseHingeLoss.__doc__ = pairwise_loss_subclass_doc_string.format(
+    loss_name="hinge loss",
     formula=formula,
     explanation=explanation,
     extra_args=extra_args,

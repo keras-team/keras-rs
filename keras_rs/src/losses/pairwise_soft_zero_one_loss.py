@@ -25,6 +25,7 @@ explanation = """
 """
 extra_args = ""
 PairwiseSoftZeroOneLoss.__doc__ = pairwise_loss_subclass_doc_string.format(
+    loss_name="soft zero-one loss",
     formula=formula,
     explanation=explanation,
     extra_args=extra_args,
