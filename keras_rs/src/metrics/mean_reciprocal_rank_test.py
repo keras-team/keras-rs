@@ -192,7 +192,8 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
             ),
             ops.array(
                 [
-                    [0.8, 0.7, 0.1, 0.2][0.9, 0.1, 0.2, 0.3],
+                    [0.8, 0.7, 0.1, 0.2],
+                    [0.9, 0.1, 0.2, 0.3],
                 ],
                 dtype="float32",
             ),
