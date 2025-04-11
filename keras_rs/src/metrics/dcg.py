@@ -35,7 +35,7 @@ class DCG(RankingMetric):
     ) -> types.Tensor:
         sorted_y_true, sorted_weights = sort_by_scores(
             tensors_to_sort=[y_true, sample_weight],
-            y_pred=y_pred,
+            scores=y_pred,
             k=self.k,
             mask=mask,
         )

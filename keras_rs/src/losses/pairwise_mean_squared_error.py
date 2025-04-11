@@ -65,6 +65,7 @@ explanation = """
 """
 extra_args = ""
 PairwiseMeanSquaredError.__doc__ = pairwise_loss_subclass_doc_string.format(
+    loss_name="mean squared error",
     formula=formula,
     explanation=explanation,
     extra_args=extra_args,

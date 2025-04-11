@@ -12,9 +12,9 @@ def process_inputs(
     y_pred: types.Tensor,
     mask: Optional[types.Tensor] = None,
     check_y_true_rank: bool = True,
-) -> tuple[types.Tensor, types.Tensor, Optional[types.Tensor]]:
+) -> tuple[types.Tensor, types.Tensor, Optional[types.Tensor], bool]:
     """
-    Utility function for processing inputs for pairwise losses.
+    Utility function for processing inputs for losses and metrics.
 
     This utility function does three things:
 
@@ -50,10 +50,13 @@ def process_inputs(
             f"`y_true['mask'].shape` = {mask_shape}."
         )
 
+    batched = True
     if y_true_rank == 1:
+        batched = False
+
         y_true = ops.expand_dims(y_true, axis=0)
         y_pred = ops.expand_dims(y_pred, axis=0)
         if mask is not None:
             mask = ops.expand_dims(mask, axis=0)
 
-    return y_true, y_pred, mask
+    return y_true, y_pred, mask, batched

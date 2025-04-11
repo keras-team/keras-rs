@@ -83,7 +83,7 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
             mask = y_true.get("mask", None)
             y_true = y_true["labels"]
 
-        y_true, y_pred, mask = process_inputs(y_true, y_pred, mask)
+        y_true, y_pred, mask, _ = process_inputs(y_true, y_pred, mask)
 
         losses, weights = self.compute_unreduced_loss(
             labels=y_true, logits=y_pred, mask=mask
@@ -94,7 +94,7 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
 
 
 pairwise_loss_subclass_doc_string = (
-    "Computes pairwise hinge loss between true labels and predicted scores."
+    "Computes pairwise {loss_name} between true labels and predicted scores."
     """
     This loss function is designed for ranking tasks, where the goal is to
     correctly order items within each list. It computes the loss by comparing
