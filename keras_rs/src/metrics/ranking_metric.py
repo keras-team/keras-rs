@@ -90,7 +90,7 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
         if isinstance(y_pred, list):
             y_pred = ops.convert_to_tensor(y_pred)
         # `sample_weight` can be a scalar too.
-        if isinstance(sample_weight, (list, float)):
+        if isinstance(sample_weight, (list, float, int)):
             sample_weight = ops.convert_to_tensor(sample_weight)
 
         # === Process `sample_weight` ===
