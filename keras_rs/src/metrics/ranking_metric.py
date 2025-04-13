@@ -158,8 +158,6 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
         per_list_metric_values, per_list_metric_weights = self.compute_metric(
             y_true=y_true, y_pred=y_pred, mask=mask, sample_weight=sample_weight
         )
-        print(f"{per_list_metric_values=}")
-        print(f"{per_list_metric_weights=}")
 
         # Chain to `super()` to get mean metric.
         # TODO (abheesht): Figure out if we want to return unaggregated metric
