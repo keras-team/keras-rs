@@ -1,5 +1,6 @@
 import math
 
+import keras
 from absl.testing import parameterized
 from keras import ops
 from keras.metrics import deserialize
@@ -301,3 +302,18 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
             sum([1 / 1, 3 / 1 + 2 / 3 + 1 / 4, 0, 2 / 1 + 1 / 2]) / 4
         )
         self.assertAllClose(result, expected_output, rtol=1e-5)
+
+    def test_model_evaluate(self):
+        inputs = keras.Input(shape=(20,), dtype="float32")
+        outputs = keras.layers.Dense(5)(inputs)
+        model = keras.Model(inputs=inputs, outputs=outputs)
+
+        model.compile(
+            loss=keras.losses.MeanSquaredError(),
+            metrics=[DCG()],
+            optimizer="adam",
+        )
+        model.evaluate(
+            x=keras.random.normal((2, 20)),
+            y=keras.random.randint((2, 5), minval=0, maxval=4),
+        )

@@ -1,5 +1,6 @@
 import math
 
+import keras
 from absl.testing import parameterized
 from keras import ops
 from keras.metrics import deserialize
@@ -307,3 +308,18 @@ class nDCGTest(testing.TestCase, parameterized.TestCase):
         idcg = [1 / 1, 3 / 1 + 2 / 2 + 1 / 3, 0.0, 2 / 1 + 1 / 2]
         ndcg = sum([a / b if b != 0.0 else 0.0 for a, b in zip(dcg, idcg)]) / 4
         self.assertAllClose(result, ndcg, rtol=1e-5)
+
+    def test_model_evaluate(self):
+        inputs = keras.Input(shape=(20,), dtype="float32")
+        outputs = keras.layers.Dense(5)(inputs)
+        model = keras.Model(inputs=inputs, outputs=outputs)
+
+        model.compile(
+            loss=keras.losses.MeanSquaredError(),
+            metrics=[nDCG()],
+            optimizer="adam",
+        )
+        model.evaluate(
+            x=keras.random.normal((2, 20)),
+            y=keras.random.randint((2, 5), minval=0, maxval=4),
+        )

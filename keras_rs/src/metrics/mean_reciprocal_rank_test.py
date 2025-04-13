@@ -1,3 +1,4 @@
+import keras
 from absl.testing import parameterized
 from keras import ops
 from keras.metrics import deserialize
@@ -218,3 +219,18 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
         metric = MeanReciprocalRank()
         restored = deserialize(serialize(metric))
         self.assertDictEqual(metric.get_config(), restored.get_config())
+
+    def test_model_evaluate(self):
+        inputs = keras.Input(shape=(20,), dtype="float32")
+        outputs = keras.layers.Dense(5)(inputs)
+        model = keras.Model(inputs=inputs, outputs=outputs)
+
+        model.compile(
+            loss=keras.losses.MeanSquaredError(),
+            metrics=[MeanReciprocalRank()],
+            optimizer="adam",
+        )
+        model.evaluate(
+            x=keras.random.normal((2, 20)),
+            y=keras.random.randint((2, 5), minval=0, maxval=4),
+        )
