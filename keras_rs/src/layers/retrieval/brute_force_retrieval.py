@@ -83,6 +83,13 @@ class BruteForceRetrieval(Retrieval):
         candidate_embeddings: types.Tensor,
         candidate_ids: Optional[types.Tensor] = None,
     ) -> None:
+        """Update the set of candidates and optionally their candidate IDs.
+
+        Args:
+            candidate_embeddings: The candidate embeddings.
+            candidate_ids: The identifiers for the candidates. If `None`, the
+                indices of the candidates are returned instead.
+        """
         self._validate_update_candidates_inputs(
             candidate_embeddings, candidate_ids
         )
@@ -119,6 +126,16 @@ class BruteForceRetrieval(Retrieval):
     def call(
         self, inputs: types.Tensor
     ) -> Union[types.Tensor, tuple[types.Tensor, types.Tensor]]:
+        """Returns the top candidates for the query passed as input.
+
+        Args:
+            inputs: the query for which to return top candidates.
+
+        Returns:
+            A tuple with the top scores and the top identifiers if
+            `returns_scores` is True, otherwise a tensor with the top
+            identifiers.
+        """
         scores = self.compute_score(inputs, self.candidate_embeddings)
         top_scores, top_ids = keras.ops.top_k(scores, k=self.k)
 
