@@ -53,11 +53,7 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
         sample_weight: types.Tensor,
     ) -> types.Tensor:
         """Abstract method, should be implemented by subclasses."""
-
-        raise NotImplementedError(
-            "All subclasses of the `keras_rs.losses.metrics.RankingMetric`"
-            "must implement the `compute_metric()` method."
-        )
+        pass
 
     def update_state(
         self,

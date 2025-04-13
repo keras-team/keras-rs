@@ -26,10 +26,7 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
 
     @abc.abstractmethod
     def pairwise_loss(self, pairwise_logits: types.Tensor) -> types.Tensor:
-        raise NotImplementedError(
-            "All subclasses of `keras_rs.losses.pairwise_loss.PairwiseLoss`"
-            "must implement the `pairwise_loss()` method."
-        )
+        pass
 
     def compute_unreduced_loss(
         self,
