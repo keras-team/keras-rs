@@ -40,7 +40,7 @@ class Retrieval(keras.layers.Layer, abc.ABC):
         """Validates inputs to `update_candidates()`."""
 
         if candidate_embeddings is None:
-            raise ValueError("`candidate_embeddings` is required")
+            raise ValueError("`candidate_embeddings` is required.")
 
         if len(candidate_embeddings.shape) != 2:
             raise ValueError(
@@ -80,10 +80,7 @@ class Retrieval(keras.layers.Layer, abc.ABC):
             candidate_ids: The identifiers for the candidates. If `None`, the
                 indices of the candidates are returned instead.
         """
-        raise NotImplementedError(
-            "All subclasses of the `keras_rs.layers.Retrieval` layer"
-            "must implement the `update_candidates()` method."
-        )
+        pass
 
     @abc.abstractmethod
     def call(
@@ -99,10 +96,7 @@ class Retrieval(keras.layers.Layer, abc.ABC):
             `returns_scores` is True, otherwise a tensor with the top
             identifiers.
         """
-        raise NotImplementedError(
-            "All subclasses of the `keras_rs.layers.Retrieval` layer"
-            "must implement the `call()` method."
-        )
+        pass
 
     def compute_score(
         self, query_embedding: types.Tensor, candidate_embedding: types.Tensor
