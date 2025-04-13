@@ -13,7 +13,7 @@ class DummyRetrieval(Retrieval):
         pass
 
 
-class BruteForceRetrievalTest(testing.TestCase, parameterized.TestCase):
+class RetrievalTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
         self.layer = DummyRetrieval(k=5)
 
@@ -57,7 +57,7 @@ class BruteForceRetrievalTest(testing.TestCase, parameterized.TestCase):
         with self.assertRaises(TypeError):
             DummyRetrieval(k=5)
 
-    def test_update_states_not_overridden(self):
+    def test_update_candidates_not_overridden(self):
         class DummyRetrieval(Retrieval):
             def call(self, inputs):
                 pass
