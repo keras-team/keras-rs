@@ -138,7 +138,7 @@ formula = """
 extra_args = """
     gain_fn: callable. Maps relevance scores (`y_true`) to gain values. The
         default implements `2**y - 1`. Used for both DCG and IDCG.
-    rank_discount_fn: function. Maps rank positions (1-based) to discount
+    rank_discount_fn: callable. Maps rank positions (1-based) to discount
         values. The default (`default_rank_discount_fn`) typically implements
         `log2(rank + 1)`. Used for both DCG and IDCG.
 """
