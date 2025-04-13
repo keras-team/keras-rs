@@ -24,14 +24,14 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
         self.y_true_unbatched_none = ops.array([0, 0, 0, 0], dtype="float32")
         self.y_true_unbatched_multi = ops.array([1, 0, 2, 0], dtype="float32")
         self.y_pred_unbatched_multi = ops.array(
-            [0.9, 0.2, 0.8, 0.3], dtype="float32"
+            [0.9, 0.2, 0.1, 0.3], dtype="float32"
         )
 
         # Batched inputs
         self.y_true_batched = ops.array(
             [
                 [0, 0, 1, 0],
-                [0, 3, 0, 0],
+                [0, 3, 4, 0],
                 [0, 0, 0, 0],
                 [1, 0, 2, 0],
             ],
@@ -42,7 +42,7 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
                 [0.1, 0.2, 0.9, 0.3],
                 [0.8, 0.7, 0.1, 0.2],
                 [0.4, 0.3, 0.2, 0.1],
-                [0.9, 0.2, 0.8, 0.3],
+                [0.9, 0.2, 0.1, 0.3],
             ],
             dtype="float32",
         )
@@ -100,19 +100,19 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
             self.y_true_unbatched_multi, self.y_pred_unbatched_multi
         )
         result = map_metric.result()
-        self.assertAllClose(result, 1.0)
+        self.assertAllClose(result, 0.75)
 
     def test_batched_input(self):
         map_metric = MeanAveragePrecision()
         map_metric.update_state(self.y_true_batched, self.y_pred_batched)
         result = map_metric.result()
-        self.assertAllClose(result, 0.625)
+        self.assertAllClose(result, 0.5625)
 
     @parameterized.named_parameters(
         ("1", 1, 0.375),
-        ("2", 2, 0.625),
-        ("3", 3, 0.625),
-        ("4", 4, 0.625),
+        ("2", 2, 0.4375),
+        ("3", 3, 0.4375),
+        ("4", 4, 0.5625),
     )
     def test_k(self, k, expected_map):
         map_metric = MeanAveragePrecision(k=k)
@@ -134,7 +134,7 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
             self.y_true_batched[2:], self.y_pred_batched[2:]
         )
         result2 = map_metric.result()
-        self.assertAllClose(result2, 0.625)
+        self.assertAllClose(result2, 0.5625)
 
         # Reset state
         map_metric.reset_state()
@@ -142,11 +142,7 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
         self.assertAllClose(result3, 0.0)
 
     @parameterized.named_parameters(
-        (
-            "weight_0.5",
-            0.5,
-            0.625,
-        ),
+        ("0.5", 0.5, 0.5625),
         ("weight_0", 0.0, 0.0),
     )
     def test_scalar_sample_weight(self, sample_weight, expected_output):
@@ -168,7 +164,7 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
             sample_weight=sample_weight,
         )
         result = map_metric.result()
-        self.assertAllClose(result, 0.703125)
+        self.assertAllClose(result, 0.572368)
 
     @parameterized.named_parameters(
         (
@@ -193,7 +189,7 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
             1.0,
         ),
         (
-            "batch_size_2_masking",
+            "batch_size_2",
             ops.array(
                 [
                     [0, 1, 0, 0],
