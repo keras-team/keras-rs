@@ -9,6 +9,13 @@ from keras_rs.src import testing
 from keras_rs.src.metrics.dcg import DCG
 
 
+def _compute_dcg(labels, ranks):
+    val = 0.0
+    for label, rank in zip(labels, ranks):
+        val += (math.pow(2, label) - 1) / math.log2(rank + 1)
+    return val
+
+
 class DCGTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
         # === Unbatched Inputs ===
@@ -55,17 +62,17 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
             ],
             dtype="float32",
         )
-        dcg_r0 = (math.pow(2, 1) - 1) / math.log2(1 + 1)
-        dcg_r1 = (
-            (math.pow(2, 3) - 1) / math.log2(1 + 1)
-            + (math.pow(2, 2) - 1) / math.log2(3 + 1)
-            + (math.pow(2, 1) - 1) / math.log2(4 + 1)
+        self.expected_output_batched = (
+            sum(
+                [
+                    _compute_dcg([1], [1]),
+                    _compute_dcg([3, 2, 1], [1, 3, 4]),
+                    0.0,
+                    _compute_dcg([2, 1], [1, 2]),
+                ]
+            )
+            / 4
         )
-        dcg_r2 = 0.0
-        dcg_r3 = (math.pow(2, 2) - 1) / math.log2(1 + 1) + (
-            math.pow(2, 1) - 1
-        ) / math.log2(2 + 1)
-        self.exp_value_batched = (dcg_r0 + dcg_r1 + dcg_r2 + dcg_r3) / 4.0
 
     def test_invalid_k_init(self):
         with self.assertRaisesRegex(
@@ -87,8 +94,7 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
             self.y_true_unbatched, self.y_pred_unbatched_perfect
         )
         result = dcg_metric.result()
-        exp_value = (math.pow(2, 1) - 1) / math.log2(1 + 1)
-        self.assertAllClose(result, exp_value)
+        self.assertAllClose(result, _compute_dcg([1], [1]))
 
     def test_unbatched_good_rank_binary(self):
         dcg_metric = DCG()
@@ -96,8 +102,7 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
             self.y_true_unbatched, self.y_pred_unbatched_good
         )
         result = dcg_metric.result()
-        exp_value = (math.pow(2, 1) - 1) / math.log2(2 + 1)
-        self.assertAllClose(result, exp_value)
+        self.assertAllClose(result, _compute_dcg([1], [2]))
 
     def test_unbatched_bad_rank_binary(self):
         dcg_metric = DCG()
@@ -105,8 +110,7 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
             self.y_true_unbatched, self.y_pred_unbatched_bad
         )
         result = dcg_metric.result()
-        exp_value = (math.pow(2, 1) - 1) / math.log2(3 + 1)
-        self.assertAllClose(result, exp_value)
+        self.assertAllClose(result, _compute_dcg([1], [3]))
 
     def test_unbatched_no_relevant(self):
         dcg_metric = DCG()
@@ -124,12 +128,7 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
             self.y_pred_unbatched_graded_perfect,
         )
         result = dcg_metric.result()
-        exp_value = (
-            (math.pow(2, 3) - 1) / math.log2(1 + 1)
-            + (math.pow(2, 2) - 1) / math.log2(3 + 1)
-            + (math.pow(2, 1) - 1) / math.log2(4 + 1)
-        )
-        self.assertAllClose(result, exp_value)
+        self.assertAllClose(result, _compute_dcg([3, 2, 1], [1, 3, 4]))
 
     def test_unbatched_mixed_rank_graded(self):
         dcg_metric = DCG()
@@ -137,18 +136,13 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
             self.y_true_unbatched_graded, self.y_pred_unbatched_graded_mixed
         )
         result = dcg_metric.result()
-        exp_value = (
-            (math.pow(2, 1) - 1) / math.log2(1 + 1)
-            + (math.pow(2, 2) - 1) / math.log2(2 + 1)
-            + (math.pow(2, 3) - 1) / math.log2(3 + 1)
-        )
-        self.assertAllClose(result, exp_value)
+        self.assertAllClose(result, _compute_dcg([1, 2, 3], [1, 2, 3]))
 
     def test_batched_input(self):
         dcg_metric = DCG()
         dcg_metric.update_state(self.y_true_batched, self.y_pred_batched)
         result = dcg_metric.result()
-        self.assertAllClose(result, self.exp_value_batched)
+        self.assertAllClose(result, self.expected_output_batched)
 
     @parameterized.named_parameters(
         ("1", 1, 2.75),
@@ -168,27 +162,24 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
         dcg_metric.update_state(
             self.y_true_batched[:2], self.y_pred_batched[:2]
         )
-        result1 = dcg_metric.result()
-        expected1_r0 = (math.pow(2, 1) - 1) / math.log2(1 + 1)
-        expected1_r1 = (
-            (math.pow(2, 3) - 1) / math.log2(1 + 1)
-            + (math.pow(2, 2) - 1) / math.log2(3 + 1)
-            + (math.pow(2, 1) - 1) / math.log2(4 + 1)
+        result = dcg_metric.result()
+        self.assertAllClose(
+            result,
+            sum([_compute_dcg([1], [1]), _compute_dcg([3, 2, 1], [1, 3, 4])])
+            / 2,
         )
-        expected1 = (expected1_r0 + expected1_r1) / 2.0
-        self.assertAllClose(result1, expected1)
 
         # Batch 2
         dcg_metric.update_state(
             self.y_true_batched[2:], self.y_pred_batched[2:]
         )
-        result2 = dcg_metric.result()
-        self.assertAllClose(result2, self.exp_value_batched)
+        result = dcg_metric.result()
+        self.assertAllClose(result, self.expected_output_batched)
 
         # Reset state
         dcg_metric.reset_state()
-        result3 = dcg_metric.result()
-        self.assertAllClose(result3, 0.0)
+        result = dcg_metric.result()
+        self.assertAllClose(result, 0.0)
 
     @parameterized.named_parameters(
         ("0.5", 0.5, 3.390402),
@@ -215,21 +206,15 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
         )
         result = dcg_metric.result()
 
-        dcg_r0 = (math.pow(2, 1) - 1) / math.log2(1 + 1)
-        dcg_r1 = (
-            (math.pow(2, 3) - 1) / math.log2(1 + 1)
-            + (math.pow(2, 2) - 1) / math.log2(3 + 1)
-            + (math.pow(2, 1) - 1) / math.log2(4 + 1)
+        expected_output = [
+            _compute_dcg([1], [1]) * 1,
+            _compute_dcg([3, 2, 1], [1, 3, 4]) * 0.5,
+            0.0,
+            _compute_dcg([2, 1], [1, 2]) * 1.5,
+        ]
+        self.assertAllClose(
+            result, sum(expected_output) / (1 + 0.5 + 1 + 1.5), rtol=1e-5
         )
-        dcg_r2 = 0.0
-        dcg_r3 = (math.pow(2, 2) - 1) / math.log2(1 + 1) + (
-            math.pow(2, 1) - 1
-        ) / math.log2(2 + 1)
-        print(dcg_r0, dcg_r1, dcg_r2, dcg_r3)
-        expected_val = (
-            dcg_r0 * 1.0 + dcg_r1 * 0.5 + dcg_r2 * 1.0 + dcg_r3 * 1.5
-        ) / (1.0 + 0.5 + 1.0 + 1.5)
-        self.assertAllClose(result, expected_val, rtol=1e-5)
 
     @parameterized.named_parameters(
         (
@@ -251,14 +236,14 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
             ops.array([[1, 0, 1]], dtype="float32"),
             ops.array([[0.8, 0.2, 0.6]], dtype="float32"),
             ops.array([[1.0, 1.0, 0.0]], dtype="float32"),
-            (math.pow(2, 1) - 1) * 1.0 / math.log2(1 + 1),
+            _compute_dcg([1], [1]),
         ),
         (
             "mask_irrelevant_item",
             ops.array([[0, 1, 0]], dtype="float32"),
             ops.array([[0.5, 0.8, 0.2]], dtype="float32"),
             ops.array([[0.0, 1.0, 1.0]], dtype="float32"),
-            (math.pow(2, 1) - 1) * 1.0 / math.log2(1 + 1),
+            _compute_dcg([1], [1]),
         ),
         (
             "varied_masks",
@@ -283,20 +268,16 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
                 ],
                 dtype="float32",
             ),
-            (
-                ((math.pow(2, 1) - 1) * 1.0 / math.log2(2 + 1))
-                + ((math.pow(2, 1) - 1) * 1.0 / math.log2(1 + 1))
-            )
-            / 2.0,
+            _compute_dcg([1, 1], [2, 1]) / 2,
         ),
     )
     def test_2d_sample_weight_masking(
-        self, y_true, y_pred, sample_weight, expected_output_formula
+        self, y_true, y_pred, sample_weight, expected_output
     ):
         dcg_metric = DCG()
         dcg_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
         result = dcg_metric.result()
-        self.assertAllClose(result, expected_output_formula, rtol=1e-5)
+        self.assertAllClose(result, expected_output, rtol=1e-5)
 
     def test_serialization(self):
         metric = DCG()
@@ -316,11 +297,7 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
         dcg_metric.update_state(self.y_true_batched, self.y_pred_batched)
         result = dcg_metric.result()
 
-        exp_value_r0 = 1.0 / 1.0
-        exp_value_r1 = 3.0 / 1.0 + 2.0 / 3.0 + 1.0 / 4.0
-        exp_value_r2 = 0.0
-        exp_value_r3 = 2.0 / 1.0 + 1.0 / 2.0
-        expected_avg_dcg = (
-            exp_value_r0 + exp_value_r1 + exp_value_r2 + exp_value_r3
-        ) / 4.0
-        self.assertAllClose(result, expected_avg_dcg, rtol=1e-5)
+        expected_output = (
+            sum([1 / 1, 3 / 1 + 2 / 3 + 1 / 4, 0, 2 / 1 + 1 / 2]) / 4
+        )
+        self.assertAllClose(result, expected_output, rtol=1e-5)

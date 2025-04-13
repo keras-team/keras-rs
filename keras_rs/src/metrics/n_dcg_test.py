@@ -9,6 +9,13 @@ from keras_rs.src import testing
 from keras_rs.src.metrics.n_dcg import nDCG
 
 
+def _compute_dcg(labels, ranks):
+    val = 0.0
+    for label, rank in zip(labels, ranks):
+        val += (math.pow(2, label) - 1) / math.log2(rank + 1)
+    return val
+
+
 class nDCGTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
         # === Unbatched Inputs ===
@@ -55,33 +62,24 @@ class nDCGTest(testing.TestCase, parameterized.TestCase):
             ],
             dtype="float32",
         )
-        dcg_r0 = (math.pow(2, 1) - 1) / math.log2(1 + 1)
-        idcg_r0 = (math.pow(2, 1) - 1) / math.log2(1 + 1)
-        ndcg_r0 = dcg_r0 / idcg_r0 if idcg_r0 > 0 else 0.0
 
-        dcg_r1 = (
-            (math.pow(2, 3) - 1) / math.log2(1 + 1)
-            + (math.pow(2, 2) - 1) / math.log2(3 + 1)
-            + (math.pow(2, 1) - 1) / math.log2(4 + 1)
-        )
-        idcg_r1 = (
-            (math.pow(2, 3) - 1) / math.log2(1 + 1)
-            + (math.pow(2, 2) - 1) / math.log2(2 + 1)
-            + (math.pow(2, 1) - 1) / math.log2(3 + 1)
-        )
-        ndcg_r1 = dcg_r1 / idcg_r1 if idcg_r1 > 0 else 0.0
-
-        ndcg_r2 = 0.0
-
-        dcg_r3 = (math.pow(2, 2) - 1) / math.log2(1 + 1) + (
-            math.pow(2, 1) - 1
-        ) / math.log2(2 + 1)
-        idcg_r3 = (math.pow(2, 2) - 1) / math.log2(1 + 1) + (
-            math.pow(2, 1) - 1
-        ) / math.log2(2 + 1)
-        ndcg_r3 = dcg_r3 / idcg_r3 if idcg_r3 > 0 else 0.0
-
-        self.exp_value_batched = (ndcg_r0 + ndcg_r1 + ndcg_r2 + ndcg_r3) / 4.0
+        expected_dcg = [
+            _compute_dcg([1], [1]),
+            _compute_dcg([3, 2, 1], [1, 3, 4]),
+            0.0,
+            _compute_dcg([2, 1], [1, 2]),
+        ]
+        expected_idcg = [
+            _compute_dcg([1], [1]),
+            _compute_dcg([3, 2, 1], [1, 2, 3]),
+            0.0,
+            _compute_dcg([2, 1], [1, 2]),
+        ]
+        expected_ndcg = [
+            a / b if b != 0.0 else 0.0
+            for a, b in zip(expected_dcg, expected_idcg)
+        ]
+        self.expected_output_batched = sum(expected_ndcg) / 4.0
 
     def test_invalid_k_init(self):
         with self.assertRaisesRegex(
@@ -111,9 +109,9 @@ class nDCGTest(testing.TestCase, parameterized.TestCase):
             self.y_true_unbatched, self.y_pred_unbatched_good
         )
         result = ndcg_metric.result()
-        ndcg = (math.pow(2, 1) - 1) / math.log2(2 + 1)
-        idcg = (math.pow(2, 1) - 1) / math.log2(1 + 1)
-        self.assertAllClose(result, ndcg / idcg if idcg > 0 else 0.0)
+        ndcg = _compute_dcg([1], [2])
+        idcg = _compute_dcg([1], [1])
+        self.assertAllClose(result, ndcg / idcg)
 
     def test_unbatched_bad_rank_binary(self):
         ndcg_metric = nDCG()
@@ -121,9 +119,9 @@ class nDCGTest(testing.TestCase, parameterized.TestCase):
             self.y_true_unbatched, self.y_pred_unbatched_bad
         )
         result = ndcg_metric.result()
-        ndcg = (math.pow(2, 1) - 1) / math.log2(3 + 1)
-        idcg = (math.pow(2, 1) - 1) / math.log2(1 + 1)
-        self.assertAllClose(result, ndcg / idcg if idcg > 0 else 0.0)
+        ndcg = _compute_dcg([1], [3])
+        idcg = _compute_dcg([1], [1])
+        self.assertAllClose(result, ndcg / idcg)
 
     def test_unbatched_no_relevant(self):
         ndcg_metric = nDCG()
@@ -141,18 +139,10 @@ class nDCGTest(testing.TestCase, parameterized.TestCase):
             self.y_pred_unbatched_graded_perfect,
         )
         result = ndcg_metric.result()
-        dcg_val = (
-            (math.pow(2, 3) - 1) / math.log2(1 + 1)
-            + (math.pow(2, 2) - 1) / math.log2(3 + 1)
-            + (math.pow(2, 1) - 1) / math.log2(4 + 1)
-        )
-        idcg_val = (
-            (math.pow(2, 3) - 1) / math.log2(1 + 1)
-            + (math.pow(2, 2) - 1) / math.log2(2 + 1)
-            + (math.pow(2, 1) - 1) / math.log2(3 + 1)
-        )
-        exp_value = dcg_val / idcg_val if idcg_val > 0 else 0.0
-        self.assertAllClose(result, exp_value, rtol=1e-5)
+
+        dcg = _compute_dcg([3, 2, 1], [1, 3, 4])
+        idcg = _compute_dcg([3, 2, 1], [1, 2, 3])
+        self.assertAllClose(result, dcg / idcg, rtol=1e-5)
 
     def test_unbatched_mixed_rank_graded(self):
         ndcg_metric = nDCG()
@@ -160,24 +150,15 @@ class nDCGTest(testing.TestCase, parameterized.TestCase):
             self.y_true_unbatched_graded, self.y_pred_unbatched_graded_mixed
         )
         result = ndcg_metric.result()
-        dcg_val = (
-            (math.pow(2, 1) - 1) / math.log2(1 + 1)
-            + (math.pow(2, 2) - 1) / math.log2(2 + 1)
-            + (math.pow(2, 3) - 1) / math.log2(3 + 1)
-        )
-        idcg_val = (
-            (math.pow(2, 3) - 1) / math.log2(1 + 1)
-            + (math.pow(2, 2) - 1) / math.log2(2 + 1)
-            + (math.pow(2, 1) - 1) / math.log2(3 + 1)
-        )
-        exp_value = dcg_val / idcg_val if idcg_val > 0 else 0.0
-        self.assertAllClose(result, exp_value, rtol=1e-5)
+        dcg = _compute_dcg([1, 2, 3], [1, 2, 3])
+        idcg = _compute_dcg([3, 2, 1], [1, 2, 3])
+        self.assertAllClose(result, dcg / idcg, rtol=1e-5)
 
     def test_batched_input(self):
         ndcg_metric = nDCG()
         ndcg_metric.update_state(self.y_true_batched, self.y_pred_batched)
         result = ndcg_metric.result()
-        self.assertAllClose(result, self.exp_value_batched, rtol=1e-5)
+        self.assertAllClose(result, self.expected_output_batched, rtol=1e-5)
 
     @parameterized.named_parameters(
         ("1", 1, 0.75),
@@ -197,36 +178,23 @@ class nDCGTest(testing.TestCase, parameterized.TestCase):
         ndcg_metric.update_state(
             self.y_true_batched[:2], self.y_pred_batched[:2]
         )
-        result1 = ndcg_metric.result()
-        # Calculate expected nDCG for first 2 rows
-        dcg_r0 = (math.pow(2, 1) - 1) / math.log2(1 + 1)
-        idcg_r0 = (math.pow(2, 1) - 1) / math.log2(1 + 1)
-        ndcg_r0 = dcg_r0 / idcg_r0 if idcg_r0 > 0 else 0.0
-        dcg_r1 = (
-            (math.pow(2, 3) - 1) / math.log2(1 + 1)
-            + (math.pow(2, 2) - 1) / math.log2(3 + 1)
-            + (math.pow(2, 1) - 1) / math.log2(4 + 1)
-        )
-        idcg_r1 = (
-            (math.pow(2, 3) - 1) / math.log2(1 + 1)
-            + (math.pow(2, 2) - 1) / math.log2(2 + 1)
-            + (math.pow(2, 1) - 1) / math.log2(3 + 1)
-        )
-        ndcg_r1 = dcg_r1 / idcg_r1 if idcg_r1 > 0 else 0.0
-        expected1 = (ndcg_r0 + ndcg_r1) / 2.0
-        self.assertAllClose(result1, expected1, rtol=1e-5)
+        result = ndcg_metric.result()
+        dcg = [_compute_dcg([1], [1]), _compute_dcg([3, 2, 1], [1, 3, 4])]
+        idcg = [_compute_dcg([1], [1]), _compute_dcg([3, 2, 1], [1, 2, 3])]
+        ndcg = sum([a / b if b != 0.0 else 0.0 for a, b in zip(dcg, idcg)]) / 2
+        self.assertAllClose(result, ndcg, rtol=1e-5)
 
         # Batch 2
         ndcg_metric.update_state(
             self.y_true_batched[2:], self.y_pred_batched[2:]
         )
-        result2 = ndcg_metric.result()
-        self.assertAllClose(result2, self.exp_value_batched, rtol=1e-5)
+        result = ndcg_metric.result()
+        self.assertAllClose(result, self.expected_output_batched, rtol=1e-5)
 
         # Reset state
         ndcg_metric.reset_state()
-        result3 = ndcg_metric.result()
-        self.assertAllClose(result3, 0.0)
+        result = ndcg_metric.result()
+        self.assertAllClose(result, 0.0)
 
     @parameterized.named_parameters(
         ("0.5", 0.5, 0.7377),
@@ -335,21 +303,7 @@ class nDCGTest(testing.TestCase, parameterized.TestCase):
         ndcg_metric.update_state(self.y_true_batched, self.y_pred_batched)
         result = ndcg_metric.result()
 
-        dcg_alt_r0 = 1.0 / 1.0
-        idcg_alt_r0 = 1.0 / 1.0
-        ndcg_alt_r0 = dcg_alt_r0 / idcg_alt_r0 if idcg_alt_r0 > 0 else 0.0
-
-        dcg_alt_r1 = 3.0 / 1.0 + 2.0 / 3.0 + 1.0 / 4.0
-        idcg_alt_r1 = 3.0 / 1.0 + 2.0 / 2.0 + 1.0 / 3.0
-        ndcg_alt_r1 = dcg_alt_r1 / idcg_alt_r1 if idcg_alt_r1 > 0 else 0.0
-
-        ndcg_alt_r2 = 0.0
-
-        dcg_alt_r3 = 2.0 / 1.0 + 1.0 / 2.0
-        idcg_alt_r3 = 2.0 / 1.0 + 1.0 / 2.0
-        ndcg_alt_r3 = dcg_alt_r3 / idcg_alt_r3 if idcg_alt_r3 > 0 else 0.0
-
-        expected_avg_ndcg = (
-            ndcg_alt_r0 + ndcg_alt_r1 + ndcg_alt_r2 + ndcg_alt_r3
-        ) / 4.0
-        self.assertAllClose(result, expected_avg_ndcg, rtol=1e-5)
+        dcg = [1 / 1, 3 / 1 + 2 / 3 + 1 / 4, 0, 2 / 1 + 1 / 2]
+        idcg = [1 / 1, 3 / 1 + 2 / 2 + 1 / 3, 0.0, 2 / 1 + 1 / 2]
+        ndcg = sum([a / b if b != 0.0 else 0.0 for a, b in zip(dcg, idcg)]) / 4
+        self.assertAllClose(result, ndcg, rtol=1e-5)
