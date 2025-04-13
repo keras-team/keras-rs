@@ -17,8 +17,8 @@ class Retrieval(keras.layers.Layer, abc.ABC):
 
     Args:
         k: int. Number of candidates to retrieve.
-        return_scores: bool.When `True`, this layer returns a tuple with the top
-            scores and the top identifiers. When `False`, this layer returns
+        return_scores: bool. When `True`, this layer returns a tuple with the
+            top scores and the top identifiers. When `False`, this layer returns
             a single tensor with the top identifiers.
     """
 
