@@ -12,4 +12,3 @@ from keras_rs.src.losses.pairwise_mean_squared_error import (
 from keras_rs.src.losses.pairwise_soft_zero_one_loss import (
     PairwiseSoftZeroOneLoss,
 )
-from keras_rs.src.metrics.mean_reciprocal_rank import MeanReciprocalRank

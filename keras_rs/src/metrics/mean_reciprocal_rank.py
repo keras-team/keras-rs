@@ -10,7 +10,7 @@ from keras_rs.src.utils.ranking_metrics_utils import get_list_weights
 from keras_rs.src.utils.ranking_metrics_utils import sort_by_scores
 
 
-@keras_rs_export("keras_rs.losses.MeanReciprocalRank")
+@keras_rs_export("keras_rs.metrics.MeanReciprocalRank")
 class MeanReciprocalRank(RankingMetric):
     def compute_metric(
         self,
