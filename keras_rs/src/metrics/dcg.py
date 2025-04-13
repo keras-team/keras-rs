@@ -3,6 +3,7 @@ from typing import Any, Callable, Optional
 from keras import ops
 
 from keras_rs.src import types
+from keras_rs.src.api_export import keras_rs_export
 from keras_rs.src.metrics.ranking_metric import RankingMetric
 from keras_rs.src.utils.ranking_metrics_utils import compute_dcg
 from keras_rs.src.utils.ranking_metrics_utils import default_gain_fn
@@ -11,6 +12,7 @@ from keras_rs.src.utils.ranking_metrics_utils import get_list_weights
 from keras_rs.src.utils.ranking_metrics_utils import sort_by_scores
 
 
+@keras_rs_export("keras_rs.metrics.DCG")
 class DCG(RankingMetric):
     def __init__(
         self,

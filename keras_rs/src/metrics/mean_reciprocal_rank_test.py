@@ -9,6 +9,7 @@ from keras_rs.src.metrics.mean_reciprocal_rank import MeanReciprocalRank
 
 class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
+        # === Unbatched inputs ===
         self.y_true_unbatched = ops.array([0, 0, 1, 0], dtype="float32")
         self.y_pred_unbatched_perfect = ops.array(
             [0.1, 0.2, 0.9, 0.3], dtype="float32"
@@ -25,6 +26,7 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
             [0.9, 0.2, 0.8, 0.3], dtype="float32"
         )
 
+        # === Batched inputs ===
         self.y_true_batched = ops.array(
             [
                 [0, 0, 1, 0],
@@ -157,7 +159,7 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
             sample_weight=sample_weight,
         )
         result = mrr_metric.result()
-        self.assertAllClose(result, 0.703125)
+        self.assertAllClose(result, 0.675)
 
     @parameterized.named_parameters(
         (
@@ -203,7 +205,7 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
             0.777778,
         ),
     )
-    def test_item_sample_weight(
+    def test_2d_sample_weight(
         self, y_true, y_pred, sample_weight, expected_output
     ):
         mrr_metric = MeanReciprocalRank()

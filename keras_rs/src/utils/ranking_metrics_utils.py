@@ -157,7 +157,7 @@ def get_list_weights(
         A tensor of shape [batch_size, 1], containing the per-list weights.
     """
     # TODO: Pretty nasty function. Check if we can simplify it at a later point.
-
+    print(weights)
     # Calculate if the sum of weights per list is greater than 0.0.
     nonzero_weights = ops.greater(ops.sum(weights, axis=1, keepdims=True), 0.0)
     # Calculate the sum of relevance per list
@@ -208,6 +208,7 @@ def get_list_weights(
         ),
         ops.zeros_like(per_list_weights),
     )
+    print(final_weights)
 
     return final_weights
 

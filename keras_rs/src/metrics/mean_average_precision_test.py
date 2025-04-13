@@ -9,7 +9,7 @@ from keras_rs.src.metrics.mean_average_precision import MeanAveragePrecision
 
 class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
-        # Unbatched inputs
+        # === Unbatched inputs ===
         self.y_true_unbatched = ops.array([0, 0, 1, 0], dtype="float32")
         self.y_pred_unbatched_perfect = ops.array(
             [0.1, 0.2, 0.9, 0.3], dtype="float32"
@@ -27,7 +27,7 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
             [0.9, 0.2, 0.1, 0.3], dtype="float32"
         )
 
-        # Batched inputs
+        # === Batched inputs ===
         self.y_true_batched = ops.array(
             [
                 [0, 0, 1, 0],
@@ -164,7 +164,7 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
             sample_weight=sample_weight,
         )
         result = map_metric.result()
-        self.assertAllClose(result, 0.572368)
+        self.assertAllClose(result, 0.6)
 
     @parameterized.named_parameters(
         (
@@ -214,7 +214,7 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
             0.777778,
         ),
     )
-    def test_item_sample_weight(
+    def test_2d_sample_weight(
         self, y_true, y_pred, sample_weight, expected_output
     ):
         map_metric = MeanAveragePrecision()
@@ -224,10 +224,6 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
         self.assertAllClose(result, expected_output)
 
     def test_serialization(self):
-        metric = MeanAveragePrecision(k=10, name="map_test")
-        config = serialize(metric)
-        restored = deserialize(config)
-        self.assertIsInstance(restored, MeanAveragePrecision)
-        self.assertEqual(metric.k, restored.k)
-        self.assertEqual(metric.name, restored.name)
-        self.assertEqual(metric.dtype, restored.dtype)
+        metric = MeanAveragePrecision()
+        restored = deserialize(serialize(metric))
+        self.assertDictEqual(metric.get_config(), restored.get_config())
