@@ -90,7 +90,7 @@ class BruteForceRetrieval(Retrieval):
             candidate_ids: The identifiers for the candidates. If `None`, the
                 indices of the candidates are returned instead.
         """
-        self._validate_update_candidates_inputs(
+        self._validate_candidate_embeddings_and_ids(
             candidate_embeddings, candidate_ids
         )
 

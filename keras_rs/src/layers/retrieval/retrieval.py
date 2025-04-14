@@ -12,7 +12,7 @@ class Retrieval(keras.layers.Layer, abc.ABC):
     """Retrieval base abstract class.
 
     This layer provides a common interface for all retrieval layers. In order
-    to define a custom retrieval layer, this abstract class can be
+    to implement a custom retrieval layer, this abstract class should be
     subclassed.
 
     Args:
@@ -32,7 +32,7 @@ class Retrieval(keras.layers.Layer, abc.ABC):
         self.k = k
         self.return_scores = return_scores
 
-    def _validate_update_candidates_inputs(
+    def _validate_candidate_embeddings_and_ids(
         self,
         candidate_embeddings: types.Tensor,
         candidate_ids: Optional[types.Tensor] = None,

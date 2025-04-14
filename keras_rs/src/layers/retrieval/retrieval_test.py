@@ -39,11 +39,11 @@ class RetrievalTest(testing.TestCase, parameterized.TestCase):
             "the same number of rows",
         ),
     )
-    def test_validate_update_candidates_inputs(
+    def test_validate_candidate_embeddings_and_ids(
         self, candidate_embeddings, candidate_ids, error_msg
     ):
         with self.assertRaisesRegex(ValueError, error_msg):
-            self.layer._validate_update_candidates_inputs(
+            self.layer._validate_candidate_embeddings_and_ids(
                 candidate_embeddings, candidate_ids
             )
 
