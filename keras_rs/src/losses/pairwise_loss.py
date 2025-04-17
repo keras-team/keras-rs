@@ -5,8 +5,8 @@ import keras
 from keras import ops
 
 from keras_rs.src import types
-from keras_rs.src.utils.loss_and_metric_utils import process_inputs
-from keras_rs.src.utils.pairwise_loss_utils import pairwise_comparison
+from keras_rs.src.losses.pairwise_loss_utils import pairwise_comparison
+from keras_rs.src.metrics.utils import process_inputs
 
 
 class PairwiseLoss(keras.losses.Loss, abc.ABC):

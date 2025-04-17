@@ -6,8 +6,8 @@ from keras_rs.src.metrics.ranking_metric import RankingMetric
 from keras_rs.src.metrics.ranking_metric import (
     ranking_metric_subclass_doc_string,
 )
-from keras_rs.src.utils.ranking_metrics_utils import get_list_weights
-from keras_rs.src.utils.ranking_metrics_utils import sort_by_scores
+from keras_rs.src.metrics.ranking_metrics_utils import get_list_weights
+from keras_rs.src.metrics.ranking_metrics_utils import sort_by_scores
 
 
 @keras_rs_export("keras_rs.metrics.MeanReciprocalRank")

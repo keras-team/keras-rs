@@ -5,9 +5,9 @@ import keras
 from keras import ops
 
 from keras_rs.src import types
+from keras_rs.src.metrics.utils import process_inputs
 from keras_rs.src.utils.keras_utils import check_rank
 from keras_rs.src.utils.keras_utils import check_shapes_compatible
-from keras_rs.src.utils.loss_and_metric_utils import process_inputs
 
 
 class RankingMetric(keras.metrics.Mean, abc.ABC):
@@ -83,7 +83,8 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
         # `self.dtype`.
         y_true = ops.convert_to_tensor(y_true)
         y_pred = ops.convert_to_tensor(y_pred)
-        sample_weight = ops.convert_to_tensor(sample_weight)
+        if sample_weight is not None:
+            sample_weight = ops.convert_to_tensor(sample_weight)
 
         # === Process `sample_weight` ===
         if sample_weight is None:
@@ -114,14 +115,15 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
         elif sample_weight_rank == 2:
             check_shapes_compatible(sample_weight_shape, y_true_shape)
 
-        # Want to make sure `sample_weight` is of the same shape as
-        # `y_true`.
+        # Reshape `sample_weight` to the shape of `y_true`.
         sample_weight = ops.multiply(ops.ones_like(y_true), sample_weight)
 
-        # === Process inputs - shape checking, upranking, etc. ===
+        # Get `mask` from `sample_weight`.
         mask = ops.greater(
             sample_weight, ops.cast(0, dtype=sample_weight.dtype)
         )
+
+        # === Process inputs - shape checking, upranking, etc. ===
         y_true, y_pred, mask, batched = process_inputs(
             y_true=y_true,
             y_pred=y_pred,
