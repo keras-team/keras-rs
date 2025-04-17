@@ -14,5 +14,6 @@ numpy
 # pip build
 build
 
-# keras
+# required dependencies, should match dependencies in pyproject.toml
 keras
+ml-dtypes

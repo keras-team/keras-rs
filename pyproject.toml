@@ -27,6 +27,7 @@ classifiers = [
 ]
 dependencies = [
     "keras",
+    "ml-dtypes",
 ]
 
 [project.urls]
@@ -60,6 +61,7 @@ known-first-party = ["keras_rs"]
 [tool.mypy]
 strict = "True"
 exclude = ["_test\\.py$", "^examples"]
+untyped_calls_exclude = ["ml_dtypes"]
 disable_error_code = ["import-untyped"]
 disallow_subclassing_any = "False"
 

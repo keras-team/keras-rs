@@ -5,7 +5,9 @@ from keras import ops
 from keras_rs.src import types
 
 
-def apply_pairwise_op(x: types.Tensor, op: ops) -> types.Tensor:
+def apply_pairwise_op(
+    x: types.Tensor, op: Callable[[types.Tensor, types.Tensor], types.Tensor]
+) -> types.Tensor:
     return op(
         ops.expand_dims(x, axis=-1),
         ops.expand_dims(x, axis=-2),
