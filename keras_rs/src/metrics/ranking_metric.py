@@ -81,13 +81,9 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
         # === Convert to tensors, if list ===
         # TODO (abheesht): Figure out if we need to cast tensors to
         # `self.dtype`.
-        if isinstance(y_true, list):
-            y_true = ops.convert_to_tensor(y_true)
-        if isinstance(y_pred, list):
-            y_pred = ops.convert_to_tensor(y_pred)
-        # `sample_weight` can be a scalar too.
-        if isinstance(sample_weight, (list, float, int)):
-            sample_weight = ops.convert_to_tensor(sample_weight)
+        y_true = ops.convert_to_tensor(y_true)
+        y_pred = ops.convert_to_tensor(y_pred)
+        sample_weight = ops.convert_to_tensor(sample_weight)
 
         # === Process `sample_weight` ===
         if sample_weight is None:
@@ -146,7 +142,7 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
         y_pred = ops.where(
             mask,
             y_pred,
-            -1e-6 * ops.ones_like(y_pred)
+            -keras.config.epsilon() * ops.ones_like(y_pred)
             + ops.amin(y_pred, axis=1, keepdims=True),
         )
 

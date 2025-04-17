@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Union
 
 import keras
 
@@ -44,11 +44,10 @@ def check_shapes_compatible(
     return True
 
 
-# Check ranks and shapes.
 def check_rank(
     x_rank: int,
-    allowed_ranks: tuple[int, ...] = (1, 2),
-    tensor_name: Optional[str] = None,
+    allowed_ranks: tuple[int, ...],
+    tensor_name: str,
 ) -> None:
     if x_rank not in allowed_ranks:
         raise ValueError(

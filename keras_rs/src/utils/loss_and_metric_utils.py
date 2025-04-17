@@ -32,10 +32,10 @@ def process_inputs(
         mask_rank = len(mask_shape)
 
     if check_y_true_rank:
-        check_rank(y_true_rank, tensor_name="y_true")
-    check_rank(y_pred_rank, tensor_name="y_pred")
+        check_rank(y_true_rank, allowed_ranks=(1, 2), tensor_name="y_true")
+    check_rank(y_pred_rank, allowed_ranks=(1, 2), tensor_name="y_pred")
     if mask is not None:
-        check_rank(mask_rank, tensor_name="mask")
+        check_rank(mask_rank, allowed_ranks=(1, 2), tensor_name="mask")
     if not check_shapes_compatible(y_true_shape, y_pred_shape):
         raise ValueError(
             "`y_true` and `y_pred` should have the same shape. Received: "
