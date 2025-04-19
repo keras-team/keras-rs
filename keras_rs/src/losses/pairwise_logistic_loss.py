@@ -29,6 +29,7 @@ explanation = """
 """
 extra_args = ""
 PairwiseLogisticLoss.__doc__ = pairwise_loss_subclass_doc_string.format(
+    loss_name="logistic loss",
     formula=formula,
     explanation=explanation,
     extra_args=extra_args,

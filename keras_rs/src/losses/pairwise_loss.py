@@ -5,8 +5,8 @@ import keras
 from keras import ops
 
 from keras_rs.src import types
-from keras_rs.src.utils.pairwise_loss_utils import pairwise_comparison
-from keras_rs.src.utils.pairwise_loss_utils import process_loss_call_inputs
+from keras_rs.src.losses.pairwise_loss_utils import pairwise_comparison
+from keras_rs.src.metrics.utils import process_inputs
 
 
 class PairwiseLoss(keras.losses.Loss, abc.ABC):
@@ -26,10 +26,7 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
 
     @abc.abstractmethod
     def pairwise_loss(self, pairwise_logits: types.Tensor) -> types.Tensor:
-        raise NotImplementedError(
-            "All subclasses of `keras_rs.losses.pairwise_loss.PairwiseLoss`"
-            "must implement the `pairwise_loss()` method."
-        )
+        pass
 
     def compute_unreduced_loss(
         self,
@@ -83,7 +80,7 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
             mask = y_true.get("mask", None)
             y_true = y_true["labels"]
 
-        y_true, y_pred, mask = process_loss_call_inputs(y_true, y_pred, mask)
+        y_true, y_pred, mask, _ = process_inputs(y_true, y_pred, mask)
 
         losses, weights = self.compute_unreduced_loss(
             labels=y_true, logits=y_pred, mask=mask
@@ -94,7 +91,7 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
 
 
 pairwise_loss_subclass_doc_string = (
-    "Computes pairwise hinge loss between true labels and predicted scores."
+    "Computes pairwise {loss_name} between true labels and predicted scores."
     """
     This loss function is designed for ranking tasks, where the goal is to
     correctly order items within each list. It computes the loss by comparing
