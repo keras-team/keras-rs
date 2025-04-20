@@ -6,8 +6,12 @@ from keras_rs.src.metrics.ranking_metric import RankingMetric
 from keras_rs.src.metrics.ranking_metric import (
     ranking_metric_subclass_doc_string,
 )
+from keras_rs.src.metrics.ranking_metric import (
+    ranking_metric_subclass_doc_string_args,
+)
 from keras_rs.src.metrics.ranking_metrics_utils import get_list_weights
 from keras_rs.src.metrics.ranking_metrics_utils import sort_by_scores
+from keras_rs.src.utils.doc_string_utils import format_docstring
 
 
 @keras_rs_export("keras_rs.metrics.MeanReciprocalRank")
@@ -69,26 +73,28 @@ class MeanReciprocalRank(RankingMetric):
         return mrr, per_list_weights
 
 
-core_concept_sentence = (
+concept_sentence = (
     "the rank position of the single highest-scoring relevant item"
 )
-relevance_type_description = "binary indicators (0 or 1) of relevance"
+relevance_type = "binary indicators (0 or 1) of relevance"
 score_range_interpretation = (
     "from 0 to 1, with 1 indicating the first relevant item was always ranked "
     "first"
 )
-formula = """
-    ```
-    MRR(y, s) = max_{i} y_{i} / rank(s_{i})
-    ```
-"""
+formula = """```
+MRR(y, s) = max_{i} y_{i} / rank(s_{i})
+```"""
 extra_args = ""
-MeanReciprocalRank.__doc__ = ranking_metric_subclass_doc_string.format(
-    metric_name="Mean Reciprocal Rank",
-    metric_abbreviation="MRR",
-    core_concept_sentence=core_concept_sentence,
-    relevance_type_description=relevance_type_description,
-    score_range_interpretation=score_range_interpretation,
-    formula=formula,
-    extra_args=extra_args,
+MeanReciprocalRank.__doc__ = (
+    format_docstring(
+        ranking_metric_subclass_doc_string,
+        width=80,
+        metric_name="Mean Reciprocal Rank",
+        metric_abbreviation="MRR",
+        concept_sentence=concept_sentence,
+        relevance_type=relevance_type,
+        score_range_interpretation=score_range_interpretation,
+        formula=formula,
+    )
+    + ranking_metric_subclass_doc_string_args
 )

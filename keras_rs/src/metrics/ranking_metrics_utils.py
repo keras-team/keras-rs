@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 import keras
 from keras import ops
@@ -10,7 +10,7 @@ def get_shuffled_indices(
     shape: types.TensorShape,
     mask: Optional[types.Tensor] = None,
     shuffle_ties: bool = True,
-    seed: Optional[int] = None,
+    seed: Optional[Union[int, keras.random.SeedGenerator]] = None,
 ) -> types.Tensor:
     """Utility function for getting shuffled indices, with masked indices
     pushed to the end.
@@ -57,7 +57,7 @@ def sort_by_scores(
     mask: Optional[types.Tensor] = None,
     k: Optional[int] = None,
     shuffle_ties: bool = True,
-    seed: Optional[int] = None,
+    seed: Optional[Union[int, keras.random.SeedGenerator]] = None,
 ) -> types.Tensor:
     """
     Utility function for sorting tensors by scores.

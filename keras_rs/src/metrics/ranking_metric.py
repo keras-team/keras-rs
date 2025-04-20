@@ -210,31 +210,33 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
         return config
 
 
-ranking_metric_subclass_doc_string = (
-    "    Computes {metric_name} ({metric_abbreviation})."
-    """
-    This metric evaluates ranking quality by focusing on
-    {core_concept_sentence}. It processes true relevance labels in `y_true`
-    ({relevance_type_description}) against predicted scores in
-    `y_pred`. The scores in `y_pred` are used to determine the rank order of
-    items, usually by sorting in descending order. Resulting scores generally
-    range {score_range_interpretation}.
+ranking_metric_subclass_doc_string = """
+Computes {metric_name} ({metric_abbreviation}).
 
-    For each list of predicted scores `s` in `y_pred` and the corresponding list
-    of true labels `y` in `y_true`, the per-query {metric_abbreviation} score is
-    calculated as follows:
+This metric evaluates ranking quality by focusing on {concept_sentence}. It
+processes true relevance labels in `y_true` ({relevance_type})
+against predicted scores in `y_pred`. The scores in `y_pred` are used to
+determine the rank order of items, usually by sorting in descending order.
+Resulting scores generally range {score_range_interpretation}.
+
+For each list of predicted scores `s` in `y_pred` and the corresponding list
+of true labels `y` in `y_true`, the per-query {metric_abbreviation} score is
+calculated as follows:
 
 {formula}
 
-    The final {metric_abbreviation} score reported is typically the weighted
-    average of these per-query scores across all queries/lists in the dataset.
+The final {metric_abbreviation} score reported is typically the weighted
+average of these per-query scores across all queries/lists in the dataset.
 
-    Note: `sample_weight` is handled differently for ranking metrics. For
-    batched inputs, `sample_weight` can be scalar, 1D, 2D. The scalar case and
-    1D case (list-wise weights) are straightforward. The 2D case (item-wise
-    weights) is different, in the sense that the sample weights are aggregated
-    to get 1D weights. For more details, refer to
-    `keras_rs.src.metrics.ranking_metrics_utils.get_list_weights`.
+Note: `sample_weight` is handled differently for ranking metrics. For
+batched inputs, `sample_weight` can be scalar, 1D, 2D. The scalar case and
+1D case (list-wise weights) are straightforward. The 2D case (item-wise
+weights) is different, in the sense that the sample weights are aggregated
+to get 1D weights. For more details, refer to
+`keras_rs.src.metrics.ranking_metrics_utils.get_list_weights`.
+"""
+
+ranking_metric_subclass_doc_string_args = """
 
     Args:{extra_args}
         k: int. The number of top-ranked items to consider (the 'k' in 'top-k').
@@ -248,5 +250,4 @@ ranking_metric_subclass_doc_string = (
             `"float32"` unless set to different value
             (via `keras.backend.set_floatx()`). If a `keras.DTypePolicy` is
             provided, then the `compute_dtype` will be utilized.
-    """
-)
+"""

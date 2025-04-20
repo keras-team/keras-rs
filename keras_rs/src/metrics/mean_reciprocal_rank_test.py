@@ -170,6 +170,49 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
         self.assertAllClose(result, expected_output)
 
     @parameterized.named_parameters(
+        (
+            "mask_relevant_items",
+            {"labels": [[0.0, 1.0, 0.0]], "mask": [[True, False, True]]},
+            [[0.5, 0.8, 0.2]],
+            None,
+            0.0,
+        ),
+        (
+            "mask_first_relevant_item",
+            {"labels": [[1, 0, 1]], "mask": [[False, True, True]]},
+            [[0.8, 0.2, 0.6]],
+            None,
+            1.0,
+        ),
+        (
+            "mask_irrelevant_item",
+            {"labels": [[0, 1, 0]], "mask": [[False, True, True]]},
+            [[0.5, 0.8, 0.2]],
+            None,
+            1.0,
+        ),
+        (
+            "general_case",
+            {
+                "labels": [[0, 1, 0, 0], [1, 0, 0, 1]],
+                "mask": [
+                    [True, True, False, False],
+                    [False, False, True, True],
+                ],
+            },
+            [[0.8, 0.7, 0.1, 0.2], [0.9, 0.1, 0.2, 0.3]],
+            [[0.8, 0.8, 1.0, 1.0], [0.0, 0.0, 1.0, 1.0]],
+            0.777778,
+        ),
+    )
+    def test_masking(self, y_true, y_pred, sample_weight, expected_output):
+        mrr_metric = MeanReciprocalRank()
+
+        mrr_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
+        result = mrr_metric.result()
+        self.assertAllClose(result, expected_output)
+
+    @parameterized.named_parameters(
         ("1", 1, 0.5), ("2", 2, 0.625), ("3", 3, 0.625), ("4", 4, 0.625)
     )
     def test_k(self, k, expected_mrr):
