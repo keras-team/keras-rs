@@ -7,7 +7,7 @@ from keras_rs.src.utils.keras_utils import check_rank
 from keras_rs.src.utils.keras_utils import check_shapes_compatible
 
 
-def process_inputs(
+def standardize_call_inputs_ranks(
     y_true: types.Tensor,
     y_pred: types.Tensor,
     mask: Optional[types.Tensor] = None,

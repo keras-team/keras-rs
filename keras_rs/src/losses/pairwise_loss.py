@@ -6,7 +6,7 @@ from keras import ops
 
 from keras_rs.src import types
 from keras_rs.src.losses.pairwise_loss_utils import pairwise_comparison
-from keras_rs.src.metrics.utils import process_inputs
+from keras_rs.src.metrics.utils import standardize_call_inputs_ranks
 
 
 class PairwiseLoss(keras.losses.Loss, abc.ABC):
@@ -80,7 +80,9 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
             mask = y_true.get("mask", None)
             y_true = y_true["labels"]
 
-        y_true, y_pred, mask, _ = process_inputs(y_true, y_pred, mask)
+        y_true, y_pred, mask, _ = standardize_call_inputs_ranks(
+            y_true, y_pred, mask
+        )
 
         losses, weights = self.compute_unreduced_loss(
             labels=y_true, logits=y_pred, mask=mask

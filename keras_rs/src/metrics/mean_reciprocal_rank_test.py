@@ -10,24 +10,6 @@ from keras_rs.src.metrics.mean_reciprocal_rank import MeanReciprocalRank
 
 class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
-        # === Unbatched inputs ===
-        self.y_true_unbatched = ops.array([0, 0, 1, 0], dtype="float32")
-        self.y_pred_unbatched_perfect = ops.array(
-            [0.1, 0.2, 0.9, 0.3], dtype="float32"
-        )
-        self.y_pred_unbatched_second = ops.array(
-            [0.8, 0.1, 0.7, 0.2], dtype="float32"
-        )
-        self.y_pred_unbatched_third = ops.array(
-            [0.4, 0.3, 0.2, 0.1], dtype="float32"
-        )
-        self.y_true_unbatched_none = ops.array([0, 0, 0, 0], dtype="float32")
-        self.y_true_unbatched_multi = ops.array([1, 0, 1, 0], dtype="float32")
-        self.y_pred_unbatched_multi = ops.array(
-            [0.9, 0.2, 0.8, 0.3], dtype="float32"
-        )
-
-        # === Batched inputs ===
         self.y_true_batched = ops.array(
             [
                 [0, 0, 1, 0],
@@ -61,51 +43,131 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
         ):
             MeanReciprocalRank(k=3.5)  # type: ignore
 
-    def test_unbatched_perfect_rank(self):
+    @parameterized.named_parameters(
+        (
+            "perfect_rank",
+            [0.0, 0.0, 1.0, 0.0],
+            [0.1, 0.2, 0.9, 0.3],
+            None,
+            1.0,
+        ),
+        (
+            "second_rank",
+            [0.0, 0.0, 1.0, 0.0],
+            [0.8, 0.1, 0.7, 0.2],
+            None,
+            1 / 2,
+        ),
+        (
+            "third_rank",
+            [0.0, 0.0, 1.0, 0.0],
+            [0.4, 0.3, 0.2, 0.1],
+            None,
+            1 / 3,
+        ),
+        (
+            "irrelevant",
+            [0.0, 0.0, 0.0, 0.0],
+            [0.1, 0.2, 0.9, 0.3],
+            None,
+            0.0,
+        ),
+        (
+            "multiple_relevant_items",
+            [1.0, 0.0, 1.0, 0.0],
+            [0.9, 0.2, 0.8, 0.3],
+            None,
+            1.0,
+        ),
+        (
+            "sample_weight_0",
+            [0.0, 1.0, 0.0],
+            [0.5, 0.8, 0.2],
+            [0.0, 0.0, 0.0],
+            0.0,
+        ),
+        (
+            "sample_weight_scalar",
+            [0.0, 0.0, 1.0, 0.0],
+            [0.8, 0.1, 0.7, 0.2],
+            5.0,
+            1 / 2,
+        ),
+        (
+            "sample_weight_1d",
+            [1.0, 0.0, 1.0, 0.0],
+            [0.9, 0.2, 0.8, 0.3],
+            [2.0, 1.0, 3.0, 0.0],
+            1.0,
+        ),
+    )
+    def test_unbatched_inputs(
+        self, y_true, y_pred, sample_weight, expected_output
+    ):
         mrr_metric = MeanReciprocalRank()
-        mrr_metric.update_state(
-            self.y_true_unbatched, self.y_pred_unbatched_perfect
-        )
+        mrr_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
         result = mrr_metric.result()
-        self.assertAllClose(result, 1.0)
-
-    def test_unbatched_second_rank(self):
-        mrr_metric = MeanReciprocalRank()
-        mrr_metric.update_state(
-            self.y_true_unbatched, self.y_pred_unbatched_second
-        )
-        result = mrr_metric.result()
-        self.assertAllClose(result, 0.5)
-
-    def test_unbatched_third_rank(self):
-        mrr_metric = MeanReciprocalRank()
-        mrr_metric.update_state(
-            self.y_true_unbatched, self.y_pred_unbatched_third
-        )
-        result = mrr_metric.result()
-        self.assertAllClose(result, 1 / 3)
-
-    def test_unbatched_no_relevant(self):
-        mrr_metric = MeanReciprocalRank()
-        mrr_metric.update_state(
-            self.y_true_unbatched_none, self.y_pred_unbatched_perfect
-        )
-        result = mrr_metric.result()
-        self.assertAllClose(result, 0.0)
-
-    def test_unbatched_multiple_relevant(self):
-        mrr_metric = MeanReciprocalRank()
-        mrr_metric.update_state(
-            self.y_true_unbatched_multi, self.y_pred_unbatched_multi
-        )
-        result = mrr_metric.result()
-        self.assertAllClose(result, 1.0)
+        self.assertAllClose(result, expected_output)
 
     def test_batched_input(self):
         mrr_metric = MeanReciprocalRank()
         mrr_metric.update_state(self.y_true_batched, self.y_pred_batched)
         result = mrr_metric.result()
         self.assertAllClose(result, 0.625)
+
+    @parameterized.named_parameters(
+        ("scalar_0.5", 0.5, 0.625),
+        ("scalar_0", 0, 0),
+        ("scalar_1d", [1.0, 0.5, 2.0, 1.0], 0.675),
+    )
+    def test_batched_inputs_sample_weight(self, sample_weight, expected_output):
+        mrr_metric = MeanReciprocalRank()
+        mrr_metric.update_state(
+            self.y_true_batched,
+            self.y_pred_batched,
+            sample_weight=sample_weight,
+        )
+        result = mrr_metric.result()
+        self.assertAllClose(result, expected_output)
+
+    @parameterized.named_parameters(
+        (
+            "mask_relevant_items",
+            [[0.0, 1.0, 0.0]],
+            [[0.5, 0.8, 0.2]],
+            [[1.0, 0.0, 1.0]],
+            0.0,
+        ),
+        (
+            "mask_first_relevant_item",
+            [[1, 0, 1]],
+            [[0.8, 0.2, 0.6]],
+            [[0.0, 1.0, 1.0]],
+            1.0,
+        ),
+        (
+            "mask_irrelevant_item",
+            [[0, 1, 0]],
+            [[0.5, 0.8, 0.2]],
+            [[0.0, 1.0, 1.0]],
+            1.0,
+        ),
+        (
+            "general_case",
+            [[0, 1, 0, 0], [1, 0, 0, 1]],
+            [[0.8, 0.7, 0.1, 0.2], [0.9, 0.1, 0.2, 0.3]],
+            [[0.8, 0.8, 0.0, 0.0], [0.0, 0.0, 1.0, 1.0]],
+            0.777778,
+        ),
+    )
+    def test_2d_sample_weight(
+        self, y_true, y_pred, sample_weight, expected_output
+    ):
+        mrr_metric = MeanReciprocalRank()
+
+        mrr_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
+        result = mrr_metric.result()
+        self.assertAllClose(result, expected_output)
 
     @parameterized.named_parameters(
         ("1", 1, 0.5), ("2", 2, 0.625), ("3", 3, 0.625), ("4", 4, 0.625)
@@ -122,98 +184,20 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
         mrr_metric.update_state(
             self.y_true_batched[:2], self.y_pred_batched[:2]
         )
-        result1 = mrr_metric.result()
-        self.assertAllClose(result1, 0.75)
+        result = mrr_metric.result()
+        self.assertAllClose(result, 0.75)
 
         # Batch 2: Last two lists
         mrr_metric.update_state(
             self.y_true_batched[2:], self.y_pred_batched[2:]
         )
-        result2 = mrr_metric.result()
-        self.assertAllClose(result2, 0.625)
+        result = mrr_metric.result()
+        self.assertAllClose(result, 0.625)
 
         # Reset state
         mrr_metric.reset_state()
-        result3 = mrr_metric.result()
-        self.assertAllClose(result3, 0.0)
-
-    @parameterized.named_parameters(
-        ("0.5", 0.5, 0.625),
-        ("0", 0, 0),
-    )
-    def test_scalar_sample_weight(self, sample_weight, expected_output):
-        mrr_metric = MeanReciprocalRank()
-        mrr_metric.update_state(
-            self.y_true_batched,
-            self.y_pred_batched,
-            sample_weight=sample_weight,
-        )
         result = mrr_metric.result()
-        self.assertAllClose(result, expected_output)
-
-    def test_1d_sample_weight(self):
-        mrr_metric = MeanReciprocalRank()
-        sample_weight = ops.array([1.0, 0.5, 2.0, 1.0], dtype="float32")
-        mrr_metric.update_state(
-            self.y_true_batched,
-            self.y_pred_batched,
-            sample_weight=sample_weight,
-        )
-        result = mrr_metric.result()
-        self.assertAllClose(result, 0.675)
-
-    @parameterized.named_parameters(
-        (
-            "mask_relevant",
-            ops.array([[0, 1, 0]], dtype="float32"),
-            ops.array([[0.5, 0.8, 0.2]], dtype="float32"),
-            ops.array([[1.0, 0.0, 1.0]], dtype="float32"),
-            0.0,
-        ),
-        (
-            "mask_first_relevant",
-            ops.array([[1, 0, 1]], dtype="float32"),
-            ops.array([[0.8, 0.2, 0.6]], dtype="float32"),
-            ops.array([[0.0, 1.0, 1.0]], dtype="float32"),
-            1.0,
-        ),
-        (
-            "mask_irrelevant",
-            ops.array([[0, 1, 0]], dtype="float32"),
-            ops.array([[0.5, 0.8, 0.2]], dtype="float32"),
-            ops.array([[0.0, 1.0, 1.0]], dtype="float32"),
-            1.0,
-        ),
-        (
-            "batch_size_2",
-            ops.array(
-                [
-                    [0, 1, 0, 0],
-                    [1, 0, 0, 1],
-                ],
-                dtype="float32",
-            ),
-            ops.array(
-                [
-                    [0.8, 0.7, 0.1, 0.2],
-                    [0.9, 0.1, 0.2, 0.3],
-                ],
-                dtype="float32",
-            ),
-            ops.array(
-                [[0.8, 0.8, 0.8, 0.8], [0.0, 0.0, 1.0, 1.0]], dtype="float32"
-            ),
-            0.777778,
-        ),
-    )
-    def test_2d_sample_weight(
-        self, y_true, y_pred, sample_weight, expected_output
-    ):
-        mrr_metric = MeanReciprocalRank()
-
-        mrr_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
-        result = mrr_metric.result()
-        self.assertAllClose(result, expected_output)
+        self.assertAllClose(result, 0.0)
 
     def test_serialization(self):
         metric = MeanReciprocalRank()

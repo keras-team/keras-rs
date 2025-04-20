@@ -83,6 +83,8 @@ def sort_by_scores(
     max_possible_k = ops.shape(scores)[1]
     if k is None:
         k = max_possible_k
+    elif isinstance(max_possible_k, int):
+        k = min(k, max_possible_k)
     else:
         k = ops.minimum(k, max_possible_k)
 
@@ -128,15 +130,14 @@ def get_list_weights(
     sum(per_list_weights) / num(sum(relevance) != 0 && sum(weights) != 0)
     ```
 
-    When all the lists have sum(relevance) == 0, we set the average weight to
+    When all the lists have `sum(relevance) == 0`, we set the average weight to
     1.0.
 
     This computation takes care of the following cases:
     - When all the weights are 1.0, the per-list weights will be 1.0
       everywhere, even for lists without any relevant examples because
       `sum(per_list_weights) ==  num(sum(relevance) != 0)`. This handles the
-      standard ranking metrics where the weights are all
-      1.0.
+      standard ranking metrics where the weights are all 1.0.
     - When every list has a nonzero weight, the default weight is not used.
       This handles the unbiased metrics well.
     - For the mixture of the above 2 scenario, the weights for lists with
@@ -147,7 +148,7 @@ def get_list_weights(
       num(sum(relevance) != 0) / num(lists)
       ```
 
-      The rest have weights 1.0 / num(lists).
+      The rest have weights `1.0 / num(lists)`.
 
     Args:
         weights:  The weights `Tensor` of shape [batch_size, list_size].
@@ -156,32 +157,27 @@ def get_list_weights(
     Returns:
         A tensor of shape [batch_size, 1], containing the per-list weights.
     """
-    # TODO: Pretty nasty function. Check if we can simplify it at a later point.
-
     # Calculate if the sum of weights per list is greater than 0.0.
     nonzero_weights = ops.greater(ops.sum(weights, axis=1, keepdims=True), 0.0)
     # Calculate the sum of relevance per list
     per_list_relevance = ops.sum(relevance, axis=1, keepdims=True)
-
-    # Identify lists where both weights and relevance sums are non-zero.
+    # Calculate if the sum of relevance per list is greater than 0.0
     nonzero_relevance_condition = ops.greater(per_list_relevance, 0.0)
-    nonzero_relevance = ops.where(
-        nonzero_weights,
-        ops.cast(nonzero_relevance_condition, "float32"),
-        ops.zeros_like(per_list_relevance),
+    # Identify lists where both weights and relevance sums are non-zero.
+    nonzero_relevance = ops.cast(
+        ops.logical_and(nonzero_weights, nonzero_relevance_condition),
+        dtype="float32",
     )
-    # Count the number of lists with non-zero relevance (and implicitly
-    # non-zero weights).
+    # Count the number of lists with non-zero relevance and non-zero weights.
     nonzero_relevance_count = ops.sum(nonzero_relevance, axis=0, keepdims=True)
 
-    # Calculate the per-list weights using the core formula
-    # Numerator: sum(weights * relevance) per list
-    numerator = ops.sum(weights * relevance, axis=1, keepdims=True)
+    # Calculate the per-list weights using the core formula.
+    # Numerator: `sum(weights * relevance)` per list
+    numerator = ops.sum(ops.multiply(weights, relevance), axis=1, keepdims=True)
     # Denominator: per_list_relevance = sum(relevance) per list
     per_list_weights = ops.divide_no_nan(numerator, per_list_relevance)
 
-    # Calculate the sum of the initially computed per-list weights (where
-    # relevance > 0)
+    # Calculate the sum of the computed per-list weights.
     sum_weights = ops.sum(per_list_weights, axis=0, keepdims=True)
 
     # Calculate the average weight to use as default for lists with zero
@@ -189,8 +185,8 @@ def get_list_weights(
     # default to 1.0.
     avg_weight = ops.where(
         ops.greater(nonzero_relevance_count, 0.0),
-        ops.divide_no_nan(sum_weights, nonzero_relevance_count),
-        ops.ones_like(nonzero_relevance_count),
+        ops.divide(sum_weights, nonzero_relevance_count),
+        ops.cast(1, dtype=sum_weights.dtype),
     )
 
     # Final assignment of weights based on conditions:
@@ -204,9 +200,9 @@ def get_list_weights(
         ops.where(
             nonzero_relevance_condition,
             per_list_weights,
-            ops.ones_like(per_list_weights) * avg_weight,
+            avg_weight,
         ),
-        ops.zeros_like(per_list_weights),
+        ops.cast(0, dtype=per_list_weights.dtype),
     )
 
     return final_weights

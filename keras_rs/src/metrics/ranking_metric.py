@@ -5,7 +5,7 @@ import keras
 from keras import ops
 
 from keras_rs.src import types
-from keras_rs.src.metrics.utils import process_inputs
+from keras_rs.src.metrics.utils import standardize_call_inputs_ranks
 from keras_rs.src.utils.keras_utils import check_rank
 from keras_rs.src.utils.keras_utils import check_shapes_compatible
 
@@ -106,14 +106,16 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
             tensor_name="sample_weight",
         )
 
-        # If `sample_weight` rank is 1, it should be of shape `(batch_size,)`.
-        # Otherwise, it should be of shape `(batch_size, list_size)`.
-        if sample_weight_rank == 1:
-            check_shapes_compatible(sample_weight_shape, (y_true_shape[0],))
-            # Uprank this, so that we get per-list weights here.
-            sample_weight = ops.expand_dims(sample_weight, axis=1)
-        elif sample_weight_rank == 2:
-            check_shapes_compatible(sample_weight_shape, y_true_shape)
+        if y_true_rank == 2:
+            # If `sample_weight` rank is 1, it should be of shape
+            # `(batch_size,)`. Otherwise, it should be of shape
+            # `(batch_size, list_size)`.
+            if sample_weight_rank == 1:
+                check_shapes_compatible(sample_weight_shape, (y_true_shape[0],))
+                # Uprank this, so that we get per-list weights here.
+                sample_weight = ops.expand_dims(sample_weight, axis=1)
+            elif sample_weight_rank == 2:
+                check_shapes_compatible(sample_weight_shape, y_true_shape)
 
         # Reshape `sample_weight` to the shape of `y_true`.
         sample_weight = ops.multiply(ops.ones_like(y_true), sample_weight)
@@ -124,7 +126,7 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
         )
 
         # === Process inputs - shape checking, upranking, etc. ===
-        y_true, y_pred, mask, batched = process_inputs(
+        y_true, y_pred, mask, batched = standardize_call_inputs_ranks(
             y_true=y_true,
             y_pred=y_pred,
             mask=mask,
