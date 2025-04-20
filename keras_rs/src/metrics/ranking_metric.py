@@ -1,5 +1,5 @@
 import abc
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import keras
 from keras import ops
@@ -26,6 +26,9 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
     Args:
         k: int. The number of top-ranked items to consider (the 'k' in 'top-k').
             Must be a positive integer.
+        shuffle_ties: bool. Whether to randomly shuffle scores before sorting.
+            This is done to break ties. Defaults to `True`.
+        seed: int. Random seed used for shuffling.
         name: Optional name for the loss instance.
         dtype: The dtype of the metric's computations. Defaults to `None`, which
             means using `keras.backend.floatx()`. `keras.backend.floatx()` is a
@@ -34,7 +37,13 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
             provided, then the `compute_dtype` will be utilized.
     """
 
-    def __init__(self, k: Optional[int] = None, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        k: Optional[int] = None,
+        shuffle_ties: bool = True,
+        seed: Optional[Union[int, keras.random.SeedGenerator]] = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
 
         if k is not None and (not isinstance(k, int) or k < 1):
@@ -43,6 +52,11 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
             )
 
         self.k = k
+        self.shuffle_ties = shuffle_ties
+        self.seed = seed
+
+        # Define `SeedGenerator`. JAX doesn't work, otherwise.
+        self.seed_generator = keras.random.SeedGenerator(seed)
 
     @abc.abstractmethod
     def compute_metric(
@@ -65,9 +79,14 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
         Accumulates statistics for the ranking metric.
 
         Args:
-            y_true: tensor. Ground truth values. Of shape `(list_size)`
-                for unbatched inputs or `(batch_size, list_size)` for batched
-                inputs.
+            y_true: tensor or dict. Ground truth values. If tensor, of shape
+                `(list_size)` for unbatched inputs or `(batch_size, list_size)`
+                for batched inputs. If an item has a label of -1, it is ignored
+                in loss computation. If it is a dictionary, it should have two
+                keys: `"labels"` and `"mask"`. `"mask"` can be used to ignore
+                elements in metric computation, i.e., pairs will not be formed
+                with those items. Note that the final mask is an `and` of the
+                passed mask, `labels >= 0`, and `sample_weight > 0`.
             y_pred: tensor. The predicted values, of shape `(list_size)` for
                 unbatched inputs or `(batch_size, list_size)` for batched
                 inputs. Should be of the same shape as `y_true`.
@@ -75,8 +94,17 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
                 shape `(list_size)` or `(batch_size, list_size)`. Defaults to
                 `None`.
         """
-        # TODO (abheesht): Should `y_true` be a dict, with `"mask"` as one key
-        # for parity  with pairwise losses?
+        # === Process `y_true`, if dict ===
+        passed_mask = None
+        if isinstance(y_true, dict):
+            if "labels" not in y_true:
+                raise ValueError(
+                    '`"labels"` should be present in `y_true`. Received: '
+                    f"`y_true` = {y_true}"
+                )
+
+            passed_mask = y_true.get("mask", None)
+            y_true = y_true["labels"]
 
         # === Convert to tensors, if list ===
         # TODO (abheesht): Figure out if we need to cast tensors to
@@ -85,6 +113,8 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
         y_pred = ops.convert_to_tensor(y_pred)
         if sample_weight is not None:
             sample_weight = ops.convert_to_tensor(sample_weight)
+        if passed_mask is not None:
+            passed_mask = ops.convert_to_tensor(passed_mask)
 
         # === Process `sample_weight` ===
         if sample_weight is None:
@@ -120,22 +150,29 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
         # Reshape `sample_weight` to the shape of `y_true`.
         sample_weight = ops.multiply(ops.ones_like(y_true), sample_weight)
 
-        # Get `mask` from `sample_weight`.
-        mask = ops.greater(
-            sample_weight, ops.cast(0, dtype=sample_weight.dtype)
-        )
+        # Mask all values less than 0 (since less than 0 implies invalid
+        # labels).
+        valid_mask = ops.greater_equal(y_true, ops.cast(0.0, y_true.dtype))
+        if passed_mask is not None:
+            valid_mask = ops.logical_and(valid_mask, passed_mask)
 
         # === Process inputs - shape checking, upranking, etc. ===
-        y_true, y_pred, mask, batched = standardize_call_inputs_ranks(
+        y_true, y_pred, valid_mask, batched = standardize_call_inputs_ranks(
             y_true=y_true,
             y_pred=y_pred,
-            mask=mask,
+            mask=valid_mask,
             check_y_true_rank=False,
         )
 
         # Uprank sample_weight if unbatched.
         if not batched:
             sample_weight = ops.expand_dims(sample_weight, axis=0)
+
+        # Get `mask` from `sample_weight`.
+        sample_weight_mask = ops.greater(
+            sample_weight, ops.cast(0, dtype=sample_weight.dtype)
+        )
+        mask = ops.logical_and(valid_mask, sample_weight_mask)
 
         # === Update "invalid" `y_true`, `y_pred` entries based on mask ===
 
@@ -149,6 +186,9 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
             -keras.config.epsilon() * ops.ones_like(y_pred)
             + ops.amin(y_pred, axis=1, keepdims=True),
         )
+        sample_weight = ops.where(
+            mask, sample_weight, ops.cast(0, sample_weight.dtype)
+        )
 
         # === Actual computation ===
         per_list_metric_values, per_list_metric_weights = self.compute_metric(
@@ -156,7 +196,7 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
         )
 
         # Chain to `super()` to get mean metric.
-        # TODO (abheesht): Figure out if we want to return unaggregated metric
+        # TODO(abheesht): Figure out if we want to return unaggregated metric
         # values too of shape `(batch_size,)` from `result()`.
         super().update_state(
             per_list_metric_values, sample_weight=per_list_metric_weights
@@ -164,7 +204,9 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
 
     def get_config(self) -> dict[str, Any]:
         config: dict[str, Any] = super().get_config()
-        config.update({"k": self.k})
+        config.update(
+            {"k": self.k, "shuffle_ties": self.shuffle_ties, "seed": self.seed}
+        )
         return config
 
 
@@ -187,9 +229,19 @@ ranking_metric_subclass_doc_string = (
     The final {metric_abbreviation} score reported is typically the weighted
     average of these per-query scores across all queries/lists in the dataset.
 
+    Note: `sample_weight` is handled differently for ranking metrics. For
+    batched inputs, `sample_weight` can be scalar, 1D, 2D. The scalar case and
+    1D case (list-wise weights) are straightforward. The 2D case (item-wise
+    weights) is different, in the sense that the sample weights are aggregated
+    to get 1D weights. For more details, refer to
+    `keras_rs.src.metrics.ranking_metrics_utils.get_list_weights`.
+
     Args:{extra_args}
         k: int. The number of top-ranked items to consider (the 'k' in 'top-k').
             Must be a positive integer.
+        shuffle_ties: bool. Whether to randomly shuffle scores before sorting.
+            This is done to break ties. Defaults to `True`.
+        seed: int. Random seed used for shuffling.
         name: Optional name for the loss instance.
         dtype: The dtype of the metric's computations. Defaults to `None`, which
             means using `keras.backend.floatx()`. `keras.backend.floatx()` is a

@@ -26,6 +26,8 @@ class MeanReciprocalRank(RankingMetric):
             scores=y_pred,
             mask=mask,
             k=self.k,
+            shuffle_ties=self.shuffle_ties,
+            seed=self.seed_generator,
         )
 
         # This will depend on `k`, i.e., it will not always be the same as

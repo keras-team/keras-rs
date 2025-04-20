@@ -56,8 +56,8 @@ def sort_by_scores(
     scores: types.Tensor,
     mask: Optional[types.Tensor] = None,
     k: Optional[int] = None,
-    seed: Optional[int] = None,
     shuffle_ties: bool = True,
+    seed: Optional[int] = None,
 ) -> types.Tensor:
     """
     Utility function for sorting tensors by scores.
@@ -70,16 +70,13 @@ def sort_by_scores(
             by.
         k: int. The number of top-ranked items to consider (the 'k' in 'top-k').
             If `None`, `list_size` is used.
-        seed: int. Seed for shuffling.
         shuffle_ties: bool. Whether to randomly shuffle scores before sorting.
             This is done to break ties.
+        seed: int. Seed for shuffling.
 
     Returns:
         List of sorted tensors (`tensors_to_sort`), sorted using `scores`.
     """
-    # TODO: Consider exposing `shuffle_ties` to the user.
-    # TODO: Figure out `seed`. How do we propagate it down here from ranking
-    # metric?
     max_possible_k = ops.shape(scores)[1]
     if k is None:
         k = max_possible_k
@@ -118,30 +115,29 @@ def get_list_weights(
 ) -> types.Tensor:
     """Computes per-list weights from provided sample weights.
 
-    The per-list weights are computed as:
+    Per-list weights are calculated as follows:
     ```
     per_list_weights = sum(weights * relevance) / sum(relevance).
     ```
 
-    For a list with sum(relevance) = 0, we set a default weight as the following
-    average weight while all the lists with sum(weights) = 0 are ignored:
-
+    For lists where the sum of relevance is 0, a default weight is assigned:
     ```
-    sum(per_list_weights) / num(sum(relevance) != 0 && sum(weights) != 0)
+    sum(per_list_weights) / num(sum(relevance) != 0 AND sum(weights) != 0)
     ```
 
-    When all the lists have `sum(relevance) == 0`, we set the average weight to
-    1.0.
+    If all lists have a sum of relevance equal to 0, the default weight is 1.0.
 
-    This computation takes care of the following cases:
-    - When all the weights are 1.0, the per-list weights will be 1.0
-      everywhere, even for lists without any relevant examples because
-      `sum(per_list_weights) ==  num(sum(relevance) != 0)`. This handles the
-      standard ranking metrics where the weights are all 1.0.
-    - When every list has a nonzero weight, the default weight is not used.
-      This handles the unbiased metrics well.
-    - For the mixture of the above 2 scenario, the weights for lists with
-      nonzero relevance and nonzero weights is proportional to
+    As a result of the above computation, this function takes care of the
+    following cases:
+    - **Uniform Weights:** When all input weights are 1.0, all per-list weights
+      will be 1.0, even for lists with no relevant examples. This aligns with
+      standard ranking metrics.
+    - **Non-zero Weights per List:** If every list has at least one non-zero
+      weight, the default weight mechanism is not utilized, which is suitable
+      for unbiased metrics.
+    - **Mixed Scenarios:** For cases with a mix of lists having zero and
+      non-zero relevance and weights, the weights for lists with non-zero
+      relevance and weights are proportional to:
 
       ```
       per_list_weights / sum(per_list_weights) *
@@ -151,11 +147,12 @@ def get_list_weights(
       The rest have weights `1.0 / num(lists)`.
 
     Args:
-        weights:  The weights `Tensor` of shape [batch_size, list_size].
-        relevance:  The relevance `Tensor` of shape [batch_size, list_size].
+        weights: tensor. Weights tensor of shape `(batch_size, list_size)`.
+        relevance: tensor. The relevance `Tensor` of shape
+            `(batch_size, list_size)`.
 
     Returns:
-        A tensor of shape [batch_size, 1], containing the per-list weights.
+        A tensor of shape `(batch_size, 1)`, containing the per-list weights.
     """
     # Calculate if the sum of weights per list is greater than 0.0.
     nonzero_weights = ops.greater(ops.sum(weights, axis=1, keepdims=True), 0.0)

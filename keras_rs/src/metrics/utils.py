@@ -21,6 +21,16 @@ def standardize_call_inputs_ranks(
     - Checks that `y_true`, `y_pred` are of rank 1 or 2;
     - Checks that `y_true`, `y_pred`, `mask` have the same shape;
     - Adds batch dimension if rank = 1.
+
+    Args:
+        y_true: tensor. Ground truth values.
+        y_pred: tensor. The predicted values.
+        mask: tensor. Boolean mask for `y_true`.
+        check_y_true_rank: bool. Whether to check the rank of `y_true`.
+
+    Returns:
+        Tuple of processed `y_true`, `y_pred`, `mask`, and `batched`. `batched`
+        is a bool indicating if the inputs are batched.
     """
 
     y_true_shape = ops.shape(y_true)

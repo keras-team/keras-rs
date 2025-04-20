@@ -63,8 +63,8 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
                 in loss computation. If it is a dictionary, it should have two
                 keys: `"labels"` and `"mask"`. `"mask"` can be used to ignore
                 elements in loss computation, i.e., pairs will not be formed
-                with those items. Note that the final mask is an and of the
-                passed mask, and `labels == -1`.
+                with those items. Note that the final mask is an `and` of the
+                passed mask, and `labels >= 0`.
             y_pred: tensor. The predicted values, of shape `(list_size)` for
                 unbatched inputs or `(batch_size, list_size)` for batched
                 inputs. Should be of the same shape as `y_true`.
