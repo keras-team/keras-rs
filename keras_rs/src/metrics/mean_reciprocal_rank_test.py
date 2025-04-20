@@ -118,7 +118,7 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
     @parameterized.named_parameters(
         ("scalar_0.5", 0.5, 0.625),
         ("scalar_0", 0, 0),
-        ("scalar_1d", [1.0, 0.5, 2.0, 1.0], 0.675),
+        ("1d", [1.0, 0.5, 2.0, 1.0], 0.675),
     )
     def test_batched_inputs_sample_weight(self, sample_weight, expected_output):
         mrr_metric = MeanReciprocalRank()

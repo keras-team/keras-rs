@@ -29,6 +29,10 @@ def format_docstring(template: str, width: int = 80, **kwargs: Any) -> str:
             processed_output.append(
                 textwrap.indent(formula_dedented, base_indent_str)
             )
+        elif "where:" in stripped_block:
+            processed_output.append(
+                textwrap.indent(stripped_block, base_indent_str)
+            )
         else:
             processed_output.append(
                 textwrap.fill(
