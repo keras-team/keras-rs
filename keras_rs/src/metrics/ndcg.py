@@ -108,9 +108,8 @@ class NDCG(RankingMetric):
 
 
 concept_sentence = (
-    "NCDG is a normalized measure of ranking quality. It normalizes the "
-    " Discounted Cumulative Gain (DCG) with the Ideal Discounted Cumulative "
-    "Gain (IDCG) for each list."
+    "It normalizes the Discounted Cumulative Gain (DCG) with the Ideal "
+    "Discounted Cumulative Gain (IDCG) for each list."
 )
 relevance_type = (
     "graded relevance scores (non-negative numbers where higher values "
