@@ -1,6 +1,8 @@
 from typing import Any, Callable, Optional
 
 from keras import ops
+from keras.saving import deserialize_keras_object
+from keras.saving import serialize_keras_object
 
 from keras_rs.src import types
 from keras_rs.src.api_export import keras_rs_export
@@ -47,6 +49,8 @@ class NDCG(RankingMetric):
             scores=y_pred,
             k=self.k,
             mask=mask,
+            shuffle_ties=self.shuffle_ties,
+            seed=self.seed_generator,
         )
 
         dcg = compute_dcg(
@@ -65,6 +69,8 @@ class NDCG(RankingMetric):
             scores=weighted_gains,
             k=self.k,
             mask=mask,
+            shuffle_ties=self.shuffle_ties,
+            seed=self.seed_generator,
         )
         ideal_dcg = compute_dcg(
             y_true=ideal_sorted_y_true,
@@ -79,6 +85,26 @@ class NDCG(RankingMetric):
         )
 
         return per_list_ndcg, per_list_weights
+
+    def get_config(self) -> dict[str, Any]:
+        config: dict[str, Any] = super().get_config()
+        config.update(
+            {
+                "gain_fn": serialize_keras_object(self.gain_fn),
+                "rank_discount_fn": serialize_keras_object(
+                    self.rank_discount_fn
+                ),
+            }
+        )
+        return config
+
+    @classmethod
+    def from_config(cls, config: dict[str, Any]) -> "NDCG":
+        config["gain_fn"] = deserialize_keras_object(config["gain_fn"])
+        config["rank_discount_fn"] = deserialize_keras_object(
+            config["rank_discount_fn"]
+        )
+        return cls(**config)
 
 
 concept_sentence = (
