@@ -17,6 +17,7 @@ from keras_rs.src.layers.retrieval.hard_negative_mining import (
 from keras_rs.src.layers.retrieval.remove_accidental_hits import (
     RemoveAccidentalHits,
 )
+from keras_rs.src.layers.retrieval.retrieval import Retrieval
 from keras_rs.src.layers.retrieval.sampling_probability_correction import (
     SamplingProbabilityCorrection,
 )
