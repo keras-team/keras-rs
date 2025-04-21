@@ -42,3 +42,15 @@ def check_shapes_compatible(
                 return False
 
     return True
+
+
+def check_rank(
+    x_rank: int,
+    allowed_ranks: tuple[int, ...],
+    tensor_name: str,
+) -> None:
+    if x_rank not in allowed_ranks:
+        raise ValueError(
+            f"`{tensor_name}` should have a rank from `{allowed_ranks}`."
+            f"Received: `{x_rank}`."
+        )

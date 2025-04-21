@@ -4,10 +4,11 @@ import keras
 
 from keras_rs.src import types
 from keras_rs.src.api_export import keras_rs_export
+from keras_rs.src.layers.retrieval.retrieval import Retrieval
 
 
 @keras_rs_export("keras_rs.layers.BruteForceRetrieval")
-class BruteForceRetrieval(keras.layers.Layer):
+class BruteForceRetrieval(Retrieval):
     """Brute force top-k retrieval.
 
     This layer maintains a set of candidates and is able to exactly retrieve the
@@ -60,11 +61,13 @@ class BruteForceRetrieval(keras.layers.Layer):
         return_scores: bool = True,
         **kwargs: Any,
     ) -> None:
-        super().__init__(**kwargs)
+        # Keep `k`, `return_scores` as separately passed args instead of keeping
+        # them in `kwargs`. This is to ensure the user does not have to hop
+        # to the base class to check which other args can be passed.
+        super().__init__(k=k, return_scores=return_scores, **kwargs)
+
         self.candidate_embeddings = None
         self.candidate_ids = None
-        self.k = k
-        self.return_scores = return_scores
 
         if candidate_embeddings is None:
             if candidate_ids is not None:
@@ -84,36 +87,12 @@ class BruteForceRetrieval(keras.layers.Layer):
 
         Args:
             candidate_embeddings: The candidate embeddings.
-            candidate_ids: The identifiers for the candidates. If `None` the
+            candidate_ids: The identifiers for the candidates. If `None`, the
                 indices of the candidates are returned instead.
         """
-        if candidate_embeddings is None:
-            raise ValueError("`candidate_embeddings` is required")
-
-        if len(candidate_embeddings.shape) != 2:
-            raise ValueError(
-                "`candidate_embeddings` must be a tensor of rank 2 "
-                "(num_candidates, embedding_size), received "
-                "`candidate_embeddings` with shape "
-                f"{candidate_embeddings.shape}"
-            )
-
-        if candidate_embeddings.shape[0] < self.k:
-            raise ValueError(
-                "The number of candidates provided "
-                f"({candidate_embeddings.shape[0]}) is less than the number of "
-                f"candidates to retrieve (k={self.k})."
-            )
-
-        if (
-            candidate_ids is not None
-            and candidate_ids.shape[0] != candidate_embeddings.shape[0]
-        ):
-            raise ValueError(
-                "The `candidate_embeddings` and `candidate_is` tensors must "
-                "have the same number of rows, got tensors of shape "
-                f"{candidate_embeddings.shape} and {candidate_ids.shape}."
-            )
+        self._validate_candidate_embeddings_and_ids(
+            candidate_embeddings, candidate_ids
+        )
 
         if self.candidate_embeddings is not None:
             # Update of existing variables.
@@ -167,31 +146,3 @@ class BruteForceRetrieval(keras.layers.Layer):
             return top_scores, top_ids
         else:
             return top_ids
-
-    def compute_score(
-        self, query_embedding: types.Tensor, candidate_embedding: types.Tensor
-    ) -> types.Tensor:
-        """Computes the standard dot product score from queries and candidates.
-
-        Args:
-            query_embedding: Tensor of query embedding corresponding to the
-                queries for which to retrieve top candidates.
-            candidate_embedding: Tensor of candidate embeddings.
-
-        Returns:
-            The dot product of queries and candidates.
-        """
-
-        return keras.ops.matmul(
-            query_embedding, keras.ops.transpose(candidate_embedding)
-        )
-
-    def get_config(self) -> dict[str, Any]:
-        config: dict[str, Any] = super().get_config()
-        config.update(
-            {
-                "k": self.k,
-                "return_scores": self.compute_score,
-            }
-        )
-        return config

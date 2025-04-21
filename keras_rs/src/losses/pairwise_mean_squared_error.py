@@ -6,7 +6,7 @@ from keras_rs.src import types
 from keras_rs.src.api_export import keras_rs_export
 from keras_rs.src.losses.pairwise_loss import PairwiseLoss
 from keras_rs.src.losses.pairwise_loss import pairwise_loss_subclass_doc_string
-from keras_rs.src.utils.pairwise_loss_utils import apply_pairwise_op
+from keras_rs.src.losses.pairwise_loss_utils import apply_pairwise_op
 
 
 @keras_rs_export("keras_rs.losses.PairwiseMeanSquaredError")
@@ -65,6 +65,7 @@ explanation = """
 """
 extra_args = ""
 PairwiseMeanSquaredError.__doc__ = pairwise_loss_subclass_doc_string.format(
+    loss_name="mean squared error",
     formula=formula,
     explanation=explanation,
     extra_args=extra_args,
