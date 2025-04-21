@@ -63,8 +63,8 @@ class MeanAveragePrecision(RankingMetric):
 
 
 concept_sentence = (
-    "an average of precision values computed after each relevant item is "
-    "encountered in the ranked list"
+    "It calculates the average of precision values computed after each "
+    "relevant item present in the ranked list"
 )
 relevance_type = "binary indicators (0 or 1) of relevance"
 score_range_interpretation = (
