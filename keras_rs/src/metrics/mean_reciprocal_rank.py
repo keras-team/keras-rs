@@ -74,7 +74,8 @@ class MeanReciprocalRank(RankingMetric):
 
 
 concept_sentence = (
-    "the rank position of the single highest-scoring relevant item"
+    "It focuses on the rank position of the single highest-scoring relevant "
+    "item"
 )
 relevance_type = "binary indicators (0 or 1) of relevance"
 score_range_interpretation = (
