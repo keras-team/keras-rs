@@ -216,8 +216,7 @@ Computes {metric_name} ({metric_abbreviation}).
 This metric evaluates ranking quality. {concept_sentence}. The metric processes
 true relevance labels in `y_true` ({relevance_type}) against predicted scores in
 `y_pred`. The scores in `y_pred` are used to determine the rank order of items,
-by sorting in descending order. Resulting scores generally range
-{score_range_interpretation}.
+by sorting in descending order. {score_range_interpretation}.
 
 For each list of predicted scores `s` in `y_pred` and the corresponding list
 of true labels `y` in `y_true`, the per-query {metric_abbreviation} score is
