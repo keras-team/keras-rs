@@ -92,19 +92,17 @@ class DCG(RankingMetric):
 
 
 concept_sentence = (
-    "a measure of ranking quality that sums the graded relevance scores of "
-    "items, applying a configurable discount based on position"
+    "It computes the sum of the graded relevance scores of items, applying a "
+    "configurable discount based on position"
 )
 relevance_type = (
     "graded relevance scores (non-negative numbers where higher values "
     "indicate greater relevance)"
 )
 score_range_interpretation = (
-    "Returns a weighted average score per ranked list. Scores are "
-    "non-negative, with higher values indicating better ranking quality "
-    "(highly relevant items are ranked higher). The score for a single list "
-    "is not inherently normalized between 0 and 1, and its maximum depends on "
-    "the specific relevance scores, weights, and list length (or cutoff `k`)."
+    "Scores are non-negative, with higher values indicating better ranking "
+    "quality (highly relevant items are ranked higher). The score for a single "
+    "list is not bounded or normalized, i.e., it does not lie in a range"
 )
 
 formula = """
@@ -113,9 +111,6 @@ DCG@k(y', w') = sum_{i=1}^{k} (gain_fn(y'_i) / rank_discount_fn(i))
 ```
 
 where:
-    - `k` is the rank position cutoff (determined by the `k` parameter or
-        list size).
-    - The sum is over the top `k` ranks `i` (from 1 to `k`).
     - `y'_i` is the true relevance score of the item ranked at position `i`
         (obtained by sorting `y_true` according to `y_pred`).
     - `gain_fn` is the user-provided function mapping relevance `y'_i` to a
@@ -124,14 +119,12 @@ where:
     - `rank_discount_fn` is the user-provided function mapping rank `i`
         to a discount value. The default function (`default_rank_discount_fn`)
         is typically equivalent to `lambda rank: 1 / log2(rank + 1)`.
-    - The final result aggregates these per-list scores, often involving
-        normalization by list-specific weights derived from sample weights
-        and gains, to produce a weighted average.
+    - The final result aggregates these per-list scores.
 """
 extra_args = """
         gain_fn: callable. Maps relevance scores (`y_true`) to gain values. The
             default implements `2**y - 1`.
-        rank_discount_fn: function. Maps rank positions (1-based) to discount
+        rank_discount_fn: function. Maps rank positions to discount
             values. The default (`default_rank_discount_fn`) implements
             `1 / log2(rank + 1)`."""
 
