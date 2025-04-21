@@ -68,25 +68,28 @@ concept_sentence = (
 )
 relevance_type = "binary indicators (0 or 1) of relevance"
 score_range_interpretation = (
-    "from 0 to 1, with higher values indicating that relevant items are "
-    "generally positioned higher in the ranking"
+    "Scores range from 0 to 1, with higher values indicating that relevant "
+    "items are generally positioned higher in the ranking"
 )
 
 formula = """
+The formula for average precision is defined below. MAP is the mean over average
+precision computed for each list.
+
 ```
-MAP(y, s) = sum_k (P@k(y, s) * rel(k)) / sum_i y_i
-rel(k) = y_i if rank(s_i) = k
+AP(y, s) = sum_j (P@j(y, s) * rel(j)) / sum_i y_i
+rel(j) = y_i if rank(s_i) = j
 ```
 
 where:
-    - `k` represents the rank position (starting from 1).
-    - `sum_k` indicates a summation over all ranks `k` from 1 up to the list
-        size (or the specified cutoff).
-    - `P@k(y, s)` denotes the Precision at rank `k`, calculated as the
-        number of relevant items found within the top `k` positions divided by
-        `k`.
-    - `rel(k)` represents the relevance of the item specifically at rank
-        `k`. `rel(k)` is 1 if the item at rank `k` is relevant, and 0
+    - `j` represents the rank position (starting from 1).
+    - `sum_j` indicates a summation over all ranks `j` from 1 up to the list
+        size (or `k`).
+    - `P@j(y, s)` denotes the Precision at rank `j`, calculated as the
+        number of relevant items found within the top `j` positions divided by
+        `j`.
+    - `rel(j)` represents the relevance of the item specifically at rank
+        `j`. `rel(j)` is 1 if the item at rank `j` is relevant, and 0
         otherwise.
     - `y_i` is the true relevance label of the original item `i` before
         ranking.
@@ -94,8 +97,6 @@ where:
         score `s_i`.
     - `sum_i y_i` calculates the total number of relevant items in the
         original list `y`.
-    - If `sum_i y_i` (the total number of relevant items) is 0, the score
-        for this query (Average Precision) is defined as 0.
 """
 extra_args = ""
 
