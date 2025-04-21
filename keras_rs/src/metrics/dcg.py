@@ -102,9 +102,7 @@ relevance_type = (
 score_range_interpretation = (
     "Scores are non-negative, with higher values indicating better ranking "
     "quality (highly relevant items are ranked higher). The score for a single "
-    "list is not inherently normalized between 0 and 1, and its maximum "
-    "depends on the specific relevance scores, weights, and list length (or "
-    "`k`)"
+    "list is not bounded or normalized, i.e., it does not lie in a range"
 )
 
 formula = """
@@ -126,7 +124,7 @@ where:
 extra_args = """
         gain_fn: callable. Maps relevance scores (`y_true`) to gain values. The
             default implements `2**y - 1`.
-        rank_discount_fn: function. Maps rank positions (1-based) to discount
+        rank_discount_fn: function. Maps rank positions to discount
             values. The default (`default_rank_discount_fn`) implements
             `1 / log2(rank + 1)`."""
 
