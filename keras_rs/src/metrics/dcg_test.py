@@ -215,10 +215,10 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
     def test_2d_sample_weight(
         self, y_true, y_pred, sample_weight, expected_output
     ):
-        mrr_metric = DCG()
+        dcg_metric = DCG()
 
-        mrr_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
-        result = mrr_metric.result()
+        dcg_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
+        result = dcg_metric.result()
         self.assertAllClose(result, expected_output)
 
     @parameterized.named_parameters(
@@ -278,10 +278,10 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
         ),
     )
     def test_masking(self, y_true, y_pred, sample_weight, expected_output):
-        mrr_metric = DCG()
+        dcg_metric = DCG()
 
-        mrr_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
-        result = mrr_metric.result()
+        dcg_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
+        result = dcg_metric.result()
         self.assertAllClose(result, expected_output)
 
     @parameterized.named_parameters(

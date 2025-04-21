@@ -8,11 +8,15 @@ from keras_rs.src.metrics.ranking_metric import RankingMetric
 from keras_rs.src.metrics.ranking_metric import (
     ranking_metric_subclass_doc_string,
 )
+from keras_rs.src.metrics.ranking_metric import (
+    ranking_metric_subclass_doc_string_args,
+)
 from keras_rs.src.metrics.ranking_metrics_utils import compute_dcg
 from keras_rs.src.metrics.ranking_metrics_utils import default_gain_fn
 from keras_rs.src.metrics.ranking_metrics_utils import default_rank_discount_fn
 from keras_rs.src.metrics.ranking_metrics_utils import get_list_weights
 from keras_rs.src.metrics.ranking_metrics_utils import sort_by_scores
+from keras_rs.src.utils.doc_string_utils import format_docstring
 
 
 @keras_rs_export("keras_rs.metrics.DCG")
@@ -103,19 +107,19 @@ where:
         and gains, to produce a weighted average.
 """
 extra_args = """
-gain_fn: callable. Maps relevance scores (`y_true`) to gain values. The
-    default implements `2**y - 1`.
-rank_discount_fn: function. Maps rank positions (1-based) to discount
-    values. The default (`default_rank_discount_fn`) typically implements
-    `log2(rank + 1)`.
-"""
+        gain_fn: callable. Maps relevance scores (`y_true`) to gain values. The
+            default implements `2**y - 1`.
+        rank_discount_fn: function. Maps rank positions (1-based) to discount
+            values. The default (`default_rank_discount_fn`) implements
+            `1 / log2(rank + 1)`."""
 
-DCG.__doc__ = ranking_metric_subclass_doc_string.format(
+DCG.__doc__ = format_docstring(
+    ranking_metric_subclass_doc_string,
+    width=80,
     metric_name="Discounted Cumulative Gain",
     metric_abbreviation="DCG",
     concept_sentence=concept_sentence,
     relevance_type=relevance_type,
     score_range_interpretation=score_range_interpretation,
     formula=formula,
-    extra_args=extra_args,
-)
+) + ranking_metric_subclass_doc_string_args.format(extra_args=extra_args)
