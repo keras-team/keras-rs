@@ -212,7 +212,10 @@ def default_gain_fn(label: types.Tensor) -> types.Tensor:
 
 @keras.saving.register_keras_serializable()  # type: ignore[misc]
 def default_rank_discount_fn(rank: types.Tensor) -> types.Tensor:
-    return ops.divide(ops.cast(1, dtype=rank.dtype), ops.log2(1 + rank))
+    return ops.divide(
+        ops.cast(1, dtype=rank.dtype),
+        ops.log2(ops.add(ops.cast(1, dtype=rank.dtype), rank)),
+    )
 
 
 def compute_dcg(
