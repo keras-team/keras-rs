@@ -74,27 +74,25 @@ class MeanReciprocalRank(RankingMetric):
 
 
 concept_sentence = (
-    "the rank position of the single highest-scoring relevant item"
+    "It focuses on the rank position of the single highest-scoring relevant "
+    "item"
 )
 relevance_type = "binary indicators (0 or 1) of relevance"
 score_range_interpretation = (
-    "from 0 to 1, with 1 indicating the first relevant item was always ranked "
-    "first"
+    "Scores range from 0 to 1, with 1 indicating the first relevant item was "
+    "always ranked first"
 )
 formula = """```
 MRR(y, s) = max_{i} y_{i} / rank(s_{i})
 ```"""
 extra_args = ""
-MeanReciprocalRank.__doc__ = (
-    format_docstring(
-        ranking_metric_subclass_doc_string,
-        width=80,
-        metric_name="Mean Reciprocal Rank",
-        metric_abbreviation="MRR",
-        concept_sentence=concept_sentence,
-        relevance_type=relevance_type,
-        score_range_interpretation=score_range_interpretation,
-        formula=formula,
-    )
-    + ranking_metric_subclass_doc_string_args
-)
+MeanReciprocalRank.__doc__ = format_docstring(
+    ranking_metric_subclass_doc_string,
+    width=80,
+    metric_name="Mean Reciprocal Rank",
+    metric_abbreviation="MRR",
+    concept_sentence=concept_sentence,
+    relevance_type=relevance_type,
+    score_range_interpretation=score_range_interpretation,
+    formula=formula,
+) + ranking_metric_subclass_doc_string_args.format(extra_args=extra_args)
