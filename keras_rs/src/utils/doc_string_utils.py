@@ -44,5 +44,5 @@ def format_docstring(template: str, width: int = 80, **kwargs: Any) -> str:
             )
 
     final_string = "".join(processed_output).strip()
-    final_string = " " * 4 + final_string
+    final_string = base_indent_str + final_string
     return final_string
