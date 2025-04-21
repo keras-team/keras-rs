@@ -213,11 +213,11 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
 ranking_metric_subclass_doc_string = """
 Computes {metric_name} ({metric_abbreviation}).
 
-This metric evaluates ranking quality by focusing on {concept_sentence}. It
-processes true relevance labels in `y_true` ({relevance_type})
-against predicted scores in `y_pred`. The scores in `y_pred` are used to
-determine the rank order of items, usually by sorting in descending order.
-Resulting scores generally range {score_range_interpretation}.
+This metric evaluates ranking quality. {concept_sentence}. The metric processes
+true relevance labels in `y_true` ({relevance_type}) against predicted scores in
+`y_pred`. The scores in `y_pred` are used to determine the rank order of items,
+by sorting in descending order. Resulting scores generally range
+{score_range_interpretation}.
 
 For each list of predicted scores `s` in `y_pred` and the corresponding list
 of true labels `y` in `y_true`, the per-query {metric_abbreviation} score is
