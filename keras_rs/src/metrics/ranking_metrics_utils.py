@@ -205,10 +205,12 @@ def get_list_weights(
     return final_weights
 
 
+@keras.saving.register_keras_serializable()  # type: ignore[misc]
 def default_gain_fn(label: types.Tensor) -> types.Tensor:
     return ops.subtract(ops.power(2.0, label), 1.0)
 
 
+@keras.saving.register_keras_serializable()  # type: ignore[misc]
 def default_rank_discount_fn(rank: types.Tensor) -> types.Tensor:
     return ops.divide(ops.cast(1, dtype=rank.dtype), ops.log2(1 + rank))
 
