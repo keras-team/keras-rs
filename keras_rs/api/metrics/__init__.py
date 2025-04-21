@@ -5,3 +5,4 @@ since your modifications would be overwritten.
 """
 
 from keras_rs.src.metrics.mean_reciprocal_rank import MeanReciprocalRank
+from keras_rs.src.metrics.recall_at_k import RecallAtK
