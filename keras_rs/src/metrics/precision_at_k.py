@@ -69,18 +69,18 @@ class PrecisionAtK(RankingMetric):
 
 concept_sentence = (
     "It measures the proportion of relevant items among the top-k "
-    "recommendations."
+    "recommendations"
 )
 relevance_type = "binary indicators (0 or 1) of relevance"
 score_range_interpretation = (
     "Scores range from 0 to 1, with 1 indicating all top-k items were relevant"
 )
 formula = """```
-P@k(y, s) = \frac{1}{k} \sum_{i=1}^{k} y_{idx_i}
+P@k(y, s) = 1/k sum_i I[rank(s_i) < k] y_i
 ```
 
-where `y_{idx_i}` is the relevance label (0/1) of the item ranked at position
-`i`."""
+where `y_i` is the relevance label (0/1) of the item ranked at position
+`i`, and `I[condition]` is 1 if the condition is met, otherwise 0."""
 extra_args = ""
 PrecisionAtK.__doc__ = format_docstring(
     ranking_metric_subclass_doc_string,
