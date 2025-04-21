@@ -38,6 +38,18 @@ class PairwiseMeanSquaredErrorTest(testing.TestCase, parameterized.TestCase):
         output = loss(y_true=self.batched_labels, y_pred=self.batched_scores)
         self.assertAllClose(output, self.expected_output, atol=1e-5)
 
+    def test_temperature(self):
+        loss = PairwiseMeanSquaredError(temperature=0.5, reduction="none")
+        output = loss(y_true=self.batched_labels, y_pred=self.batched_scores)
+        self.assertAllClose(
+            output,
+            [
+                [12.440001, 34.64, 9.84, 9.84, 28.759998],
+                [2.29, 1.41, 1.89, 1.89, 0.84],
+            ],
+            atol=1e-5,
+        )
+
     def test_invalid_input_rank(self):
         rank_1_input = ops.ones((2, 3, 4))
 

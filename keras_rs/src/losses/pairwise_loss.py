@@ -1,5 +1,5 @@
 import abc
-from typing import Optional
+from typing import Any, Optional
 
 import keras
 from keras import ops
@@ -22,7 +22,18 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
     `pairwise_loss` method.
     """
 
-    # TODO: Add `temperature`, `lambda_weights`.
+    def __init__(self, temperature: float = 1.0, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+
+        if temperature <= 0.0:
+            raise ValueError(
+                f"`temperature` should be a positive float. Received: "
+                f"`temperature` = {temperature}."
+            )
+
+        self.temperature = temperature
+
+        # TODO(abheesht): Add `lambda_weights`.
 
     @abc.abstractmethod
     def pairwise_loss(self, pairwise_logits: types.Tensor) -> types.Tensor:
@@ -49,6 +60,10 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
             logits=logits,
             mask=valid_mask,
             logits_op=ops.subtract,
+        )
+        pairwise_logits = ops.divide(
+            pairwise_logits,
+            ops.cast(self.temperature, dtype=pairwise_logits.dtype),
         )
 
         return self.pairwise_loss(pairwise_logits), pairwise_labels
@@ -83,6 +98,11 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
             mask = y_true.get("mask", None)
             y_true = y_true["labels"]
 
+        y_true = ops.convert_to_tensor(y_true)
+        y_pred = ops.convert_to_tensor(y_pred)
+        if mask is not None:
+            mask = ops.convert_to_tensor(mask)
+
         y_true, y_pred, mask = process_loss_call_inputs(y_true, y_pred, mask)
 
         losses, weights = self.compute_unreduced_loss(
@@ -91,6 +111,11 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
         losses = ops.multiply(losses, weights)
         losses = ops.sum(losses, axis=-1)
         return losses
+
+    def get_config(self) -> dict[str, Any]:
+        config: dict[str, Any] = super().get_config()
+        config.update({"temperature": self.temperature})
+        return config
 
 
 pairwise_loss_subclass_doc_string = (
