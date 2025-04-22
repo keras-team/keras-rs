@@ -5,8 +5,7 @@ since your modifications would be overwritten.
 """
 
 from keras_rs.src.metrics.dcg import DCG
-from keras_rs.src.metrics.mean_reciprocal_rank import MeanReciprocalRank
-from keras_rs.src.metrics.ndcg import NDCG
 from keras_rs.src.metrics.mean_average_precision import MeanAveragePrecision
 from keras_rs.src.metrics.mean_reciprocal_rank import MeanReciprocalRank
+from keras_rs.src.metrics.ndcg import NDCG
 from keras_rs.src.metrics.recall_at_k import RecallAtK
