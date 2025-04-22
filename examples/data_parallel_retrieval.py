@@ -40,7 +40,7 @@ For the synchronous data parallelism strategy in distributed training,
 we will use the `DataParallel` class present in the `keras.distribution`
 API.
 """
-devices = jax.devices("gpu")  # Assume it has >1 local GPUs.
+devices = jax.devices()  # Assume it has >1 local devices.
 data_parallel = keras.distribution.DataParallel(devices=devices)
 
 """
@@ -187,7 +187,7 @@ and evaluate the model.
 """
 
 model = RetrievalModel(users_count + 1, movies_count + 1)
-model.compile(optimizer=keras.optimizers.Adagrad(learning_rate=0.1))
+model.compile(optimizer=keras.optimizers.Adagrad(learning_rate=0.2))
 
 """
 Let's train the model. Evaluation takes a bit of time, so we only evaluate the

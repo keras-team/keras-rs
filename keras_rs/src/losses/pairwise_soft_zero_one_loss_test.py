@@ -41,6 +41,18 @@ class PairwiseSoftZeroOneLossTest(testing.TestCase, parameterized.TestCase):
         output = loss(y_true=self.batched_labels, y_pred=self.batched_scores)
         self.assertAllClose(output, self.expected_output, atol=1e-5)
 
+    def test_temperature(self):
+        loss = PairwiseSoftZeroOneLoss(temperature=0.5, reduction="none")
+        output = loss(y_true=self.batched_labels, y_pred=self.batched_scores)
+        self.assertAllClose(
+            output,
+            [
+                [0.982014, 0.0, 0.880797, 0.141321, 2.503386],
+                [0.0, 0.167982, 1.020515, 0.339565, 0.520515],
+            ],
+            atol=1e-5,
+        )
+
     def test_invalid_input_rank(self):
         rank_1_input = ops.ones((2, 3, 4))
 
