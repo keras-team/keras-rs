@@ -207,8 +207,8 @@ to push certain fixes out to our users.
    [this PR](https://github.com/keras-team/keras-io/pull/1134) as a reference
    for what to change. Ask fchollet@ to review.
 
-   During development of the branch, you can pin the keras-hub dev release in
-   the keras-io `requirements.txt` file. Remember to update this to the official
+   During development of the branch, you can pin the keras-rs dev release in the
+   keras-io `requirements.txt` file. Remember to update this to the official
    release before we merge the PR.
 
 6. We are now ready to cut the official release! Make a PR similar to step 2,

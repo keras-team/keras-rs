@@ -5,19 +5,21 @@ since your modifications would be overwritten.
 """
 
 from keras_rs.src.layers.feature_interaction.dot_interaction import (
-    DotInteraction,
+    DotInteraction as DotInteraction,
 )
-from keras_rs.src.layers.feature_interaction.feature_cross import FeatureCross
+from keras_rs.src.layers.feature_interaction.feature_cross import (
+    FeatureCross as FeatureCross,
+)
 from keras_rs.src.layers.retrieval.brute_force_retrieval import (
-    BruteForceRetrieval,
+    BruteForceRetrieval as BruteForceRetrieval,
 )
 from keras_rs.src.layers.retrieval.hard_negative_mining import (
-    HardNegativeMining,
+    HardNegativeMining as HardNegativeMining,
 )
 from keras_rs.src.layers.retrieval.remove_accidental_hits import (
-    RemoveAccidentalHits,
+    RemoveAccidentalHits as RemoveAccidentalHits,
 )
-from keras_rs.src.layers.retrieval.retrieval import Retrieval
+from keras_rs.src.layers.retrieval.retrieval import Retrieval as Retrieval
 from keras_rs.src.layers.retrieval.sampling_probability_correction import (
-    SamplingProbabilityCorrection,
+    SamplingProbabilityCorrection as SamplingProbabilityCorrection,
 )

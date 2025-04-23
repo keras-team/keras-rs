@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "keras-rs"
 authors = [
-    {name = "Keras RS team", email = "keras-rs@google.com"},
+    {name = "Keras team", email = "keras-users@googlegroups.com"},
 ]
 description = "Multi-backend recommender systems with Keras 3."
 readme = "README.md"
@@ -20,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3 :: Only",
     "Operating System :: Unix",
+    "Operating System :: Microsoft :: Windows",
     "Operating System :: MacOS",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering",
@@ -37,8 +38,10 @@ Repository = "https://github.com/keras-team/keras-rs"
 [tool.setuptools.dynamic]
 version = {attr = "keras_rs.src.version.__version__"}
 
-[tool.setuptools.packages.find]
-include = ["keras_rs", "keras_rs.*"]
+[tool.setuptools.package-dir]
+ "" = "."
+ "keras_rs" = "keras_rs/api"  # Remap api/ to the root of the package.
+ "keras_rs.src" = "keras_rs/src"
 
 [tool.ruff]
 line-length = 80
@@ -60,10 +63,14 @@ known-first-party = ["keras_rs"]
 
 [tool.mypy]
 strict = "True"
-exclude = ["_test\\.py$", "^examples"]
+exclude = ["_test\\.py$", "^examples/"]
 untyped_calls_exclude = ["ml_dtypes"]
 disable_error_code = ["import-untyped"]
 disallow_subclassing_any = "False"
+
+[[tool.mypy.overrides]]
+module = "keras_rs.api"
+ignore_errors = true
 
 [tool.pytest.ini_options]
 filterwarnings = ["ignore::DeprecationWarning"]

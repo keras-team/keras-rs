@@ -29,8 +29,10 @@ to_copy = ["pyproject.toml", "README.md"]
 
 
 def ignore_files(path: str, filenames: list[str]) -> list[str]:
+    # Skip all files in "keras_rs.src.testing" which are used only by tests.
     if path.endswith("testing"):
         return filenames
+    # Skip unit tests.
     return [f for f in filenames if f.endswith("_test.py")]
 
 
