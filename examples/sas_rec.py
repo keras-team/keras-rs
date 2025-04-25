@@ -6,8 +6,9 @@ that users have interacted with previously and then predicts the next item.
 Here, the order of the items within each sequence matters. Previously, in the
 [Recommending movies: retrieval using a sequential model](https://github.com/keras-team/keras-rs/blob/main/examples/sequential_retrieval.py)
 example, we built a GRU-based sequential retrieval model. In this example, we
-will build a popular Transformer decoder-based model named Self-Attentive
-Sequential Recommendation (SasRec) for the same sequential recommendation task.
+will build a popular Transformer decoder-based model named
+[Self-Attentive Sequential Recommendation (SASRec)](https://arxiv.org/abs/1808.09781)
+for the same sequential recommendation task.
 
 Let's begin by importing all the necessary libraries.
 """
@@ -48,9 +49,9 @@ RATINGS_DATA_COLUMNS = ["UserID", "MovieID", "Rating", "Timestamp"]
 MOVIES_DATA_COLUMNS = ["MovieID", "Title", "Genres"]
 MIN_RATING = 2
 
-# Training/model args picked from SasRec paper
+# Training/model args picked from SASRec paper
 BATCH_SIZE = 128
-NUM_EPOCHS = 5
+NUM_EPOCHS = 10
 LEARNING_RATE = 0.001
 
 NUM_LAYERS = 2
@@ -62,7 +63,7 @@ DROPOUT = 0.2
 ## Dataset
 
 Next, we need to prepare our dataset. Like we did in the
-[basic retrieval](https://github.com/keras-team/keras-rs/blob/main/examples/basic_retrieval.py)
+[sequential retrieval](https://github.com/keras-team/keras-rs/blob/main/examples/sequential_retrieval.py)
 example, we are going to use the MovieLens dataset. 
 
 The dataset preparation step is fairly involved. The original ratings dataset
@@ -166,8 +167,8 @@ sequences = get_movie_sequence_per_user(ratings_df)
 So far, we have essentially replicated what we did in the sequential retrieval
 example. We have a sequence of movies for every user.
 
-SasRec is trained contrastively, which means the model learns to distinguish
-between sequences of movies a user has actually interacted with(positive
+SASRec is trained contrastively, which means the model learns to distinguish
+between sequences of movies a user has actually interacted with (positive
 examples) and sequences they have not interacted with (negative examples).
 
 The following function, `format_data`, prepares the data in this specific
@@ -188,7 +189,6 @@ def format_data(sequences):
         sequence = [int(d["movie_id"]) for d in sequences[user_id]]
 
         # Get negative sequence.
-        # TODO: Check if this can be done more efficiently with TF.
         def random_negative_item_id(low, high, positive_lst):
             sampled = np.random.randint(low=low, high=high)
             while sampled in positive_lst:
@@ -225,15 +225,15 @@ preprocessing are:
     recommendation, the model learns to predict the next item in a sequence
     given the preceding items. This is achieved by:
     - taking the original `example["sequence"]` and creating the model's
-        input features (`item_ids`) from all items *except the last one*
-        (`example["sequence"][..., :-1]`);
+      input features (`item_ids`) from all items *except the last one*
+      (`example["sequence"][..., :-1]`);
     - creating the target "positive sequence" (what the model tries to predict
-        as the actual next items) by taking the original `example["sequence"]`
-        and shifting it, using all items *except the first one*
-        (`example["sequence"][..., 1:]`);
+      as the actual next items) by taking the original `example["sequence"]`
+      and shifting it, using all items *except the first one*
+      (`example["sequence"][..., 1:]`);
     - shifting `example["negative_sequence"]` (from `format_data`) is
-        to create the target "negative sequence" for the contrastive loss
-        (`example["negative_sequence"][..., 1:]`).
+      to create the target "negative sequence" for the contrastive loss
+      (`example["negative_sequence"][..., 1:]`).
 
 2.  Handling Variable Length Sequences: Neural networks typically require
     fixed-size inputs. Therefore, both the input feature sequences and the
@@ -244,22 +244,22 @@ preprocessing are:
 
 3.  Differentiating Training and Validation/Testing:
     - During training:
-        - Input features (`item_ids`) and context for negative sequences
-            are prepared as described above (all but the last item of the
-            original sequences).
-        - Target positive and negative sequences are the shifted versions of
-            the original sequences.
+      - Input features (`item_ids`) and context for negative sequences
+        are prepared as described above (all but the last item of the
+        original sequences).
+      - Target positive and negative sequences are the shifted versions of
+        the original sequences.
         - `sample_weight` is created based on the input features to ensure
-            that loss is calculated only on actual items, not on padding tokens
-            in the targets.
+          that loss is calculated only on actual items, not on padding tokens
+          in the targets.
     - During validation/testing:
-        - Input features are prepared similarly.
-        - The model's performance is typically evaluated on its ability to
-            predict the actual last item of the original sequence. Thus,
-            `sample_weight` is configured to focus the loss calculation
-            only on this final prediction in the target sequences.
+      - Input features are prepared similarly.
+      - The model's performance is typically evaluated on its ability to
+        predict the actual last item of the original sequence. Thus,
+        `sample_weight` is configured to focus the loss calculation
+        only on this final prediction in the target sequences.
 
-Note: SasRec does the same thing we've done above, except that they take the
+Note: SASRec does the same thing we've done above, except that they take the
 `item_ids[:-2]` for the validation set and `item_ids[:-1]` for the test set.
 We skip that here for brevity.
 """
@@ -273,26 +273,27 @@ def _preprocess(example, train=False):
         sequence = example["sequence"][..., :-1]
         negative_sequence = example["negative_sequence"][..., :-1]
 
-    bsz = tf.shape(sequence)[0]
+    batch_size = tf.shape(sequence)[0]
 
     if not train:
         # Loss computed only on last token.
         sample_weight = tf.zeros_like(sequence, dtype="float32")[..., :-1]
         sample_weight = tf.concat(
-            [sample_weight, tf.ones((bsz, 1), dtype="float32")], axis=1
+            [sample_weight, tf.ones((batch_size, 1), dtype="float32")], axis=1
         )
 
-    # Truncate/pad sequence. +1 to account for truncation
-    # later.
-    sequence = sequence.to_tensor(shape=[bsz, MAX_CONTEXT_LENGTH + 1])
+    # Truncate/pad sequence. +1 to account for truncation later.
+    sequence = sequence.to_tensor(
+        shape=[batch_size, MAX_CONTEXT_LENGTH + 1], default_value=PAD_ITEM_ID
+    )
     negative_sequence = negative_sequence.to_tensor(
-        shape=[bsz, MAX_CONTEXT_LENGTH + 1]
+        shape=[batch_size, MAX_CONTEXT_LENGTH + 1], default_value=PAD_ITEM_ID
     )
     if train:
         sample_weight = tf.cast(sequence != PAD_ITEM_ID, dtype="float32")
     else:
         sample_weight = sample_weight.to_tensor(
-            shape=[bsz, MAX_CONTEXT_LENGTH + 1], default_value=0
+            shape=[batch_size, MAX_CONTEXT_LENGTH + 1], default_value=0
         )
 
     example = (
@@ -339,8 +340,8 @@ for batch in val_ds.take(1):
 ## Model
 
 To encode the input sequence, we use a Transformer decoder-based model. This
-part of the model is very similar to the GPT-2 architecture. Refer to
-the [GPT text generation from scratch with KerasHub](https://keras.io/examples/generative/text_generation_gpt/#build-the-model)
+part of the model is very similar to the GPT-2 architecture. Refer to the
+[GPT text generation from scratch with KerasHub](https://keras.io/examples/generative/text_generation_gpt/#build-the-model)
 guide for more details on this part.
 
 One part to note is that when we are "predicting", i.e., `training` is `False`,
@@ -352,7 +353,7 @@ Also, it's worth discussing the `compute_loss` method. We embed the positive
 and negative sequences using the input embedding matrix. We compute the
 similarity of (positive sequence, input sequence) and (negative sequence,
 input sequence) pair embeddings by computing the dot product. The goal now is
-to maximise the similarity of the former and minimise the similarity of
+to maximize the similarity of the former and minimize the similarity of
 the latter. Let's see this mathematically. Binary Cross Entropy is written
 as follows:
 
@@ -367,14 +368,10 @@ of 0. So, for a positive pair, the loss reduces to:
 loss = -np.log(positive_logits)
 ```
 
-Minimising the loss means we want to maximise the log term, which in turn,
-implies maximising `positive_logits`. Similarly, we want to minimise
+Minimising the loss means we want to maximize the log term, which in turn,
+implies maximising `positive_logits`. Similarly, we want to minimize
 `negative_logits`.
 """
-
-
-def _sas_rec_kernel_initializer():
-    return keras.initializers.GlorotUniform()
 
 
 class SasRec(keras.Model):
@@ -397,13 +394,13 @@ class SasRec(keras.Model):
         self.item_embedding = keras_hub.layers.ReversibleEmbedding(
             input_dim=vocabulary_size,
             output_dim=hidden_dim,
-            embeddings_initializer=_sas_rec_kernel_initializer(),
+            embeddings_initializer="glorot_uniform",
             embeddings_regularizer=keras.regularizers.l2(0.001),
             dtype=dtype,
             name="item_embedding",
         )
         self.position_embedding = keras_hub.layers.PositionEmbedding(
-            initializer=_sas_rec_kernel_initializer(),
+            initializer="glorot_uniform",
             sequence_length=max_sequence_length,
             dtype=dtype,
             name="position_embedding",
@@ -427,9 +424,9 @@ class SasRec(keras.Model):
                     num_heads=num_heads,
                     dropout=dropout,
                     layer_norm_epsilon=1e-05,
-                    # SasRec uses ReLU, although GeLU might be a better option
+                    # SASRec uses ReLU, although GeLU might be a better option
                     activation="relu",
-                    kernel_initializer=_sas_rec_kernel_initializer(),
+                    kernel_initializer="glorot_uniform",
                     normalize_first=True,
                     dtype=dtype,
                     name=f"transformer_layer_{i}",
@@ -468,9 +465,8 @@ class SasRec(keras.Model):
         seq_lengths = ops.sum(ops.cast(valid_token_mask, "int32"), axis=1)
         last_token_indices = ops.maximum(seq_lengths - 1, 0)
 
-        indices_3d = ops.expand_dims(last_token_indices, axis=-1)
-        indices_3d = ops.expand_dims(indices_3d, axis=-1)
-        gathered_tokens = ops.take_along_axis(tensor, indices_3d, axis=1)
+        indices = ops.expand_dims(last_token_indices, axis=(-2, -1))
+        gathered_tokens = ops.take_along_axis(tensor, indices, axis=1)
         last_token_embedding = ops.squeeze(gathered_tokens, axis=1)
 
         return last_token_embedding
@@ -637,14 +633,17 @@ easily add logic to remove them if that is desirable.
 
 for ele in val_ds.unbatch().take(1):
     test_sample = ele[0]
-    test_sample["item_ids"] = test_sample["item_ids"][tf.newaxis, ...]
-    test_sample["padding_mask"] = test_sample["padding_mask"][tf.newaxis, ...]
+    test_sample["item_ids"] = ops.expand_dims(test_sample["item_ids"], axis=0)
+    test_sample["padding_mask"] = ops.expand_dims(
+        test_sample["padding_mask"], axis=0
+    )
 
-movie_sequence = test_sample["item_ids"].numpy()[0]
+movie_sequence = np.array(test_sample["item_ids"])[0]
 for movie_id in movie_sequence:
     if movie_id == 0:
         continue
     print(movie_id_to_movie_title[movie_id], end="; ")
+print()
 
 predictions = model.predict(test_sample)["predictions"]
 predictions = keras.ops.convert_to_numpy(predictions)
