@@ -235,7 +235,7 @@ to get 1D weights. For more details, refer to
 `keras_rs.src.metrics.ranking_metrics_utils.get_list_weights`.
 """
 
-ranking_metric_subclass_doc_string_args = """
+ranking_metric_subclass_doc_string_post_desc = """
 
     Args:{extra_args}
         k: int. The number of top-ranked items to consider (the 'k' in 'top-k').
@@ -249,4 +249,7 @@ ranking_metric_subclass_doc_string_args = """
             `"float32"` unless set to different value
             (via `keras.backend.set_floatx()`). If a `keras.DTypePolicy` is
             provided, then the `compute_dtype` will be utilized.
+
+    Example:
+{example}
 """

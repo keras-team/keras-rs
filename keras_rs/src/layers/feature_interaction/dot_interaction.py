@@ -30,6 +30,53 @@ class DotInteraction(keras.layers.Layer):
             but is much slower.
         **kwargs: Args to pass to the base class.
 
+    Example:
+
+    ```python
+    # 1. Simple forward pass
+    batch_size = 2
+    embedding_dim = 32
+    feature1 = np.random.randn(batch_size, embedding_dim)
+    feature2 = np.random.randn(batch_size, embedding_dim)
+    feature3 = np.random.randn(batch_size, embedding_dim)
+    feature_interactions = keras_rs.layers.DotInteraction()(
+        [feature1, feature2, feature3]
+    )
+
+    # 2. After embedding layer in a model
+    vocabulary_size = 32
+    embedding_dim = 6
+
+    # Create a simple model containing the layer.
+    feature_input_1 = keras.Input(shape=(), name='indices_1', dtype="int32")
+    feature_input_2 = keras.Input(shape=(), name='indices_2', dtype="int32")
+    feature_input_3 = keras.Input(shape=(), name='indices_3', dtype="int32")
+    x1 = keras.layers.Embedding(
+        input_dim=vocabulary_size,
+        output_dim=embedding_dim
+    )(feature_input_1)
+    x2 = keras.layers.Embedding(
+        input_dim=vocabulary_size,
+        output_dim=embedding_dim
+    )(feature_input_2)
+    x3 = keras.layers.Embedding(
+        input_dim=vocabulary_size,
+        output_dim=embedding_dim
+    )(feature_input_3)
+    feature_interactions = keras_rs.layers.DotInteraction()([x1, x2, x3])
+    output = keras.layers.Dense(units=10)(x2)
+    model = keras.Model(
+        [feature_input_1, feature_input_2, feature_input_3], output
+    )
+
+    # Call the model on the inputs.
+    batch_size = 2
+    f1 = np.random.randint(0, vocabulary_size, size=(batch_size,))
+    f2 = np.random.randint(0, vocabulary_size, size=(batch_size,))
+    f3 = np.random.randint(0, vocabulary_size, size=(batch_size,))
+    outputs = model([f1, f2, f3])
+    ```
+
     References:
     - [M. Naumov et al.](https://arxiv.org/abs/1906.00091)
     """

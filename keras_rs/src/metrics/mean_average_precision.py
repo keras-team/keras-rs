@@ -7,7 +7,7 @@ from keras_rs.src.metrics.ranking_metric import (
     ranking_metric_subclass_doc_string,
 )
 from keras_rs.src.metrics.ranking_metric import (
-    ranking_metric_subclass_doc_string_args,
+    ranking_metric_subclass_doc_string_post_desc,
 )
 from keras_rs.src.metrics.ranking_metrics_utils import get_list_weights
 from keras_rs.src.metrics.ranking_metrics_utils import sort_by_scores
@@ -99,6 +99,25 @@ where:
         original list `y`.
 """
 extra_args = ""
+example = """
+    >>> batch_size = 2
+    >>> list_size = 5
+    >>> labels = np.random.randint(0, 2, size=(batch_size, list_size))
+    >>> scores = np.random.random(size=(batch_size, list_size))
+    >>> metric = keras_rs.metrics.MeanAveragePrecision()(
+    ...     y_true=labels, y_pred=scores
+    ... )
+
+    # Mask certain elements (can be used for uneven inputs)
+    >>> batch_size = 2
+    >>> list_size = 5
+    >>> labels = np.random.randint(0, 2, size=(batch_size, list_size))
+    >>> scores = np.random.random(size=(batch_size, list_size))
+    >>> mask = np.random.randint(0, 2, size=(batch_size, list_size), dtype=bool)
+    >>> metric = keras_rs.metrics.MeanAveragePrecision()(
+    ...     y_true={"labels": labels, "mask": mask}, y_pred=scores
+    ... )
+"""
 
 MeanAveragePrecision.__doc__ = format_docstring(
     ranking_metric_subclass_doc_string,
@@ -109,4 +128,6 @@ MeanAveragePrecision.__doc__ = format_docstring(
     relevance_type=relevance_type,
     score_range_interpretation=score_range_interpretation,
     formula=formula,
-) + ranking_metric_subclass_doc_string_args.format(extra_args=extra_args)
+) + ranking_metric_subclass_doc_string_post_desc.format(
+    extra_args=extra_args, example=example
+)

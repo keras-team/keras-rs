@@ -11,7 +11,7 @@ from keras_rs.src.metrics.ranking_metric import (
     ranking_metric_subclass_doc_string,
 )
 from keras_rs.src.metrics.ranking_metric import (
-    ranking_metric_subclass_doc_string_args,
+    ranking_metric_subclass_doc_string_post_desc,
 )
 from keras_rs.src.metrics.ranking_metrics_utils import compute_dcg
 from keras_rs.src.metrics.ranking_metrics_utils import default_gain_fn
@@ -127,6 +127,25 @@ extra_args = """
         rank_discount_fn: function. Maps rank positions to discount
             values. The default (`default_rank_discount_fn`) implements
             `1 / log2(rank + 1)`."""
+example = """
+    >>> batch_size = 2
+    >>> list_size = 5
+    >>> labels = np.random.randint(0, 3, size=(batch_size, list_size))
+    >>> scores = np.random.random(size=(batch_size, list_size))
+    >>> metric = keras_rs.metrics.DCG()(
+    ...     y_true=labels, y_pred=scores
+    ... )
+
+    # Mask certain elements (can be used for uneven inputs)
+    >>> batch_size = 2
+    >>> list_size = 5
+    >>> labels = np.random.randint(0, 3, size=(batch_size, list_size))
+    >>> scores = np.random.random(size=(batch_size, list_size))
+    >>> mask = np.random.randint(0, 2, size=(batch_size, list_size), dtype=bool)
+    >>> metric = keras_rs.metrics.DCG()(
+    ...     y_true={"labels": labels, "mask": mask}, y_pred=scores
+    ... )
+"""
 
 DCG.__doc__ = format_docstring(
     ranking_metric_subclass_doc_string,
@@ -137,4 +156,6 @@ DCG.__doc__ = format_docstring(
     relevance_type=relevance_type,
     score_range_interpretation=score_range_interpretation,
     formula=formula,
-) + ranking_metric_subclass_doc_string_args.format(extra_args=extra_args)
+) + ranking_metric_subclass_doc_string_post_desc.format(
+    extra_args=extra_args, example=example
+)

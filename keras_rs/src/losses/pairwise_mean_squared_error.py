@@ -64,9 +64,20 @@ explanation = """
         predicted order of items relative to their true order.
 """
 extra_args = ""
+example = """
+    >>> batch_size = 2
+    >>> list_size = 5
+    >>> labels = np.random.randint(0, 2, size=(batch_size, list_size))
+    >>> scores = np.random.random(size=(batch_size, list_size))
+    >>> loss = keras_rs.losses.PairwiseMeanSquaredError()(
+    ...     y_true=labels, y_pred=scores
+    ... )
+"""
+
 PairwiseMeanSquaredError.__doc__ = pairwise_loss_subclass_doc_string.format(
     loss_name="mean squared error",
     formula=formula,
     explanation=explanation,
     extra_args=extra_args,
+    example=example,
 )

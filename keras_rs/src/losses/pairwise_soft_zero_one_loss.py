@@ -24,9 +24,20 @@ explanation = """
         suitable for gradient-based optimization.
 """
 extra_args = ""
+example = """
+    >>> batch_size = 2
+    >>> list_size = 5
+    >>> labels = np.random.randint(0, 2, size=(batch_size, list_size))
+    >>> scores = np.random.random(size=(batch_size, list_size))
+    >>> loss = keras_rs.losses.PairwiseSoftZeroOneLoss()(
+    ...     y_true=labels, y_pred=scores
+    ... )
+"""
+
 PairwiseSoftZeroOneLoss.__doc__ = pairwise_loss_subclass_doc_string.format(
     loss_name="soft zero-one loss",
     formula=formula,
     explanation=explanation,
     extra_args=extra_args,
+    example=example,
 )

@@ -7,7 +7,7 @@ from keras_rs.src.metrics.ranking_metric import (
     ranking_metric_subclass_doc_string,
 )
 from keras_rs.src.metrics.ranking_metric import (
-    ranking_metric_subclass_doc_string_args,
+    ranking_metric_subclass_doc_string_post_desc,
 )
 from keras_rs.src.metrics.ranking_metrics_utils import get_list_weights
 from keras_rs.src.metrics.ranking_metrics_utils import sort_by_scores
@@ -82,6 +82,26 @@ P@k(y, s) = 1/k sum_i I[rank(s_i) < k] y_i
 where `y_i` is the relevance label (0/1) of the item ranked at position
 `i`, and `I[condition]` is 1 if the condition is met, otherwise 0."""
 extra_args = ""
+example = """
+    >>> batch_size = 2
+    >>> list_size = 5
+    >>> labels = np.random.randint(0, 2, size=(batch_size, list_size))
+    >>> scores = np.random.random(size=(batch_size, list_size))
+    >>> metric = keras_rs.metrics.PrecisionAtK()(
+    ...     y_true=labels, y_pred=scores
+    ... )
+
+    # Mask certain elements (can be used for uneven inputs)
+    >>> batch_size = 2
+    >>> list_size = 5
+    >>> labels = np.random.randint(0, 2, size=(batch_size, list_size))
+    >>> scores = np.random.random(size=(batch_size, list_size))
+    >>> mask = np.random.randint(0, 2, size=(batch_size, list_size), dtype=bool)
+    >>> metric = keras_rs.metrics.PrecisionAtK()(
+    ...     y_true={"labels": labels, "mask": mask}, y_pred=scores
+    ... )
+"""
+
 PrecisionAtK.__doc__ = format_docstring(
     ranking_metric_subclass_doc_string,
     width=80,
@@ -91,4 +111,6 @@ PrecisionAtK.__doc__ = format_docstring(
     relevance_type=relevance_type,
     score_range_interpretation=score_range_interpretation,
     formula=formula,
-) + ranking_metric_subclass_doc_string_args.format(extra_args=extra_args)
+) + ranking_metric_subclass_doc_string_post_desc.format(
+    extra_args=extra_args, example=example
+)

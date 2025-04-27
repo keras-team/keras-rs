@@ -154,5 +154,7 @@ pairwise_loss_subclass_doc_string = (
             `"float32"` unless set to different value
             (via `keras.backend.set_floatx()`). If a `keras.DTypePolicy` is
             provided, then the `compute_dtype` will be utilized.
-    """
+
+    Example:
+{example}"""
 )

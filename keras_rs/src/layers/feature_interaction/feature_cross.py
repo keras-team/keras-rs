@@ -57,13 +57,32 @@ class FeatureCross(keras.layers.Layer):
     Example:
 
     ```python
-    # after embedding layer in a functional model
-    input = keras.Input(shape=(), name='indices', dtype="int64")
-    x0 = keras.layers.Embedding(input_dim=32, output_dim=6)(x0)
-    x1 = FeatureCross()(x0, x0)
-    x2 = FeatureCross()(x0, x1)
+    # 1. Simple forward pass
+    batch_size = 2
+    embedding_dim = 32
+    feature1 = np.random.randn(batch_size, embedding_dim)
+    feature2 = np.random.randn(batch_size, embedding_dim)
+    crossed_features = keras_rs.layers.FeatureCross()(feature1, feature2)
+
+    # 2. After embedding layer in a model
+    vocabulary_size = 32
+    embedding_dim = 6
+
+    # Create a simple model containing the layer.
+    inputs = keras.Input(shape=(), name='indices', dtype="int32")
+    x0 = keras.layers.Embedding(
+        input_dim=vocabulary_size,
+        output_dim=embedding_dim
+    )(inputs)
+    x1 = keras_rs.layers.FeatureCross()(x0, x0)
+    x2 = keras_rs.layers.FeatureCross()(x0, x1)
     logits = keras.layers.Dense(units=10)(x2)
-    model = keras.Model(input, logits)
+    model = keras.Model(inputs, logits)
+
+    # Call the model on the inputs.
+    batch_size = 2
+    input_data = np.random.randint(0, vocabulary_size, size=(batch_size,))
+    outputs = model(input_data)
     ```
 
     References:
