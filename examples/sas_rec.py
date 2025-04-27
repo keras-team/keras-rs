@@ -1,5 +1,5 @@
 """
-# Recommending movies: retrieval using a sequential transformer model (SasRec)
+# Recommending movies: retrieval using a sequential transformer model (SASRec)
 
 Sequential recommendation is a popular model that looks at a sequence of items
 that users have interacted with previously and then predicts the next item.
@@ -633,8 +633,8 @@ easily add logic to remove them if that is desirable.
 
 for ele in val_ds.unbatch().take(1):
     test_sample = ele[0]
-    test_sample["item_ids"] = ops.expand_dims(test_sample["item_ids"], axis=0)
-    test_sample["padding_mask"] = ops.expand_dims(
+    test_sample["item_ids"] = tf.expand_dims(test_sample["item_ids"], axis=0)
+    test_sample["padding_mask"] = tf.expand_dims(
         test_sample["padding_mask"], axis=0
     )
 
