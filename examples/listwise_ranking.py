@@ -107,7 +107,7 @@ to predict item orderings that correspond to these observed user preferences.
 
 Let's start by getting the entire list of movies and corresponding ratings for
 every user. We remove `user_ids` corresponding to users who have rated less than
-'x' number of movies.
+`NUM_EXAMPLES_PER_LIST` number of movies.
 """
 
 
