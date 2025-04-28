@@ -28,7 +28,7 @@ import os
 os.environ["KERAS_BACKEND"] = "jax"  # Or "tensorflow" or "torch"!
 ```
 
-Import KerasHub and other libraries:
+Import KerasRS and other libraries:
 
 ```python
 import keras
