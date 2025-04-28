@@ -218,9 +218,9 @@ user_ids = random.sample(range(1, 101), len(devices))
 predictions = model.predict(keras.ops.convert_to_tensor(user_ids))
 predictions = keras.ops.convert_to_numpy(predictions["predictions"])
 
-for user_id in user_ids:
+for i, user_id in enumerate(user_ids):
     print(f"\n==Recommended movies for user {user_id}==")
-    for movie_id in predictions[0]:
+    for movie_id in predictions[i]:
         print(movie_id_to_movie_title[movie_id])
 
 """
