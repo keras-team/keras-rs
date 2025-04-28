@@ -36,7 +36,7 @@ import keras_rs
 import numpy as np
 ```
 
-Define a simple model which uses the `FeatureCross` layer and train it:
+Define a simple model using the `FeatureCross` layer:
 
 ```python
 vocabulary_size = 32
@@ -51,14 +51,20 @@ x1 = keras_rs.layers.FeatureCross()(x0, x0)
 x2 = keras_rs.layers.FeatureCross()(x0, x1)
 output = keras.layers.Dense(units=10)(x2)
 model = keras.Model(inputs, output)
+```
 
-# Compile the model
+Compile the model.
+
+```python
 model.compile(
     loss=keras.losses.MeanSquaredError(),
     optimizer=keras.optimizers.Adam(learning_rate=3e-4)
 )
+```
 
-# Call `model.fit()` on dummy data.
+Call `model.fit()` on dummy data.
+
+```python
 batch_size = 2
 x = np.random.randint(0, vocabulary_size, size=(batch_size,))
 y = np.random.random(size=(batch_size,))
