@@ -53,7 +53,7 @@ output = keras.layers.Dense(units=10)(x2)
 model = keras.Model(inputs, output)
 ```
 
-Compile the model.
+Compile the model:
 
 ```python
 model.compile(
@@ -62,7 +62,7 @@ model.compile(
 )
 ```
 
-Call `model.fit()` on dummy data.
+Call `model.fit()` on dummy data:
 
 ```python
 batch_size = 2
