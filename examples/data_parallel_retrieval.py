@@ -214,7 +214,7 @@ We then simply use the Keras `model.predict()` method. Under the hood, it calls
 the `BruteForceRetrieval` layer to perform the actual retrieval.
 """
 
-user_ids = random.sample(range(1, 101), len(devices))
+user_ids = random.sample(range(1, 1001), len(devices))
 predictions = model.predict(keras.ops.convert_to_tensor(user_ids))
 predictions = keras.ops.convert_to_numpy(predictions["predictions"])
 
