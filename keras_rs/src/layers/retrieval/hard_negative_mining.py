@@ -12,11 +12,27 @@ MAX_FLOAT = ml_dtypes.finfo("float32").max / 100.0
 
 @keras_rs_export("keras_rs.layers.HardNegativeMining")
 class HardNegativeMining(keras.layers.Layer):
-    """Transforms logits and labels to return hard negatives.
+    """Filter logits and labels to return hard negatives.
+
+    The output will include logits and labels for the requested number of hard
+    negatives as well as the positive candidate.
 
     Args:
         num_hard_negatives: How many hard negatives to return.
         **kwargs: Args to pass to the base class.
+
+    Example:
+
+    ```python
+    # Create layer with the configured number of hard negatives to mine.
+    hard_negative_mining = keras_rs.layers.HardNegativeMining(
+        num_hard_negatives=10
+    )
+
+    # This will retrieve the top 10 negative candidates plus the positive
+    # candidate from `labels` for each row.
+    out_logits, out_labels = hard_negative_mining(in_logits, in_labels)
+    ```
     """
 
     def __init__(self, num_hard_negatives: int, **kwargs: Any) -> None:
@@ -33,12 +49,13 @@ class HardNegativeMining(keras.layers.Layer):
         negatives as well as the positive candidate.
 
         Args:
-            logits: logits tensor, typically `[batch_size, num_candidates]` but
-                can have more dimensions or be 1D as `[num_candidates]`.
-            labels: one-hot labels tensor, must be the same shape as `logits`.
+            logits: The logits tensor, typically `[batch_size, num_candidates]`
+                but can have more dimensions or be 1D as `[num_candidates]`.
+            labels: The one-hot labels tensor, must be the same shape as
+                `logits`.
 
         Returns:
-            tuple containing two tensors with the last dimension of
+            A tuple containing two tensors with the last dimension of
             `num_candidates` replaced with `num_hard_negatives + 1`.
             - logits: `[..., num_hard_negatives + 1]` tensor of logits.
             - labels: `[..., num_hard_negatives + 1]` one-hot tensor of labels.

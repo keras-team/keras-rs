@@ -15,6 +15,18 @@ class RemoveAccidentalHits(keras.layers.Layer):
 
     Zeroes the logits of negative candidates that have the same ID as the
     positive candidate in that row.
+
+    Example:
+
+    ```python
+    # Create layer with the configured number of hard negatives to mine.
+    remove_accidental_hits = keras_rs.layers.RemoveAccidentalHits()
+
+    # This will zero the logits of negative candidates that have the same ID as
+    # the positive candidate from `labels` so as to not negatively impact the
+    # true positive.
+    logits = remove_accidental_hits(logits, labels, candidate_ids)
+    ```
     """
 
     def call(
@@ -29,16 +41,17 @@ class RemoveAccidentalHits(keras.layers.Layer):
         have the same ID as the positive candidate in that row.
 
         Args:
-            logits: logits tensor, typically `[batch_size, num_candidates]` but
-                can have more dimensions or be 1D as `[num_candidates]`.
-            labels: one-hot labels tensor, must be the same shape as `logits`.
-            candidate_ids: candidate identifiers tensor, can be
+            logits: The logits tensor, typically `[batch_size, num_candidates]`
+                but can have more dimensions or be 1D as `[num_candidates]`.
+            labels: The one-hot labels tensor, must be the same shape as
+                `logits`.
+            candidate_ids: The candidate identifiers tensor, can be
                 `[num_candidates]` or `[batch_size, num_candidates]` or have
                 more dimensions as long as they match the last dimensions of
                 `labels`.
 
         Returns:
-            logits: Modified logits with the same shape as the input logits.
+            logits: The modified logits with the same shape as the input logits.
         """
         # A more principled way is to implement
         # `softmax_cross_entropy_with_logits` with a input mask. Here we
