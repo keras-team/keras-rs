@@ -19,7 +19,7 @@ congratulations! You already understand most of Keras Recommenders.
 
 ## Quickstart
 
-### Train your own model with `FeatureCross` layers
+### Train your own cross network
 
 Choose a backend:
 
