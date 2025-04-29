@@ -22,10 +22,10 @@ class PairwiseLogisticLoss(PairwiseLoss):
 
 formula = "loss = sum_{i} sum_{j} I(y_i > y_j) * log(1 + exp(-(s_i - s_j)))"
 explanation = """
-      - `log(1 + exp(-(s_i - s_j)))` is the logistic loss, which penalizes
-        cases where the score difference `s_i - s_j` is not sufficiently large
-        when `y_i > y_j`. This function provides a smooth approximation of the
-        ideal step function, making it suitable for gradient-based optimization.
+    - `log(1 + exp(-(s_i - s_j)))` is the logistic loss, which penalizes
+      cases where the score difference `s_i - s_j` is not sufficiently large
+      when `y_i > y_j`. This function provides a smooth approximation of the
+      ideal step function, making it suitable for gradient-based optimization.
 """
 extra_args = ""
 example = """

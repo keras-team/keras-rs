@@ -59,9 +59,9 @@ class PairwiseMeanSquaredError(PairwiseLoss):
 
 formula = "loss = sum_{i} sum_{j} I(y_i > y_j) * (s_i - s_j)^2"
 explanation = """
-      - `(s_i - s_j)^2` is the squared difference between the predicted scores
-        of items `i` and `j`, which penalizes discrepancies between the
-        predicted order of items relative to their true order.
+    - `(s_i - s_j)^2` is the squared difference between the predicted scores
+      of items `i` and `j`, which penalizes discrepancies between the predicted
+      order of items relative to their true order.
 """
 extra_args = ""
 example = """

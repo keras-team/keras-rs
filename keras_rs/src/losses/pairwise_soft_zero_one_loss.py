@@ -18,10 +18,10 @@ class PairwiseSoftZeroOneLoss(PairwiseLoss):
 
 formula = "loss = sum_{i} sum_{j} I(y_i > y_j) * (1 - sigmoid(s_i - s_j))"
 explanation = """
-      - `(1 - sigmoid(s_i - s_j))` represents the soft zero-one loss, which
-        approximates the ideal zero-one loss (which would be 1 if `s_i < s_j`
-        and 0 otherwise) with a smooth, differentiable function. This makes it
-        suitable for gradient-based optimization.
+    - `(1 - sigmoid(s_i - s_j))` represents the soft zero-one loss, which
+      approximates the ideal zero-one loss (which would be 1 if `s_i < s_j`
+      and 0 otherwise) with a smooth, differentiable function. This makes it
+      suitable for gradient-based optimization.
 """
 extra_args = ""
 example = """
