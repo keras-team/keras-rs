@@ -50,7 +50,8 @@ class SamplingProbabilityCorrection(keras.layers.Layer):
             candidate_sampling_probability: The sampling probability with the
                 same shape as `logits`.
 
-        Returns: The corrected logits with the same shape as the input logits.
+        Returns:
+            The corrected logits with the same shape as the input logits.
         """
         return logits - ops.log(
             ops.clip(candidate_sampling_probability, self.epsilon, 1.0)

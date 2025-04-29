@@ -108,7 +108,8 @@ example = """
     ...     y_true=labels, y_pred=scores
     ... )
 
-    # Mask certain elements (can be used for uneven inputs)
+    Mask certain elements (can be used for uneven inputs):
+
     >>> batch_size = 2
     >>> list_size = 5
     >>> labels = np.random.randint(0, 2, size=(batch_size, list_size))

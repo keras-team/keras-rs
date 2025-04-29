@@ -25,7 +25,7 @@ explanation = """
 """
 extra_args = ""
 example = """
-    1. With `compile()` API:
+    With `compile()` API:
 
     ```python
     model.compile(
@@ -34,23 +34,24 @@ example = """
     )
     ```
 
-    2. As a standalone function:
-    2.1. Unbatched inputs
+    As a standalone function with unbatched inputs:
+
     >>> y_true = np.array([1.0, 0.0, 1.0, 3.0, 2.0])
     >>> y_pred = np.array([1.0, 3.0, 2.0, 4.0, 0.8])
     >>> pairwise_soft_zero_one_loss = keras_rs.losses.PairwiseSoftZeroOneLoss()
     >>> pairwise_soft_zero_one_loss(y_true=y_true, y_pred=y_pred)
     0.86103
 
-    2.2 Batched inputs
-    2.2.1 Using default 'auto'/'sum_over_batch_size' reduction.
+    With batched inputs using default 'auto'/'sum_over_batch_size' reduction:
+
     >>> y_true = np.array([[1.0, 0.0, 1.0, 3.0], [0.0, 1.0, 2.0, 3.0]])
     >>> y_pred = np.array([[1.0, 3.0, 2.0, 4.0], [1.0, 1.8, 2.0, 3.0]])
     >>> pairwise_soft_zero_one_loss = keras_rs.losses.PairwiseSoftZeroOneLoss()
     >>> pairwise_soft_zero_one_loss(y_true=y_true, y_pred=y_pred)
     0.46202
 
-    2.2.2. With masked inputs (useful for ragged inputs)
+    With masked inputs (useful for ragged inputs):
+
     >>> y_true = {
     ...     "labels": np.array([[1.0, 0.0, 1.0, 3.0], [0.0, 1.0, 2.0, 3.0]]),
     ...     "mask": np.array(
@@ -61,7 +62,8 @@ example = """
     >>> pairwise_soft_zero_one_loss(y_true=y_true, y_pred=y_pred)
     0.29468
 
-    2.2.3 With `sample_weight`
+    With `sample_weight`:
+
     >>> y_true = np.array([[1.0, 0.0, 1.0, 3.0], [0.0, 1.0, 2.0, 3.0]])
     >>> y_pred = np.array([[1.0, 3.0, 2.0, 4.0], [1.0, 1.8, 2.0, 3.0]])
     >>> sample_weight = np.array(
@@ -73,7 +75,8 @@ example = """
     ... )
     0.40478
 
-    2.2.4 Using `'none'` reduction.
+    Using `'none'` reduction:
+
     >>> y_true = np.array([[1.0, 0.0, 1.0, 3.0], [0.0, 1.0, 2.0, 3.0]])
     >>> y_pred = np.array([[1.0, 3.0, 2.0, 4.0], [1.0, 1.8, 2.0, 3.0]])
     >>> pairwise_soft_zero_one_loss = keras_rs.losses.PairwiseSoftZeroOneLoss(

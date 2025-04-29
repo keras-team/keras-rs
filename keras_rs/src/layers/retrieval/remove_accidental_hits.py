@@ -51,7 +51,7 @@ class RemoveAccidentalHits(keras.layers.Layer):
                 `labels`.
 
         Returns:
-            logits: The modified logits with the same shape as the input logits.
+            The modified logits with the same shape as the input logits.
         """
         # A more principled way is to implement
         # `softmax_cross_entropy_with_logits` with a input mask. Here we

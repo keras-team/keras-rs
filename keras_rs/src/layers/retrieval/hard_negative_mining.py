@@ -57,8 +57,8 @@ class HardNegativeMining(keras.layers.Layer):
         Returns:
             A tuple containing two tensors with the last dimension of
             `num_candidates` replaced with `num_hard_negatives + 1`.
-            - logits: `[..., num_hard_negatives + 1]` tensor of logits.
-            - labels: `[..., num_hard_negatives + 1]` one-hot tensor of labels.
+            logits: `[..., num_hard_negatives + 1]` tensor of logits.
+            labels: `[..., num_hard_negatives + 1]` one-hot tensor of labels.
         """
 
         # Number of sampled logits, i.e, the number of hard negatives to be

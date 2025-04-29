@@ -68,7 +68,7 @@ Call `model.fit()` on dummy data:
 batch_size = 2
 x = np.random.randint(0, vocabulary_size, size=(batch_size,))
 y = np.random.random(size=(batch_size,))
-model.fit(input_data, y=y)
+model.fit(x, y=y)
 ```
 
 ### Use ranking losses and metrics

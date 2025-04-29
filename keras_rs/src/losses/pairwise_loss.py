@@ -70,7 +70,8 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
         y_true: types.Tensor,
         y_pred: types.Tensor,
     ) -> types.Tensor:
-        """
+        """Compute the pairwise loss.
+
         Args:
             y_true: tensor or dict. Ground truth values. If tensor, of shape
                 `(list_size)` for unbatched inputs or `(batch_size, list_size)`
@@ -83,6 +84,9 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
             y_pred: tensor. The predicted values, of shape `(list_size)` for
                 unbatched inputs or `(batch_size, list_size)` for batched
                 inputs. Should be of the same shape as `y_true`.
+
+        Returns:
+            The loss.
         """
         mask = None
         if isinstance(y_true, dict):
