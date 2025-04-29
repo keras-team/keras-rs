@@ -221,7 +221,6 @@ by sorting in descending order. {score_range_interpretation}.
 For each list of predicted scores `s` in `y_pred` and the corresponding list
 of true labels `y` in `y_true`, the per-query {metric_abbreviation} score is
 calculated as follows:
-
 {formula}
 
 The final {metric_abbreviation} score reported is typically the weighted

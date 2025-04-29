@@ -30,8 +30,13 @@ def format_docstring(template: str, width: int = 80, **kwargs: Any) -> str:
                 textwrap.indent(formula_dedented, base_indent_str)
             )
         elif "where:" in stripped_block:
+            # Expect this to be already indented.
+            splitted_block = stripped_block.split("\n")
             processed_output.append(
-                textwrap.indent(stripped_block, base_indent_str)
+                textwrap.indent(
+                    splitted_block[0] + "\n\n" + "\n".join(splitted_block[1:]),
+                    base_indent_str,
+                )
             )
         else:
             processed_output.append(

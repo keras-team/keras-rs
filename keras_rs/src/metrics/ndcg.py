@@ -109,7 +109,7 @@ class NDCG(RankingMetric):
 
 concept_sentence = (
     "It normalizes the Discounted Cumulative Gain (DCG) with the Ideal "
-    "Discounted Cumulative Gain (IDCG) for each list."
+    "Discounted Cumulative Gain (IDCG) for each list"
 )
 relevance_type = (
     "graded relevance scores (non-negative numbers where higher values "
@@ -124,11 +124,6 @@ score_range_interpretation = (
 )
 
 formula = """
-The metric calculates a weighted average nDCG score per list.
-For a single list, nDCG is computed as the ratio of the Discounted
-Cumulative Gain (DCG) of the predicted ranking to the Ideal Discounted
-Cumulative Gain (IDCG) of the best possible ranking:
-
 ```
 nDCG@k = DCG@k / IDCG@k
 ```
@@ -147,29 +142,25 @@ IDCG@k(y'') = sum_{i=1}^{k} (gain_fn(y''_i) / rank_discount_fn(i))
 ```
 
 where:
-    - `y'_i`: True relevance of the item at rank `i` in
-        the ranking induced by `y_pred`.
-    - `y''_i` True relevance of the item at rank `i` in
-        the *ideal* ranking (sorted by `y_true` descending).
-    - `gain_fn` is the user-provided function mapping relevance to gain.
-        The default function (`default_gain_fn`) is typically equivalent to
-        `lambda y: 2**y - 1`.
-    - `rank_discount_fn` is the user-provided function mapping rank `i`
-        (1-based) to a discount value. The default function
-        (`default_rank_discount_fn`) is typically equivalent to
-        `lambda rank: 1 / log2(rank + 1)`.
-    - If IDCG@k is 0 (e.g., no relevant items), nDCG@k is defined as 0.
-    - The final result often aggregates these per-list nDCG scores,
-        potentially involving normalization by list-specific weights, to
-        produce a weighted average.
-"""
+- `y'_i`: True relevance of the item at rank `i` in the ranking induced by
+  `y_pred`.
+- `y''_i` True relevance of the item at rank `i` in the *ideal* ranking (sorted
+  by `y_true` descending).
+- `gain_fn` is the user-provided function mapping relevance to gain. The default
+  function (`default_gain_fn`) is typically equivalent to `lambda y: 2**y - 1`.
+- `rank_discount_fn` is the user-provided function mapping rank `i` (1-based) to
+  a discount value. The default function (`default_rank_discount_fn`) is
+  typically equivalent to `lambda rank: 1 / log2(rank + 1)`.
+- If IDCG@k is 0 (e.g., no relevant items), nDCG@k is defined as 0.
+- The final result often aggregates these per-list nDCG scores, potentially
+  involving normalization by list-specific weights, to produce a weighted
+  average."""
 extra_args = """
-gain_fn: callable. Maps relevance scores (`y_true`) to gain values. The
-    default implements `2**y - 1`. Used for both DCG and IDCG.
-rank_discount_fn: callable. Maps rank positions (1-based) to discount
-    values. The default (`default_rank_discount_fn`) typically implements
-    `1 / log2(rank + 1)`. Used for both DCG and IDCG.
-"""
+        gain_fn: callable. Maps relevance scores (`y_true`) to gain values. The
+            default implements `2**y - 1`.
+        rank_discount_fn: function. Maps rank positions to discount
+            values. The default (`default_rank_discount_fn`) implements
+            `1 / log2(rank + 1)`."""
 example = """
     >>> batch_size = 2
     >>> list_size = 5

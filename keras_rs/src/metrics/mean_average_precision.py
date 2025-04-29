@@ -82,22 +82,18 @@ rel(j) = y_i if rank(s_i) = j
 ```
 
 where:
-    - `j` represents the rank position (starting from 1).
-    - `sum_j` indicates a summation over all ranks `j` from 1 up to the list
-        size (or `k`).
-    - `P@j(y, s)` denotes the Precision at rank `j`, calculated as the
-        number of relevant items found within the top `j` positions divided by
-        `j`.
-    - `rel(j)` represents the relevance of the item specifically at rank
-        `j`. `rel(j)` is 1 if the item at rank `j` is relevant, and 0
-        otherwise.
-    - `y_i` is the true relevance label of the original item `i` before
-        ranking.
-    - `rank(s_i)` is the rank position assigned to item `i` based on its
-        score `s_i`.
-    - `sum_i y_i` calculates the total number of relevant items in the
-        original list `y`.
-"""
+- `j` represents the rank position (starting from 1).
+- `sum_j` indicates a summation over all ranks `j` from 1 up to the list
+  size (or `k`).
+- `P@j(y, s)` denotes the Precision at rank `j`, calculated as the
+  number of relevant items found within the top `j` positions divided by `j`.
+- `rel(j)` represents the relevance of the item specifically at rank
+  `j`. `rel(j)` is 1 if the item at rank `j` is relevant, and 0 otherwise.
+- `y_i` is the true relevance label of the original item `i` before ranking.
+- `rank(s_i)` is the rank position assigned to item `i` based on its score
+  `s_i`.
+- `sum_i y_i` calculates the total number of relevant items in the original
+  list `y`."""
 extra_args = ""
 example = """
     >>> batch_size = 2

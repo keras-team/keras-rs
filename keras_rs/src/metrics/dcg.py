@@ -111,16 +111,15 @@ DCG@k(y', w') = sum_{i=1}^{k} (gain_fn(y'_i) / rank_discount_fn(i))
 ```
 
 where:
-    - `y'_i` is the true relevance score of the item ranked at position `i`
-        (obtained by sorting `y_true` according to `y_pred`).
-    - `gain_fn` is the user-provided function mapping relevance `y'_i` to a
-        gain value. The default function (`default_gain_fn`) is typically
-        equivalent to `lambda y: 2**y - 1`.
-    - `rank_discount_fn` is the user-provided function mapping rank `i`
-        to a discount value. The default function (`default_rank_discount_fn`)
-        is typically equivalent to `lambda rank: 1 / log2(rank + 1)`.
-    - The final result aggregates these per-list scores.
-"""
+- `y'_i` is the true relevance score of the item ranked at position `i`
+  (obtained by sorting `y_true` according to `y_pred`).
+- `gain_fn` is the user-provided function mapping relevance `y'_i` to a
+  gain value. The default function (`default_gain_fn`) is typically
+  equivalent to `lambda y: 2**y - 1`.
+- `rank_discount_fn` is the user-provided function mapping rank `i`
+  to a discount value. The default function (`default_rank_discount_fn`)
+  is typically equivalent to `lambda rank: 1 / log2(rank + 1)`.
+- The final result aggregates these per-list scores."""
 extra_args = """
         gain_fn: callable. Maps relevance scores (`y_true`) to gain values. The
             default implements `2**y - 1`.
@@ -136,7 +135,7 @@ example = """
     ...     y_true=labels, y_pred=scores
     ... )
 
-    # Mask certain elements (can be used for uneven inputs)
+    Mask certain elements (can be used for uneven inputs)
     >>> batch_size = 2
     >>> list_size = 5
     >>> labels = np.random.randint(0, 3, size=(batch_size, list_size))
