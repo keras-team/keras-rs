@@ -157,7 +157,7 @@ def print_stats(rmse_list, num_params, model_name):
     else:
         print(
             f"{model_name}: RMSE = {avg_rmse} ± {std_rmse}; "
-            "#params = {num_params}"
+            f"#params = {num_params}"
         )
 
 
