@@ -40,7 +40,7 @@ class PrecisionAtK(RankingMetric):
             ops.greater_equal(
                 sorted_y_true, ops.cast(1, dtype=sorted_y_true.dtype)
             ),
-            dtype="float32",
+            dtype=y_pred.dtype,
         )
         list_length = ops.shape(sorted_y_true)[1]
         # TODO: We do not do this for MRR, and the other metrics. Do we need to
@@ -52,13 +52,13 @@ class PrecisionAtK(RankingMetric):
 
         per_list_precision = ops.divide_no_nan(
             ops.sum(relevance, axis=1, keepdims=True),
-            ops.cast(valid_list_length, dtype="float32"),
+            ops.cast(valid_list_length, dtype=y_pred.dtype),
         )
 
         # Get weights.
         overall_relevance = ops.cast(
             ops.greater_equal(y_true, ops.cast(1, dtype=y_true.dtype)),
-            dtype="float32",
+            dtype=y_pred.dtype,
         )
         per_list_weights = get_list_weights(
             weights=sample_weight, relevance=overall_relevance

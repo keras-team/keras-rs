@@ -116,6 +116,12 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
         if passed_mask is not None:
             passed_mask = ops.convert_to_tensor(passed_mask)
 
+        # Cast to the correct dtype.
+        y_true = ops.cast(y_true, dtype=self.dtype)
+        y_pred = ops.cast(y_pred, dtype=self.dtype)
+        if sample_weight is not None:
+            sample_weight = ops.cast(sample_weight, dtype=self.dtype)
+
         # === Process `sample_weight` ===
         if sample_weight is None:
             sample_weight = ops.cast(1, dtype=y_pred.dtype)
@@ -152,7 +158,7 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
 
         # Mask all values less than 0 (since less than 0 implies invalid
         # labels).
-        valid_mask = ops.greater_equal(y_true, ops.cast(0.0, y_true.dtype))
+        valid_mask = ops.greater_equal(y_true, ops.cast(0, y_true.dtype))
         if passed_mask is not None:
             valid_mask = ops.logical_and(valid_mask, passed_mask)
 

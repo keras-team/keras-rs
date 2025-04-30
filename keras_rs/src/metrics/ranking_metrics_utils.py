@@ -163,7 +163,7 @@ def get_list_weights(
     # Identify lists where both weights and relevance sums are non-zero.
     nonzero_relevance = ops.cast(
         ops.logical_and(nonzero_weights, nonzero_relevance_condition),
-        dtype="float32",
+        dtype=weights.dtype,
     )
     # Count the number of lists with non-zero relevance and non-zero weights.
     nonzero_relevance_count = ops.sum(nonzero_relevance, axis=0, keepdims=True)
@@ -227,7 +227,7 @@ def compute_dcg(
     ] = default_rank_discount_fn,
 ) -> types.Tensor:
     list_size = ops.shape(y_true)[1]
-    positions = ops.arange(1, list_size + 1, dtype="float32")
+    positions = ops.arange(1, list_size + 1, dtype=y_true.dtype)
     gain = gain_fn(y_true)
     discount = rank_discount_fn(positions)
 

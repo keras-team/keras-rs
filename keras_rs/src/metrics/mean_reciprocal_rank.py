@@ -44,13 +44,13 @@ class MeanReciprocalRank(RankingMetric):
             ops.greater_equal(
                 sorted_y_true, ops.cast(1, dtype=sorted_y_true.dtype)
             ),
-            dtype="float32",
+            dtype=y_pred.dtype,
         )
 
         # `reciprocal_rank = [1, 0.5, 0.33]`
         reciprocal_rank = ops.divide(
-            ops.cast(1, dtype="float32"),
-            ops.arange(1, list_length + 1, dtype="float32"),
+            ops.cast(1, dtype=y_pred.dtype),
+            ops.arange(1, list_length + 1, dtype=y_pred.dtype),
         )
 
         # `mrr` should be of shape `(batch_size, 1)`.
@@ -64,7 +64,7 @@ class MeanReciprocalRank(RankingMetric):
         # Get weights.
         overall_relevance = ops.cast(
             ops.greater_equal(y_true, ops.cast(1, dtype=y_true.dtype)),
-            dtype="float32",
+            dtype=y_pred.dtype,
         )
         per_list_weights = get_list_weights(
             weights=sample_weight, relevance=overall_relevance

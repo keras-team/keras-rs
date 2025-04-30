@@ -38,11 +38,11 @@ class RecallAtK(RankingMetric):
             ops.greater_equal(
                 sorted_y_true, ops.cast(1, dtype=sorted_y_true.dtype)
             ),
-            dtype="float32",
+            dtype=y_pred.dtype,
         )
         overall_relevance = ops.cast(
             ops.greater_equal(y_true, ops.cast(1, dtype=y_true.dtype)),
-            dtype="float32",
+            dtype=y_pred.dtype,
         )
         per_list_recall = ops.divide_no_nan(
             ops.sum(relevance, axis=1, keepdims=True),

@@ -25,7 +25,7 @@ class MeanAveragePrecision(RankingMetric):
     ) -> types.Tensor:
         relevance = ops.cast(
             ops.greater_equal(y_true, ops.cast(1, dtype=y_true.dtype)),
-            dtype="float32",
+            dtype=y_pred.dtype,
         )
         sorted_relevance, sorted_weights = sort_by_scores(
             tensors_to_sort=[relevance, sample_weight],
