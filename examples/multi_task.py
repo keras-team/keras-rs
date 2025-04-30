@@ -153,7 +153,7 @@ class MultiTaskModel(keras.Model):
 
         # Top-k accuracy for retrieval
         self.top_k_metric = keras.metrics.SparseTopKCategoricalAccuracy(
-            k=100, from_sorted_ids=True
+            k=10, from_sorted_ids=True
         )
         # RMSE for ranking
         self.rmse_metric = keras.metrics.RootMeanSquaredError()
