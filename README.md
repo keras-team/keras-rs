@@ -1,5 +1,9 @@
 # Keras Recommenders
 
+<p align="center" width="100%">
+<img src="https://i.imgur.com/m1BX7Zd.png" width="434" height="157" alt="KerasRS">
+</p>
+
 Keras Recommenders is a library for building recommender systems on top of
 Keras 3. Keras Recommenders works natively with TensorFlow, JAX, or PyTorch. It
 provides a collection of building blocks which help with the full workflow of
