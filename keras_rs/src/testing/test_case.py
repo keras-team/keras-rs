@@ -42,6 +42,32 @@ class TestCase(unittest.TestCase):
             actual, desired, atol=atol, rtol=rtol, err_msg=msg
         )
 
+    def assertNotAllClose(
+        self,
+        actual: types.Tensor,
+        desired: types.Tensor,
+        atol: float = 1e-6,
+        rtol: float = 1e-6,
+        msg: str = "",
+    ) -> None:
+        """Verify that not all elements of two tensors are close in value.
+
+        Args:
+          actual: Actual tensor, the first tensor to compare.
+          desired: Expected tensor, the second tensor to compare.
+          atol: Absolute tolerance.
+          rtol: Relative tolerance.
+          msg: Optional error message.
+        """
+        try:
+            self.assertAllClose(actual, desired, atol=atol, rtol=rtol, msg=msg)
+        except AssertionError:
+            return
+        raise AssertionError(
+            f"The two values are close at all elements.\n{msg}.\n"
+            f"Values: {actual}"
+        )
+
     def assertAllEqual(
         self, actual: types.Tensor, desired: types.Tensor, msg: str = ""
     ) -> None:
