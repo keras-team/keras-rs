@@ -1,6 +1,6 @@
 """Type definitions."""
 
-from typing import Any, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence, TypeVar, Union
 
 """
 A tensor in any of the backends.
@@ -24,3 +24,10 @@ Union[
 Tensor = Any
 
 TensorShape = Sequence[Optional[int]]
+
+T = TypeVar("T")
+Nested = Union[
+    T,
+    Sequence[Union[T, "Nested[T]"]],
+    Mapping[str, Union[T, "Nested[T]"]],
+]
