@@ -1,8 +1,30 @@
-from typing import Union
+from typing import Any, Callable, Union
 
 import keras
 
 from keras_rs.src import types
+
+
+def no_automatic_dependency_tracking(
+    fn: Callable[..., Any],
+) -> Callable[..., Any]:
+    """Decorator to disable automatic dependency tracking in Keras and TF.
+
+    Args:
+        fn: the function to disable automatic dependency tracking for.
+
+    Returns:
+        a wrapped version of `fn`.
+    """
+    if keras.backend.backend() == "tensorflow":
+        import tensorflow as tf
+
+        fn = tf.__internal__.tracking.no_automatic_dependency_tracking(fn)
+
+    wrapped_fn: Callable[..., Any] = (
+        keras.src.utils.tracking.no_automatic_dependency_tracking(fn)
+    )
+    return wrapped_fn
 
 
 def clone_initializer(

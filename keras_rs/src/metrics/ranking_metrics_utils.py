@@ -63,7 +63,7 @@ def sort_by_scores(
     Utility function for sorting tensors by scores.
 
     Args:
-        tensors_to_sort. list of tensors. All tensors are of shape
+        tensors_to_sort: list of tensors. All tensors are of shape
             `(batch_size, list_size)`. These tensors are sorted based on
             `scores`.
         scores: tensor. Of shape `(batch_size, list_size)`. The scores to sort
