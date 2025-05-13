@@ -7,7 +7,7 @@ from keras_rs.src import types
 
 
 def get_shuffled_indices(
-    shape: types.TensorShape,
+    shape: types.Shape,
     mask: Optional[types.Tensor] = None,
     shuffle_ties: bool = True,
     seed: Optional[Union[int, keras.random.SeedGenerator]] = None,

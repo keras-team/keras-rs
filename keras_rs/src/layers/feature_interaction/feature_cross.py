@@ -129,7 +129,7 @@ class FeatureCross(keras.layers.Layer):
                 f"`diag_scale={self.diag_scale}`"
             )
 
-    def build(self, input_shape: types.TensorShape) -> None:
+    def build(self, input_shape: types.Shape) -> None:
         last_dim = input_shape[-1]
 
         if self.projection_dim is not None:

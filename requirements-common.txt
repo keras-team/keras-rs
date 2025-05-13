@@ -15,5 +15,7 @@ numpy
 build
 
 # required dependencies, should match dependencies in pyproject.toml
-keras
+# TODO revert. Needed to get keras-nightly until 3.10 is released.
+# keras
+keras-nightly
 ml-dtypes

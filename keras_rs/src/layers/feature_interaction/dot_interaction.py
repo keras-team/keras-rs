@@ -205,8 +205,8 @@ class DotInteraction(keras.layers.Layer):
         return activations
 
     def compute_output_shape(
-        self, input_shape: list[types.TensorShape]
-    ) -> types.TensorShape:
+        self, input_shape: list[types.Shape]
+    ) -> types.Shape:
         num_features = len(input_shape)
         batch_size = input_shape[0][0]
 

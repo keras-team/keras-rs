@@ -1,6 +1,17 @@
 """Type definitions."""
 
-from typing import Any, Mapping, Optional, Sequence, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Mapping,
+    Optional,
+    Sequence,
+    Type,
+    TypeVar,
+    Union,
+)
+
+import keras
 
 """
 A tensor in any of the backends.
@@ -23,7 +34,31 @@ Union[
 """
 Tensor = Any
 
-TensorShape = Sequence[Optional[int]]
+Shape = Sequence[Optional[int]]
+
+DType = str
+
+ConstraintLike = Union[
+    str,
+    keras.constraints.Constraint,
+    Type[keras.constraints.Constraint],
+    Callable[[Tensor], Tensor],
+]
+
+InitializerLike = Union[
+    str,
+    keras.initializers.Initializer,
+    Type[keras.initializers.Initializer],
+    Callable[[Shape, DType], Tensor],
+    Tensor,
+]
+
+RegularizerLike = Union[
+    str,
+    keras.regularizers.Regularizer,
+    Type[keras.regularizers.Regularizer],
+    Callable[[Tensor], Tensor],
+]
 
 T = TypeVar("T")
 Nested = Union[

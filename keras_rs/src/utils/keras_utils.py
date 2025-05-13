@@ -1,4 +1,4 @@
-from typing import Any, Callable, Union
+from typing import Any, Callable
 
 import keras
 
@@ -28,8 +28,8 @@ def no_automatic_dependency_tracking(
 
 
 def clone_initializer(
-    initializer: Union[str, keras.initializers.Initializer],
-) -> keras.initializers.Initializer:
+    initializer: types.InitializerLike,
+) -> types.InitializerLike:
     """Clones an initializer to ensure a new seed.
 
     Args:
@@ -51,9 +51,7 @@ def clone_initializer(
     return initializer
 
 
-def check_shapes_compatible(
-    shape1: types.TensorShape, shape2: types.TensorShape
-) -> bool:
+def check_shapes_compatible(shape1: types.Shape, shape2: types.Shape) -> bool:
     # Check rank first.
     if len(shape1) != len(shape2):
         return False
