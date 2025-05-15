@@ -14,10 +14,10 @@ A clear and concise description of what the bug is.
 
 **To Reproduce**
 <!---
-Provide a link to a [Colab Notebook](https://research.google.com/colaboratory/), which reproduces the bug.
-Alternatively, you can also paste a code snippet, but a Colab Notebook is
-preferred. In case of code snippet, please provide your environment details -
-library versions, etc.
+Provide a link to a [Colab Notebook](https://research.google.com/colaboratory/),
+which reproduces the bug. Alternatively, you can also paste a code snippet, but
+a Colab Notebook is preferred. In case of code snippet, please provide your
+environment details - library versions, etc.
 -->
 
 **Expected behavior**
