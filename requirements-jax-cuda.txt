@@ -10,4 +10,7 @@ torch>=2.1.0
 --find-links https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 jax[cuda12_pip]==0.4.28
 
+# Support for large embeddings.
+jax-tpu-embedding
+
 -r requirements-common.txt
