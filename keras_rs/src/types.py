@@ -35,6 +35,7 @@ Union[
 Tensor = Any
 
 Shape = Sequence[Optional[int]]
+TensorShape = Shape
 
 DType = str
 
