@@ -10,6 +10,83 @@ from keras_rs.src.utils.keras_utils import check_shapes_compatible
 SUPPORTED_COMBINERS = ("mean", "sum", "sqrtn")
 
 
+def _is_supported_sparse(x: types.Tensor) -> bool:
+    """Determines if the input is a supported sparse tensor.
+
+    NOTE: Currently only works for the TensorFlow and JAX backends.
+
+    Args:
+      x: Input tensor to check for sparsity.
+
+    Returns:
+      True if `x` is a supported sparse tensor.
+    """
+    if keras.backend.backend() == "tensorflow":
+        import tensorflow as tf
+
+        return isinstance(x, tf.SparseTensor)
+    elif keras.backend.backend() == "jax":
+        from jax.experimental import sparse as jax_sparse
+
+        return isinstance(x, jax_sparse.BCOO) or isinstance(x, jax_sparse.BCSR)
+
+    return False
+
+
+def _sparse_ones_like(
+    x: types.Tensor, dtype: Optional[types.DType] = None
+) -> types.Tensor:
+    """Creates a tensor of ones with the same sparsity as the input.
+
+    This differs from `keras.ops.ones_like`, which would create a dense
+    tensor of ones.
+
+    Args:
+        x: Input sparse tensor.
+        dtype: Optional dtype for the output tensor values.
+
+    Returns:
+        Sparse tensor of ones.
+
+    Raises:
+        ValueError for unsupported sparse input type and backend.
+    """
+    dtype = dtype or x.dtype
+    if keras.backend.backend() == "tensorflow":
+        import tensorflow as tf
+
+        # Ensure shape is copied exactly for compatibility in graph mode.
+        x_shape = x.shape
+        y = tf.SparseTensor(
+            x.indices, tf.ones_like(x.values, dtype=dtype), x.dense_shape
+        )
+        y.set_shape(x_shape)
+        return y
+    elif keras.backend.backend() == "jax":
+        import jax.numpy as jnp
+        from jax.experimental import sparse as jax_sparse
+
+        if isinstance(x, jax_sparse.BCOO):
+            return jax_sparse.BCOO(
+                (jnp.ones_like(x.data, dtype=dtype), x.indices),
+                shape=x.shape,
+                indices_sorted=x.indices_sorted,
+                unique_indices=x.unique_indices,
+            )
+        elif isinstance(x, jax_sparse.BCSR):
+            return jax_sparse.BCSR(
+                (jnp.ones_like(x.data, dtype=dtype), x.indices, x.indptr),
+                shape=x.shape,
+                indices_sorted=x.indices_sorted,
+                unique_indices=x.unique_indices,
+            )
+
+    raise ValueError(
+        f"Unsupported sparse input type '{x.__class__.__name__}' for backend "
+        f"{keras.backend.backend()}."
+    )
+
+
 @keras_rs_export("keras_rs.layers.EmbedReduce")
 class EmbedReduce(keras.layers.Embedding):
     """An embedding layer that reduces with a combiner.
@@ -128,7 +205,7 @@ class EmbedReduce(keras.layers.Embedding):
         #   number of items per row.
         # - For sparse inputs, after embedding, we get a dense tensor, not a
         #   sparse tensor. What it does for missing values is use embedding 0.
-        #   These are bogus embedding ands should be ignored. `ones_like` gives
+        #   These are bogus embedding and should be ignored. `ones_like` gives
         #   us a sparse tensor with the exact same missing values. Later, when
         #   we do `x = ops.multiply(x, weights)`, which masks the bogus values
         #   (note that `weights` has been densified beforehand). Additionally,
@@ -148,7 +225,11 @@ class EmbedReduce(keras.layers.Embedding):
             # Discard the weights if there were some and create a mask for
             # ragged and sparse tensors to mask the result correctly (sparse
             # only) and the apply the reduction correctly (ragged and sparse).
-            weights = ops.ones_like(inputs, dtype=dtype)
+            if _is_supported_sparse(inputs):
+                weights = _sparse_ones_like(inputs, dtype=dtype)
+            else:
+                weights = ops.ones_like(inputs, dtype=dtype)
+
         else:
             weights = ops.cast(weights, dtype)
 
