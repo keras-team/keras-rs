@@ -202,25 +202,6 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
         )
         return inputs, weights, labels
 
-    def get_sparsecore_embedding_table(
-        self, table, vocabulary_size, embedding_dim
-    ):
-        # This table has num_sparse_cores mod shards, so we need to slice,
-        # reconcat and reshape.
-        table_shards = [
-            shard.numpy()[:, :embedding_dim] for shard in table.values
-        ]
-        full_table = keras.ops.concatenate(table_shards, axis=0)
-        # TODO(fhertschuh) '4' here is the number of sparse cores per chip?
-        full_table = keras.ops.concatenate(
-            keras.ops.split(
-                full_table, self._strategy.num_replicas_in_sync * 4, axis=0
-            ),
-            axis=1,
-        )
-        full_table = keras.ops.reshape(full_table, [-1, embedding_dim])
-        return full_table[:vocabulary_size, :]
-
     @parameterized.named_parameters(
         [
             (f"{input_type}_{placement}", input_type, placement)
@@ -628,18 +609,8 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
 
         self.assertEqual(res.shape, (batch_size, EMBEDDING_OUTPUT_DIM))
 
-        if (
-            keras.backend.backend() == "tensorflow"
-            and self.placement == "sparsecore"
-        ):
-            emb = self.get_sparsecore_embedding_table(
-                layer._tpu_embedding.embedding_tables["table"],
-                VOCABULARY_SIZE,
-                EMBEDDING_OUTPUT_DIM,
-            )
-        else:
-            tables = layer.get_embedding_tables()
-            emb = tables["table"]
+        tables = layer.get_embedding_tables()
+        emb = tables["table"]
 
         if input_type == "dense":
             if combiner == "sum" and use_weights:

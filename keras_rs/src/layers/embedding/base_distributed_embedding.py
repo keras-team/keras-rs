@@ -415,7 +415,7 @@ class DistributedEmbedding(keras.layers.Layer):
             "default_device"
         ].items():
             tables[feature_config.table.name] = (
-                self._default_device_embedding_layers[path].embeddings
+                self._default_device_embedding_layers[path].embeddings.value
             )
         return tables
 
