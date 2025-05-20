@@ -268,7 +268,8 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             layer = embedding.DistributedEmbedding(feature_configs)
 
         if keras.backend.backend() == "jax":
-            res = layer(inputs, weights)
+            preprocessed_inputs = layer.preprocess(inputs, weights)
+            res = layer(preprocessed_inputs)
         else:
             res = self.run_with_strategy(layer.__call__, inputs, weights)
 
@@ -358,14 +359,13 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             # Call preprocess on dataset inputs/weights.
             def preprocess(inputs_and_labels):
                 # Extract inputs, weights and labels.
+                weights = None
                 inputs, labels = inputs_and_labels
                 labels = keras.tree.map_structure(lambda x: x.numpy(), labels)
-                return inputs, labels
-                # weights = None
-                # if use_weights:
-                #     inputs, weights = inputs
-                # preprocessed = layer.preprocess(inputs,weights,training=True)
-                # return preprocessed, labels
+                if use_weights:
+                    inputs, weights = inputs
+                preprocessed = layer.preprocess(inputs, weights, training=True)
+                return preprocessed, labels
 
             # Create a dataset generator that applies the preprocess function.
             # We need to create an intermediary tf_dataset to avoid
@@ -386,6 +386,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
                     yield preprocess(inputs)
 
             test_dataset = test_dataset_generator()
+            model = keras.Sequential([layer])
         else:
             train_dataset = self._strategy.experimental_distribute_dataset(
                 train_dataset,
@@ -393,35 +394,34 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
                     experimental_fetch_to_device=False
                 ),
             )
-
-        keras_inputs = keras.tree.map_structure(
-            lambda fc: keras.layers.Input(
-                fc.input_shape[1:],
-                dtype="int32",
-                sparse=input_type == "sparse",
-                ragged=input_type == "ragged",
-            ),
-            feature_configs,
-        )
-        if use_weights:
-            keras_weights = keras.tree.map_structure(
+            keras_inputs = keras.tree.map_structure(
                 lambda fc: keras.layers.Input(
                     fc.input_shape[1:],
-                    dtype="float32",
+                    dtype="int32",
                     sparse=input_type == "sparse",
                     ragged=input_type == "ragged",
                 ),
                 feature_configs,
             )
-            keras_model_inputs = (keras_inputs, keras_weights)
-        else:
-            keras_weights = None
-            keras_model_inputs = keras_inputs
+            if use_weights:
+                keras_weights = keras.tree.map_structure(
+                    lambda fc: keras.layers.Input(
+                        fc.input_shape[1:],
+                        dtype="float32",
+                        sparse=input_type == "sparse",
+                        ragged=input_type == "ragged",
+                    ),
+                    feature_configs,
+                )
+                keras_model_inputs = (keras_inputs, keras_weights)
+            else:
+                keras_weights = None
+                keras_model_inputs = keras_inputs
 
-        keras_model_outputs = layer(keras_inputs, keras_weights)
-        model = keras.Model(
-            inputs=keras_model_inputs, outputs=keras_model_outputs
-        )
+            keras_model_outputs = layer(keras_inputs, keras_weights)
+            model = keras.Model(
+                inputs=keras_model_inputs, outputs=keras_model_outputs
+            )
 
         with self._strategy.scope():
             model.compile(optimizer="adam", loss="mse")
@@ -581,17 +581,46 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             layer = embedding.DistributedEmbedding(feature_config)
 
         if keras.backend.backend() == "jax":
+            preprocessed = layer.preprocess(inputs, weights)
             if jit_compile:
-                layer.build(inputs.shape)
-                res, _ = self.run_with_strategy(
-                    jax.jit(layer.stateless_call),
+                # Determine explicit shardings/layouts for jit compilation
+                # (required for sparsecore computations).
+                trainable_layouts = keras.tree.map_structure(
+                    lambda x: x.value.layout, layer.trainable_variables
+                )
+                non_trainable_layouts = keras.tree.map_structure(
+                    lambda x: x.value.layout, layer.non_trainable_variables
+                )
+                # Input/output data involved in sparsecore operations are
+                # sharded across all sparse-core-capable devices.
+                jax_mesh = jax.sharding.Mesh(jax.devices(), ["sc_data"])
+                sc_data_sharding = jax.sharding.NamedSharding(
+                    jax_mesh, jax.sharding.PartitionSpec(["sc_data"])
+                )
+                preprocessed_layouts = keras.tree.map_structure(
+                    lambda _: sc_data_sharding, preprocessed
+                )
+                output_layouts = keras.tree.map_structure(
+                    lambda _: sc_data_sharding, inputs
+                )
+                res, _ = jax.jit(
+                    layer.stateless_call,
+                    in_shardings=(
+                        trainable_layouts,
+                        non_trainable_layouts,
+                        preprocessed_layouts,
+                    ),
+                    out_shardings=(
+                        output_layouts,
+                        non_trainable_layouts,
+                    ),
+                )(
                     layer.trainable_variables,
                     layer.non_trainable_variables,
-                    inputs,
-                    weights,
+                    preprocessed,
                 )
             else:
-                res = self.run_with_strategy(layer.__call__, inputs, weights)
+                res = self.run_with_strategy(layer.__call__, preprocessed)
         else:
             res = self.run_with_strategy(
                 layer.__call__, inputs, weights, jit_compile=jit_compile
