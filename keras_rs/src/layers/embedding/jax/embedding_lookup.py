@@ -197,17 +197,19 @@ def embedding_lookup_bwd(
 
     def grad_func(
         gradients: Nested[jax.Array],
-        sparse_input: Nested[jax.Array],
-        tables: Nested[jax.Array],
+        sparse_input: embedding.SparseDenseMatmulInput,
+        tables: Mapping[str, embedding.EmbeddingVariables],
         step: Optional[jax.Array],
-    ) -> Nested[jax.Array]:
-        output: Nested[jax.Array] = embedding.tpu_sparse_dense_matmul_grad(
-            gradients,
-            sparse_input,
-            tables,
-            feature_specs=config.feature_specs,
-            sharding_strategy=config.table_sharding_strategy,
-            step=step,
+    ) -> Mapping[str, embedding.EmbeddingVariables]:
+        output: Mapping[str, embedding.EmbeddingVariables] = (
+            embedding.tpu_sparse_dense_matmul_grad(
+                gradients,
+                sparse_input,
+                tables,
+                feature_specs=config.feature_specs,
+                sharding_strategy=config.table_sharding_strategy,
+                step=step,
+            )
         )
         return output
 

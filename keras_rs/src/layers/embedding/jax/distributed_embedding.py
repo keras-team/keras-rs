@@ -29,7 +29,6 @@ from keras_rs.src.types import Nested
 from keras_rs.src.utils import keras_utils
 
 ArrayLike = Union[np.ndarray[Any, Any], jax.Array]
-BackendPreprocessedInputs = Any
 FeatureConfig = config.FeatureConfig
 shard_map = jax.experimental.shard_map.shard_map
 
@@ -557,125 +556,12 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
         self._sparsecore_built = True
 
-    def preprocess(
-        self,
-        inputs: Nested[types.Tensor],
-        weights: Optional[Nested[types.Tensor]] = None,
-        training: bool = False,
-    ) -> Nested[BackendPreprocessedInputs]:
-        """Preprocess a set of ragged or dense inputs.
-
-        Args:
-            inputs: Ragged or dense set of sample IDs.
-            weights: Ragged or dense set of sample weights.
-            training: If true, will update the required buffer size after
-                preprocessing the data if necessary to account for the provided
-                input sample IDs and weights.
-
-        Returns:
-            Set of preprocessed inputs that can be fed directly into call(...).
-        """
-        # Verify input structure.
-        keras.tree.assert_same_structure(self._feature_configs, inputs)
-
-        if not self.built:
-            input_shapes = keras.tree.map_structure_up_to(
-                self._feature_configs,
-                lambda array: backend.standardize_shape(array.shape),
-                inputs,
-            )
-            self.build(input_shapes)
-
-        # Go from deeply nested structure of inputs to flat inputs.
-        flat_inputs = keras.tree.flatten(inputs)
-
-        # Go from flat to nested dict placement -> path -> input.
-        placement_to_path_to_inputs = keras.tree.pack_sequence_as(
-            self._placement_to_path_to_feature_config, flat_inputs
-        )
-
-        if weights is not None:
-            # Same for weights if present.
-            keras.tree.assert_same_structure(self._feature_configs, weights)
-            flat_weights = keras.tree.flatten(weights)
-            placement_to_path_to_weights = keras.tree.pack_sequence_as(
-                self._placement_to_path_to_feature_config, flat_weights
-            )
-        else:
-            # Populate keys for weights.
-            placement_to_path_to_weights = {
-                k: None for k in placement_to_path_to_inputs
-            }
-
-        placement_to_path_to_preprocessed: dict[
-            str, Nested[BackendPreprocessedInputs]
-        ] = {}
-
-        # Preprocess for features placed on "sparsecore".
-        if "sparsecore" in placement_to_path_to_inputs:
-            placement_to_path_to_preprocessed["sparsecore"] = (
-                self._sparsecore_preprocess(
-                    placement_to_path_to_inputs["sparsecore"],
-                    placement_to_path_to_weights["sparsecore"],
-                    training,
-                )
-            )
-
-        # Preprocess for features placed on "default_device".
-        if "default_device" in placement_to_path_to_inputs:
-            placement_to_path_to_preprocessed["default_device"] = (
-                self._default_device_preprocess(
-                    placement_to_path_to_inputs["default_device"],
-                    placement_to_path_to_weights["default_device"],
-                    training,
-                )
-            )
-
-        # Mark inputs as preprocessed.
-        output = {
-            "preprocessed_inputs_per_placement": (
-                placement_to_path_to_preprocessed
-            )
-        }
-        return output
-
-    def _default_device_preprocess(
-        self,
-        inputs: dict[str, types.Tensor],
-        weights: Optional[dict[str, types.Tensor]],
-        training: bool = False,
-    ) -> Union[
-        dict[str, np.ndarray[Any, Any]],
-        Tuple[dict[str, np.ndarray[Any, Any]], dict[str, np.ndarray[Any, Any]]],
-    ]:
-        del training
-        np_inputs: dict[str, np.ndarray[Any, Any]] = keras.tree.map_structure(
-            lambda x: embedding_utils.convert_to_numpy(x, dtype=np.int32),
-            inputs,
-        )
-
-        if weights is not None:
-            np_weights: dict[str, np.ndarray[Any, Any]] = (
-                keras.tree.map_structure(
-                    lambda x: embedding_utils.convert_to_numpy(
-                        x, dtype=np.float32
-                    ),
-                    weights,
-                )
-            )
-            return np_inputs, np_weights
-
-        # Unfortunately we cannot return a `None` object for preprocessed
-        # weights, otherwise keras will try to distribute `None` across devices
-        # and fail.  So we need to only return the inputs.
-        return np_inputs
-
     def _sparsecore_preprocess(
         self,
         inputs: dict[str, types.Tensor],
         weights: Optional[dict[str, types.Tensor]],
         training: bool = False,
-    ) -> dict[str, embedding_utils.ShardedCooMatrix]:
+    ) -> dict[str, dict[str, embedding_utils.ShardedCooMatrix]]:
         if any(
             isinstance(x, jax.core.Tracer) for x in keras.tree.flatten(inputs)
         ):
@@ -820,67 +706,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                     int_max_unique_ids_per_partition,
                 )
 
-        return preprocessed
-
-    def call(
-        self,
-        inputs: Union[Nested[types.Tensor], Nested[BackendPreprocessedInputs]],
-        weights: Optional[Nested[types.Tensor]] = None,
-        training: bool = False,
-    ) -> Nested[types.Tensor]:
-        # Check if preprocessed.
-        preprocessed = False
-        if (
-            isinstance(inputs, dict)
-            and "preprocessed_inputs_per_placement" in inputs
-        ):
-            preprocessed = True
-
-        if not preprocessed:
-            inputs = self.preprocess(inputs, weights, training)
-
-        inputs = typing.cast(
-            dict[
-                str,
-                dict[
-                    str,
-                    Union[types.Tensor, BackendPreprocessedInputs],
-                ],
-            ],
-            inputs,
-        )
-        inputs = inputs["preprocessed_inputs_per_placement"]
-
-        # The preprocessed input is already separated by placement.
-        placement_to_path_to_outputs = {}
-        if "default_device" in inputs:
-            default_device_inputs = inputs["default_device"]
-            default_device_weights = None
-            if isinstance(default_device_inputs, tuple):
-                default_device_inputs, default_device_weights = (
-                    default_device_inputs
-                )
-            placement_to_path_to_outputs["default_device"] = (
-                self._default_device_call(
-                    default_device_inputs, default_device_weights, training
-                )
-            )
-        if "sparsecore" in inputs:
-            placement_to_path_to_outputs["sparsecore"] = self._sparsecore_call(
-                inputs["sparsecore"], training=training
-            )
-
-        # Verify output structure.
-        keras.tree.assert_same_structure(
-            self._placement_to_path_to_feature_config,
-            placement_to_path_to_outputs,
-        )
-
-        # Go from placement -> path -> output to flat outputs.
-        flat_outputs = keras.tree.flatten(placement_to_path_to_outputs)
-
-        # Go from flat outputs to deeply nested structure.
-        return keras.tree.pack_sequence_as(self._feature_configs, flat_outputs)
+        return {"inputs": preprocessed}
 
     def _sparsecore_call(
         self,

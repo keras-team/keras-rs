@@ -64,7 +64,7 @@ known-first-party = ["keras_rs"]
 strict = "True"
 exclude = ["_test\\.py$", "^examples/"]
 untyped_calls_exclude = ["ml_dtypes"]
-disable_error_code = ["import-untyped"]
+disable_error_code = ["import-untyped", "unused-ignore"]
 disallow_subclassing_any = "False"
 
 [[tool.mypy.overrides]]

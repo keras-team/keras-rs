@@ -587,7 +587,6 @@ def stack_and_shard_samples(
         num_sc_per_device=num_sc_per_device,
         sharding_strategy="MOD",
         has_leading_dimension=False,
-        static_buffer_size_multiplier=0,
         allow_id_dropping=True,
     )
 

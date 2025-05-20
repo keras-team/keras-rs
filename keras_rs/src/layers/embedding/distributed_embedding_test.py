@@ -11,6 +11,7 @@ import keras
 import numpy as np
 import tensorflow as tf
 from absl import flags
+from absl.testing import absltest
 from absl.testing import parameterized
 
 from keras_rs.src import testing
@@ -355,8 +356,8 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             tf_train_dataset = train_dataset.repeat(16)
 
             def train_dataset_generator():
-                for inputs in iter(tf_train_dataset):
-                    yield preprocess(inputs)
+                for inputs_and_labels in iter(tf_train_dataset):
+                    yield preprocess(inputs_and_labels)
 
             train_dataset = train_dataset_generator()
 
@@ -728,3 +729,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             keras.tree.flatten(output_before), keras.tree.flatten(output_after)
         ):
             self.assertAllClose(before, after)
+
+
+if __name__ == "__main__":
+    absltest.main()

@@ -47,15 +47,8 @@ def _create_sparsecore_layout(
     return sparsecore_layout
 
 
-def _has_sparsecore() -> bool:
-    device_kind = jax.devices()[0].device_kind
-    if device_kind in ["TPU v5", "TPU v6 lite"]:
-        return True
-    return False
-
-
 def _num_sparsecores_per_device() -> int:
-    if _has_sparsecore():
+    if test_utils.has_sparsecores():
         return jte_utils.num_sparsecores_per_device()
 
     # Default to one for non-sparsecore tests.
@@ -320,7 +313,7 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         table_stacking: Union[str, list[str], list[list[str]]],
         jit: bool,
     ):
-        if ragged and not _has_sparsecore():
+        if ragged and not test_utils.has_sparsecores():
             self.skipTest(
                 "Ragged inputs are only supported on sparsecore devices."
             )
@@ -390,7 +383,7 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         ragged: bool,
         table_stacking: Union[str, list[str], list[list[str]]],
     ):
-        if ragged and not _has_sparsecore():
+        if ragged and not test_utils.has_sparsecores():
             self.skipTest(
                 "Ragged inputs are only supported on sparsecore devices."
             )

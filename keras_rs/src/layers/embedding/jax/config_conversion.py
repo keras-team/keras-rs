@@ -36,7 +36,7 @@ class WrappedKerasInitializer(jax.nn.initializers.Initializer):
         return None
 
     def __call__(
-        self, key: Any, shape: types.Shape, dtype: types.DType = jnp.float_
+        self, key: Any, shape: Any, dtype: Any = jnp.float_
     ) -> jax.Array:
         # Force use of provided key.  The JAX backend for random initializers
         # forwards the `seed` attribute to the underlying JAX random functions.

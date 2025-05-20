@@ -1,7 +1,9 @@
 import collections
+import typing
 from typing import Any, Optional, Sequence, Union
 
 import keras
+from keras.src import backend
 
 from keras_rs.src import types
 from keras_rs.src.layers.embedding import distributed_embedding_config
@@ -262,30 +264,74 @@ class DistributedEmbedding(keras.layers.Layer):
 
         super().build(input_shapes)
 
-    def call(
+    def preprocess(
         self,
         inputs: types.Nested[types.Tensor],
         weights: Optional[types.Nested[types.Tensor]] = None,
         training: bool = False,
     ) -> types.Nested[types.Tensor]:
-        """Lookup features in embedding tables and apply reduction.
+        """Preprocesses and reformats the data for consumption by the model.
+
+        Calling `preprocess` explicitly is only required to enable `sparsecore`
+        placement with the JAX backend and `jit_compile = True`.  For all other
+        cases and backends, explicit use of `preprocess` is optional.
+
+        In JAX, sparsecore usage requires specially formatted data that depends
+        on properties of the available hardware.  This data reformatting
+        currently does not support jit-compilation, so must be applied _prior_
+        to feeding data into a model.
+
+        An example usage might look like:
+        ```
+        # Create the embedding layer.
+        embedding_layer = DistributedEmbedding(feature_configs)
+
+        # Add preprocessing to a data input pipeline.
+        def training_dataset_generator():
+            for (inputs, weights), labels in iter(training_dataset):
+                yield embedding_layer.preprocess(
+                    inputs, weights, training=True
+                ), labels
+
+        preprocessed_training_dataset = training_dataset_generate()
+
+        # Construct, compile, and fit the model using the preprocessed data.
+        model = keras.Sequential(
+          [
+            embedding_layer,
+            keras.layers.Dense(2),
+            keras.layers.Dense(3),
+            keras.layers.Dense(4),
+          ]
+        )
+        model.compile(optimizer="adam", loss="mse", jit_compile=True)
+        model.fit(preprocessed_training_dataset, epochs=10)
+        ```
+
+        For non-JAX backends, preprocessing will bundle together the inputs and
+        weights, and separate the inputs by device placement.  This step is
+        entirely optional.
 
         Args:
-            inputs: A nested structure of 2D tensors to embed and reduce. The
-                structure must be the same as the `feature_configs` passed
-                during construction.
-            weights: An optional nested structure of 2D tensors of weights to
-               apply before reduction. When present, the structure must be the
-               same as `inputs` and the shapes must match.
+            inputs: Ragged or dense set of sample IDs.
+            weights: Optional ragged or dense set of sample weights.
+            training: If true, will update internal parameters, such as
+                required buffer sizes for the preprocessed data.
 
         Returns:
-            A nested structure of dense 2D tensors, which are the reduced
-            embeddings from the passed features. The structure is the same as
-            `inputs`.
+            Set of preprocessed inputs that can be fed directly into the
+            `inputs` argument of the layer.
         """
-
         # Verify input structure.
         keras.tree.assert_same_structure(self._feature_configs, inputs)
+
+        if not self.built:
+            input_shapes = keras.tree.map_structure_up_to(
+                self._feature_configs,
+                lambda array: backend.standardize_shape(array.shape),
+                inputs,
+            )
+            self.build(input_shapes)
 
         # Go from deeply nested structure of inputs to flat inputs.
         flat_inputs = keras.tree.flatten(inputs)
@@ -308,22 +354,98 @@ class DistributedEmbedding(keras.layers.Layer):
                 k: None for k in placement_to_path_to_inputs
             }
 
+        placement_to_path_to_preprocessed: dict[
+            str, dict[str, types.Nested[types.Tensor]]
+        ] = {}
+
+        # Preprocess for features placed on "sparsecore".
+        if "sparsecore" in placement_to_path_to_inputs:
+            placement_to_path_to_preprocessed["sparsecore"] = (
+                self._sparsecore_preprocess(
+                    placement_to_path_to_inputs["sparsecore"],
+                    placement_to_path_to_weights["sparsecore"],
+                    training,
+                )
+            )
+
+        # Preprocess for features placed on "default_device".
+        if "default_device" in placement_to_path_to_inputs:
+            placement_to_path_to_preprocessed["default_device"] = (
+                self._default_device_preprocess(
+                    placement_to_path_to_inputs["default_device"],
+                    placement_to_path_to_weights["default_device"],
+                    training,
+                )
+            )
+
+        # Mark inputs as preprocessed using an extra level of nesting.
+        # This is necessary to detect whether inputs are already preprocessed
+        # in `call`.
+        output = {
+            "preprocessed_inputs_per_placement": (
+                placement_to_path_to_preprocessed
+            )
+        }
+        return output
+
+    def call(
+        self,
+        inputs: types.Nested[types.Tensor],
+        weights: Optional[types.Nested[types.Tensor]] = None,
+        training: bool = False,
+    ) -> types.Nested[types.Tensor]:
+        """Lookup features in embedding tables and apply reduction.
+
+        Args:
+            inputs: A nested structure of 2D tensors to embed and reduce. The
+                structure must be the same as the `feature_configs` passed
+                during construction.  Alternatively, may consist of already
+                preprocessed inputs (see `preprocess`).
+            weights: An optional nested structure of 2D tensors of weights to
+               apply before reduction. When present, the structure must be the
+               same as `inputs` and the shapes must match.
+            training: Whether we are training or evaluating the model.
+
+        Returns:
+            A nested structure of dense 2D tensors, which are the reduced
+            embeddings from the passed features. The structure is the same as
+            `inputs`.
+        """
+        preprocessed_inputs = inputs
+        # Preprocess if not already done.
+        if (
+            not isinstance(inputs, dict)
+            or "preprocessed_inputs_per_placement" not in inputs
+        ):
+            preprocessed_inputs = self.preprocess(inputs, weights, training)
+
+        preprocessed_inputs = typing.cast(
+            dict[str, dict[str, dict[str, types.Tensor]]], preprocessed_inputs
+        )
+        # Placement -> path -> preprocessed inputs.
+        preprocessed_inputs = preprocessed_inputs[
+            "preprocessed_inputs_per_placement"
+        ]
+
         placement_to_path_to_outputs = {}
 
         # Call for features placed on "sparsecore".
-        if "sparsecore" in placement_to_path_to_inputs:
+        if "sparsecore" in preprocessed_inputs:
+            paths_to_inputs_and_weights = preprocessed_inputs["sparsecore"]
             placement_to_path_to_outputs["sparsecore"] = self._sparsecore_call(
-                placement_to_path_to_inputs["sparsecore"],
-                placement_to_path_to_weights["sparsecore"],
+                paths_to_inputs_and_weights["inputs"],
+                paths_to_inputs_and_weights.get("weights", None),
                 training,
             )
 
         # Call for features placed on "default_device".
-        if "default_device" in placement_to_path_to_inputs:
+        if "default_device" in preprocessed_inputs:
+            paths_to_inputs_and_weights = preprocessed_inputs["default_device"]
             placement_to_path_to_outputs["default_device"] = (
                 self._default_device_call(
-                    placement_to_path_to_inputs["default_device"],
-                    placement_to_path_to_weights["default_device"],
+                    paths_to_inputs_and_weights["inputs"],
+                    paths_to_inputs_and_weights.get("weights", None),
+                    training,
                 )
             )
 
@@ -389,6 +511,19 @@ class DistributedEmbedding(keras.layers.Layer):
             if not embedding_layer.built:
                 embedding_layer.build(input_shape)
 
+    def _default_device_preprocess(
+        self,
+        inputs: dict[str, types.Tensor],
+        weights: Optional[dict[str, types.Tensor]],
+        training: bool = False,
+    ) -> dict[str, types.Tensor]:
+        del training
+        output: dict[str, types.Tensor] = {"inputs": inputs}
+        if weights is not None:
+            output["weights"] = weights
+
+        return output
+
     def _default_device_call(
         self,
         inputs: dict[str, types.Tensor],
@@ -433,6 +568,19 @@ class DistributedEmbedding(keras.layers.Layer):
     def _sparsecore_build(self, input_shapes: dict[str, types.Shape]) -> None:
         del input_shapes
         raise self._unsupported_placement_error("sparsecore")
+
+    def _sparsecore_preprocess(
+        self,
+        inputs: dict[str, types.Tensor],
+        weights: Optional[dict[str, types.Tensor]],
+        training: bool = False,
+    ) -> dict[str, types.Tensor]:
+        del training
+        output: dict[str, types.Tensor] = {"inputs": inputs}
+        if weights is not None:
+            output["weights"] = weights
+
+        return output
 
     def _sparsecore_call(
         self,
