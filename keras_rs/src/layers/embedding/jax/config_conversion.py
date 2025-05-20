@@ -3,7 +3,7 @@
 import inspect
 import math
 import random as python_random
-from typing import Callable, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 import jax
 import jax.numpy as jnp
@@ -13,8 +13,7 @@ from jax_tpu_embedding.sparsecore.lib.nn import embedding_spec
 
 from keras_rs.src import types
 from keras_rs.src.layers.embedding import distributed_embedding_config as config
-
-Nested = types.Nested
+from keras_rs.src.types import Nested
 
 
 class WrappedKerasInitializer(jax.nn.initializers.Initializer):
@@ -30,22 +29,26 @@ class WrappedKerasInitializer(jax.nn.initializers.Initializer):
         # All built-in keras initializers have a `seed` attribute.
         # Extract this and turn it into a key for use with JAX.
         if hasattr(self.initializer, "seed"):
-            return keras.src.backend.jax.random.jax_draw_seed(
+            output: jax.Array = keras.src.backend.jax.random.jax_draw_seed(
                 self.initializer.seed
             )
+            return output
         return None
 
-    def __call__(self, key, shape, dtype=jnp.float_):
+    def __call__(
+        self, key: Any, shape: types.Shape, dtype: types.DType = jnp.float_
+    ) -> jax.Array:
         # Force use of provided key.  The JAX backend for random initializers
         # forwards the `seed` attribute to the underlying JAX random functions.
         if key is not None and hasattr(self.initializer, "seed"):
             old_seed = self.initializer.seed
             self.initializer.seed = key
-            out = self.initializer(shape, dtype)
+            out: jax.Array = self.initializer(shape, dtype)
             self.initializer.seed = old_seed
             return out
 
-        return self.initializer(shape, dtype)
+        output: jax.Array = self.initializer(shape, dtype)
+        return output
 
 
 # pylint: disable-next=g-classes-have-attributes
@@ -83,7 +86,13 @@ class WrappedJaxInitializer(keras.initializers.Initializer):
         else:
             raise ValueError(f"Unknown seed {seed} of type {type(seed)}.")
 
-    def __call__(self, shape, dtype=None, **kwargs):
+    def __call__(
+        self,
+        shape: types.Shape,
+        dtype: Optional[types.DType] = None,
+        **kwargs: Any,
+    ) -> jax.Array:
+        del kwargs  # Unused.
         return self.initializer(self.key(), shape, dtype)
 
 
@@ -140,7 +149,8 @@ def keras_to_jte_learning_rate(
         # Extract the first (and only) element of the variable.
         learning_rate = np.array(learning_rate.value, dtype=float)
         assert learning_rate.size == 1
-        return learning_rate.item(0)
+        lr_float: float = learning_rate.item(0)
+        return lr_float
     elif callable(learning_rate):
         # Callable learning rate functions are expected to take a singular step
         # count argument, or no arguments.
@@ -301,10 +311,11 @@ def jte_to_keras_table_configs(
     table_specs: Nested[embedding_spec.TableSpec],
 ) -> Nested[config.TableConfig]:
     """Converts JAX TPU Embedding `TableSpec`s to Keras RS `TableConfig`s."""
-    return keras.tree.map_structure(
+    output: Nested[config.TableConfig] = keras.tree.map_structure(
         _jte_to_keras_table_config,
         table_specs,
     )
+    return output
 
 
 def _keras_to_jte_feature_config(
@@ -373,9 +384,10 @@ def jte_to_keras_feature_configs(
         Keras RS feature configurations.
     """
     table_config_map: dict[str, config.TableConfig] = {}
-    return keras.tree.map_structure(
+    output: Nested[config.FeatureConfig] = keras.tree.map_structure(
         lambda feature_spec: _jte_to_keras_feature_config(
             feature_spec, table_config_map
         ),
         feature_specs,
     )
+    return output

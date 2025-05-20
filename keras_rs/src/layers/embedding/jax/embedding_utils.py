@@ -18,17 +18,16 @@ import jax
 import numpy as np
 from jax import numpy as jnp
 from jax_tpu_embedding.sparsecore.lib.nn import embedding
-from jax_tpu_embedding.sparsecore.lib.nn import embedding_spec
+from jax_tpu_embedding.sparsecore.lib.nn.embedding_spec import FeatureSpec
+from jax_tpu_embedding.sparsecore.lib.nn.embedding_spec import StackedTableSpec
+from jax_tpu_embedding.sparsecore.lib.nn.embedding_spec import TableSpec
 
 T = TypeVar("T")
 U = TypeVar("U")
 Nested = Union[T, Sequence[T], Mapping[str, T]]
-FeatureSpec = embedding_spec.FeatureSpec
-StackedTableSpec = embedding_spec.StackedTableSpec
-TableSpec = embedding_spec.TableSpec
 
 # Any to support tf.Ragged without needing an explicit TF dependency.
-ArrayLike = Union[jax.Array, np.ndarray, Any]
+ArrayLike = Union[jax.Array, np.ndarray, Any]  # type: ignore
 Shape = Tuple[int, ...]
 
 
@@ -116,7 +115,7 @@ def _stack_and_shard_table(
     table: jax.Array,
     num_shards: int,
     pad_value: jnp.float32,
-):
+) -> jax.Array:
     """Stacks and shards a single table for use in sparsecore lookups."""
     padded_values = pad_table(table_spec, table, num_shards, pad_value)
     sharded_padded_vocabulary_size = padded_values.shape[0] // num_shards
@@ -169,7 +168,7 @@ def stack_and_shard_tables(
         Tuple[StackedTableSpec, list[TableSpec]],
     ] = {}
 
-    def collect_stacked_tables(table_spec: TableSpec):
+    def collect_stacked_tables(table_spec: TableSpec) -> None:
         stacked_table_spec = _get_stacked_table_spec(table_spec, num_shards)
         stacked_table_name = stacked_table_spec.stack_name
         if stacked_table_name not in stacked_table_map:
@@ -180,7 +179,7 @@ def stack_and_shard_tables(
 
     table_map: dict[str, Nested[jax.Array]] = {}
 
-    def collect_tables(table_spec: TableSpec, table: Nested[jax.Array]):
+    def collect_tables(table_spec: TableSpec, table: Nested[jax.Array]) -> None:
         table_map[table_spec.name] = table
 
     _ = jax.tree.map(collect_tables, table_specs, tables)
@@ -236,7 +235,9 @@ def _unshard_and_unstack_table(
     vocabulary_size = table_spec.vocabulary_size
     embedding_dim = table_spec.embedding_dim
 
-    def _unshard_and_unstack_single_table(table_spec, stacked_table):
+    def _unshard_and_unstack_single_table(
+        table_spec: TableSpec, stacked_table: jax.Array
+    ) -> jax.Array:
         stack_embedding_dim = stacked_table.shape[-1]
 
         # Maybe re-shape in case it was flattened.
@@ -267,12 +268,13 @@ def _unshard_and_unstack_table(
         # Un-pad.
         return padded_values[:vocabulary_size, :embedding_dim]
 
-    return jax.tree.map(
+    output: Nested[jax.Array] = jax.tree.map(
         lambda stacked_table: _unshard_and_unstack_single_table(
             table_spec, stacked_table
         ),
         stacked_table_tree,
     )
+    return output
 
 
 def unshard_and_unstack_tables(
@@ -291,7 +293,7 @@ def unshard_and_unstack_tables(
     Returns:
         A mapping of table names to unstacked table values.
     """
-    return jax.tree.map(
+    output: Nested[jax.Array] = jax.tree.map(
         lambda table_spec: _unshard_and_unstack_table(
             table_spec,
             stacked_tables[
@@ -301,6 +303,7 @@ def unshard_and_unstack_tables(
         ),
         table_specs,
     )
+    return output
 
 
 def get_table_specs(feature_specs: Nested[FeatureSpec]) -> dict[str, TableSpec]:
@@ -345,7 +348,7 @@ def update_stacked_table_specs(
     feature_specs: Nested[FeatureSpec],
     max_ids_per_partition: Mapping[str, int],
     max_unique_ids_per_partition: Mapping[str, int],
-):
+) -> None:
     """Updates properties in the supplied feature specs.
 
     Args:
@@ -393,8 +396,9 @@ def update_stacked_table_specs(
 
 
 def convert_to_numpy(
-    ragged_or_dense: Union[np.ndarray, Sequence[Sequence[Any]], Any], dtype: Any
-) -> np.ndarray:
+    ragged_or_dense: Union[np.ndarray[Any, Any], Sequence[Sequence[Any]], Any],
+    dtype: Any,
+) -> np.ndarray[Any, Any]:
     """Converts a ragged or dense list of inputs to a ragged/dense numpy array.
 
     The output is adjusted to be 2D.
@@ -444,7 +448,9 @@ def convert_to_numpy(
         )
 
 
-def ones_like(ragged_or_dense: np.ndarray, dtype: Any = None) -> np.ndarray:
+def ones_like(
+    ragged_or_dense: np.ndarray[Any, Any], dtype: Any = None
+) -> np.ndarray[Any, Any]:
     """Creates an array of ones the same as as the input.
 
     This differs from traditional numpy in that a ragged input will lead to
@@ -517,12 +523,12 @@ def create_feature_samples(
 
     # Assemble.
     def _create_feature_samples(
-        sample_ids: np.ndarray,
-        sample_weights: np.ndarray,
+        sample_ids: np.ndarray[Any, Any],
+        sample_weights: np.ndarray[Any, Any],
     ) -> FeatureSamples:
         return FeatureSamples(sample_ids, sample_weights)
 
-    return jax.tree.map(
+    output: Nested[FeatureSamples] = jax.tree.map(
         lambda _, sample_ids, sample_weights: _create_feature_samples(
             sample_ids, sample_weights
         ),
@@ -530,6 +536,7 @@ def create_feature_samples(
         feature_ids,
         feature_weights,
     )
+    return output
 
 
 def stack_and_shard_samples(
@@ -564,7 +571,7 @@ def stack_and_shard_samples(
 
     def collect_tokens_and_weights(
         feature_spec: FeatureSpec, samples: FeatureSamples
-    ):
+    ) -> None:
         del feature_spec
         feature_tokens.append(samples.tokens)
         feature_weights.append(samples.weights)

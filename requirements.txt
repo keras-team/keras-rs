@@ -8,6 +8,7 @@ torch>=2.1.0
 
 # Jax.
 jax[cpu]
+jax-tpu-embedding
 
 # pre-commit checks (formatting, linting, etc.)
 pre-commit

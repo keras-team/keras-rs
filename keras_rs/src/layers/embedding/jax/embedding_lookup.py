@@ -4,7 +4,7 @@ Implementation details for use in JAX models.
 """
 
 import functools
-from typing import Mapping, Optional, Sequence, Tuple, TypeVar, Union
+from typing import Any, Mapping, Optional, Sequence, Tuple, TypeVar, Union
 
 import jax
 import numpy as np
@@ -20,7 +20,7 @@ shard_map = jax.experimental.shard_map.shard_map
 
 T = TypeVar("T")
 Nested = Union[T, Sequence[T], Mapping[str, T]]
-ArrayLike = Union[jax.Array, np.ndarray]
+ArrayLike = Union[jax.Array, np.ndarray[Any, Any]]
 JaxLayout = Union[jax.sharding.NamedSharding, layout.Layout]
 
 
@@ -56,13 +56,17 @@ class EmbeddingLookupConfiguration:
             else jte_utils.num_sparsecores_per_device()
         )
         self.samples_partition = (
-            samples_partition or jax.sharding.PartitionSpec(sharding_axis)
+            samples_partition
+            or jax.sharding.PartitionSpec(
+                sharding_axis  # type: ignore[no-untyped-call]
+            )
         )
         self.samples_layout = samples_layout or jax.sharding.NamedSharding(
             self.mesh, self.samples_partition
         )
         self.table_partition = table_partition or jax.sharding.PartitionSpec(
-            sharding_axis, None
+            sharding_axis,
+            None,  # type: ignore[no-untyped-call]
         )
         self.table_layout = table_layout or jax.sharding.NamedSharding(
             self.mesh, self.table_partition
@@ -76,7 +80,7 @@ def embedding_lookup(
     lookups: Mapping[str, ShardedCooMatrix],
     tables: Nested[jax.Array],
     step: Optional[jax.Array] = None,
-):
+) -> Nested[jax.Array]:
     """Embedding lookup function with custom gradient.
 
     Args:
@@ -122,7 +126,7 @@ def embedding_lookup(
         ),
     )
 
-    activations = sharded_matmul(
+    activations: Nested[jax.Array] = sharded_matmul(
         sparse_dense_matmul_input,
         tables,
     )
@@ -135,7 +139,10 @@ def embedding_lookup_fwd(
     lookups: Mapping[str, ShardedCooMatrix],
     table: Nested[jax.Array],
     step: Optional[jax.Array] = None,
-):
+) -> Tuple[
+    Nested[jax.Array],
+    Tuple[Nested[ShardedCooMatrix], Nested[jax.Array], Optional[jax.Array]],
+]:
     """Forward pass for embedding lookup."""
     return embedding_lookup(config, lookups, table, step), (
         lookups,
@@ -151,8 +158,8 @@ def embedding_lookup_bwd(
         Mapping[str, Nested[jax.Array]],  # Tables.
         Optional[jax.Array],  # Step.
     ],
-    gradients,
-):
+    gradients: Nested[jax.Array],
+) -> Tuple[None, Nested[jax.Array], Optional[jax.Array]]:
     """Backward pass for embedding lookup.
 
     Args:
@@ -185,10 +192,16 @@ def embedding_lookup_bwd(
 
     pt = config.table_partition
     pd = config.samples_partition
-    preplicate = jax.sharding.PartitionSpec()  # Replicate step count.
+    # Replicate step count.
+    preplicate = jax.sharding.PartitionSpec()  # type: ignore[no-untyped-call]
 
-    def grad_func(gradients, sparse_input, tables, step):
-        return embedding.tpu_sparse_dense_matmul_grad(
+    def grad_func(
+        gradients: Nested[jax.Array],
+        sparse_input: Nested[jax.Array],
+        tables: Nested[jax.Array],
+        step: Optional[jax.Array],
+    ) -> Nested[jax.Array]:
+        output: Nested[jax.Array] = embedding.tpu_sparse_dense_matmul_grad(
             gradients,
             sparse_input,
             tables,
@@ -196,6 +209,7 @@ def embedding_lookup_bwd(
             sharding_strategy=config.table_sharding_strategy,
             step=step,
         )
+        return output
 
     # activation_layout = jax.sharding.NamedSharding(config.mesh, pd)
     # step_layout = jax.sharding.NamedSharding(config.mesh, preplicate)

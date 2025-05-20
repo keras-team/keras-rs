@@ -1,5 +1,6 @@
 """Useful utilities for tests."""
 
+import typing
 from typing import (
     Any,
     Callable,
@@ -14,14 +15,14 @@ from typing import (
 import keras
 import numpy as np
 
-from keras_rs.src import types
 from keras_rs.src.layers.embedding import distributed_embedding_config as config
+from keras_rs.src.types import Nested
 
 T = TypeVar("T")
 RandomSeed = Union[int, keras.random.SeedGenerator]
-Nested = types.Nested
 FeatureConfig = config.FeatureConfig
 TableConfig = config.TableConfig
+AnyNdArray = np.ndarray[Any, Any]
 
 
 def _make_rng(seed: Optional[RandomSeed]) -> keras.random.SeedGenerator:
@@ -35,8 +36,8 @@ def _make_rng(seed: Optional[RandomSeed]) -> keras.random.SeedGenerator:
 
 def create_random_table_configs(
     count: int = 3,
-    max_vocabulary_size=1024,
-    max_embedding_dim=128,
+    max_vocabulary_size: int = 1024,
+    max_embedding_dim: int = 128,
     initializer: Optional[Union[str, keras.initializers.Initializer]] = None,
     optimizer: Union[str, keras.optimizers.Optimizer] = "sgd",
     combiner: str = "mean",
@@ -150,7 +151,7 @@ def create_random_samples(
     ragged: bool = True,
     max_ids_per_sample: int = 20,
     seed: Optional[RandomSeed] = None,
-) -> Tuple[Nested[np.ndarray], Nested[np.ndarray]]:
+) -> Tuple[Nested[AnyNdArray], Nested[AnyNdArray]]:
     """Creates random feature samples.
 
     Args:
@@ -166,8 +167,10 @@ def create_random_samples(
     """
     seed = _make_rng(seed)
 
-    def _generate_samples(feature_config: FeatureConfig):
-        batch_size = feature_config.input_shape[0]
+    def _generate_samples(
+        feature_config: FeatureConfig,
+    ) -> Tuple[AnyNdArray, AnyNdArray]:
+        batch_size = typing.cast(int, feature_config.input_shape[0])
         vocabulary_size = feature_config.table.vocabulary_size
         counts = keras.random.randint(
             shape=(batch_size,), minval=0, maxval=max_ids_per_sample, seed=seed
@@ -219,13 +222,13 @@ def create_random_samples(
                 sample_weights.append(np.asarray(weights))
 
         if ragged:
-            sample_ids = np.array(sample_ids, dtype=np.ndarray)
-            sample_weights = np.array(sample_weights, dtype=np.ndarray)
-        else:
-            sample_ids = np.array(sample_ids, dtype=np.int32)
-            sample_weights = np.array(sample_weights, dtype=np.float32)
+            output_sample_ids = np.array(sample_ids, dtype=np.ndarray)
+            output_sample_weights = np.array(sample_weights, dtype=np.ndarray)
+            return output_sample_ids, output_sample_weights
 
-        return sample_ids, sample_weights
+        output_sample_ids = np.array(sample_ids, dtype=np.int32)
+        output_sample_weights = np.array(sample_weights, dtype=np.float32)
+        return output_sample_ids, output_sample_weights
 
     feature_ids = []
     feature_weights = []
@@ -243,11 +246,11 @@ def create_random_samples(
 
 
 def _compute_expected_lookup(
-    sample_ids: np.ndarray,
-    sample_weights: np.ndarray,
-    table: np.ndarray,
+    sample_ids: AnyNdArray,
+    sample_weights: AnyNdArray,
+    table: AnyNdArray,
     combiner: str,
-) -> np.ndarray:
+) -> AnyNdArray:
     """Manually does a Sparse-Dense multiplication for embedding lookup."""
     batch_size = len(sample_ids)
     out = np.zeros(shape=(batch_size, table.shape[1]), dtype=table.dtype)
@@ -258,17 +261,21 @@ def _compute_expected_lookup(
         elif combiner == "sqrtn":
             weights = weights / np.sqrt(np.sum(np.square(weights)))
 
-        np.add.at(out, np.s_[i, :], weights @ table[sample_ids[i], :])
+        np.add.at(
+            out,
+            np.s_[i, :],  # type: ignore[arg-type]
+            weights @ table[sample_ids[i], :],
+        )
 
     return out
 
 
 def compute_expected_lookup(
     feature_configs: Nested[FeatureConfig],
-    tables: Mapping[str, np.ndarray],
-    feature_sample_ids: Nested[np.ndarray],
-    feature_sample_weights: Nested[np.ndarray],
-) -> Nested[np.ndarray]:
+    tables: Mapping[str, AnyNdArray],
+    feature_sample_ids: Nested[AnyNdArray],
+    feature_sample_weights: Nested[AnyNdArray],
+) -> Nested[AnyNdArray]:
     """Manually compute the expected embedding feature lookup.
 
     Args:
@@ -281,7 +288,11 @@ def compute_expected_lookup(
         The expected embedding feature lookups.
     """
 
-    def do_lookup(feature_config, sample_ids, sample_weights):
+    def do_lookup(
+        feature_config: FeatureConfig,
+        sample_ids: AnyNdArray,
+        sample_weights: AnyNdArray,
+    ) -> AnyNdArray:
         return _compute_expected_lookup(
             sample_ids,
             sample_weights,
@@ -289,13 +300,14 @@ def compute_expected_lookup(
             feature_config.table.combiner,
         )
 
-    return keras.tree.map_structure_up_to(
+    output: Nested[AnyNdArray] = keras.tree.map_structure_up_to(
         feature_configs,
         do_lookup,
         feature_configs,
         feature_sample_ids,
         feature_sample_weights,
     )
+    return output
 
 
 # pylint: disable-next=g-classes-have-attributes
@@ -320,13 +332,13 @@ class RandomInputSampleDataset(keras.utils.PyDataset):
     def __init__(
         self,
         feature_configs: Nested[FeatureConfig],
-        tables: Mapping[str, np.ndarray],
+        tables: Mapping[str, AnyNdArray],
         ragged: bool = True,
         max_ids_per_sample: int = 20,
         num_batches: int = 1000,
         seed: int = 0,
         preprocessor: Optional[Callable[..., Any]] = None,
-        **kwargs,
+        **kwargs: Any,
     ):
         super().__init__(**kwargs)
         self._feature_configs = feature_configs
@@ -339,10 +351,10 @@ class RandomInputSampleDataset(keras.utils.PyDataset):
         )
         self._preprocessor = preprocessor
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self._num_batches
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> Tuple[Any, Any]:
         sample_ids, sample_weights = create_random_samples(
             self._feature_configs,
             self._ragged,

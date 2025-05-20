@@ -25,12 +25,12 @@ from keras_rs.src.layers.embedding.jax import (
     embedding_lookup as jte_embedding_lookup,
 )
 from keras_rs.src.layers.embedding.jax import embedding_utils
+from keras_rs.src.types import Nested
 from keras_rs.src.utils import keras_utils
 
-ArrayLike = Union[np.ndarray, jax.Array]
+ArrayLike = Union[np.ndarray[Any, Any], jax.Array]
 BackendPreprocessedInputs = Any
 FeatureConfig = config.FeatureConfig
-Nested = types.Nested
 shard_map = jax.experimental.shard_map.shard_map
 
 
@@ -41,7 +41,7 @@ def _get_partition_spec(
         jax.sharding.NamedSharding,
         jax.sharding.PartitionSpec,
     ],
-):
+) -> Any:
     """Extracts the partition spec from a layout or sharding."""
     if isinstance(layout, keras.distribution.TensorLayout):
         layout = layout.backend_layout
@@ -73,16 +73,20 @@ class ShardedInitializer(keras.initializers.Initializer):
         self._initializer = initializer
         self._layout = layout
 
-    def __call__(self, shape, dtype=None):
+    def __call__(
+        self, shape: types.Shape, dtype: Optional[types.DType] = None
+    ) -> jax.Array:
         if self._layout is not None:
             compiled_initializer = jax.jit(
                 self._initializer,
                 out_shardings=self._layout.backend_layout,
                 static_argnames=["shape", "dtype"],
             )
-            return compiled_initializer(shape, dtype)
+            output: jax.Array = compiled_initializer(shape, dtype)
+            return output
 
-        return self._initializer(shape, dtype)
+        output = self._initializer(shape, dtype)
+        return output
 
 
 class StackedTableInitializer(keras.initializers.Initializer):
@@ -133,7 +137,9 @@ class StackedTableInitializer(keras.initializers.Initializer):
 
         return jnp.concatenate(table_shards, axis=0)
 
-    def __call__(self, shape, dtype=None):
+    def __call__(
+        self, shape: types.Shape, dtype: Optional[types.DType] = None
+    ) -> jax.Array:
         stacked_table_spec = typing.cast(
             embedding_spec.StackedTableSpec,
             self._table_specs[0].stacked_table_spec,
@@ -178,10 +184,11 @@ class StackedTableInitializer(keras.initializers.Initializer):
             ):
                 initializer_key = initializer.key()
                 if initializer_key is not None:
-                    col = jax.random.split(initializer.key(), self._num_shards)
+                    col = jax.random.split(initializer_key, self._num_shards)
                     keys = keys.at[:, i].set(col)
 
-        return sharded_initializer(keys)
+        output: jax.Array = sharded_initializer(keys)
+        return output
 
 
 class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
@@ -189,7 +196,9 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
     def _create_sparsecore_distribution(
         self, sparsecore_axis_name: str = "sparsecore"
-    ):
+    ) -> Tuple[
+        keras.distribution.ModelParallel, keras.distribution.TensorLayout
+    ]:
         """SparseCore requires a specific layout.
 
         The mesh must be 1D, must use all TPUs available, and must shard all
@@ -215,7 +224,10 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                 _tiling=((8,),),
             ),
             jax.sharding.NamedSharding(
-                device_mesh.backend_mesh, jax.sharding.PartitionSpec(axes)
+                device_mesh.backend_mesh,
+                jax.sharding.PartitionSpec(
+                    axes  # type: ignore[no-untyped-call]
+                ),
             ),
         )
         layout_map = keras.distribution.LayoutMap(device_mesh=device_mesh)
@@ -229,7 +241,11 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         )
         return sparsecore_distribution, sparsecore_layout
 
-    def _create_cpu_distribution(self, cpu_axis_name: str = "cpu"):
+    def _create_cpu_distribution(
+        self, cpu_axis_name: str = "cpu"
+    ) -> Tuple[
+        keras.distribution.ModelParallel, keras.distribution.TensorLayout
+    ]:
         """Share a variable across all CPU processes."""
         cpu_devices = jax.devices("cpu")
         device_mesh = keras.distribution.DeviceMesh(
@@ -249,7 +265,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         initializer: jax.nn.initializers.Initializer,
         dtype: Any,
         overwrite_with_gradient: bool,
-    ):
+    ) -> keras.Variable:
         var = self.add_weight(
             name=name, shape=shape, initializer=initializer, dtype=dtype
         )
@@ -313,7 +329,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             if hasattr(slot_initializers, "_fields"):
                 slot_names = slot_initializers._fields
 
-            slot_variables = (
+            slot_variables = tuple(
                 self._add_sparsecore_weight(
                     name=f"{variable_name}:slot:{slot_name}",
                     shape=table_shape,
@@ -343,7 +359,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         self,
         feature_configs: dict[str, FeatureConfig],
         table_stacking: Union[str, Sequence[str], Sequence[Sequence[str]]],
-    ):
+    ) -> None:
         if not self._has_sparsecore():
             raise ValueError(
                 "Not sparse cores available, cannot use explicit sparsecore"
@@ -591,7 +607,9 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                 k: None for k in placement_to_path_to_inputs
             }
 
-        placement_to_path_to_preprocessed = {}
+        placement_to_path_to_preprocessed: dict[
+            str, Nested[BackendPreprocessedInputs]
+        ] = {}
 
         # Preprocess for features placed on "sparsecore".
         if "sparsecore" in placement_to_path_to_inputs:
@@ -627,26 +645,30 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         weights: Optional[dict[str, types.Tensor]],
         training: bool = False,
     ) -> Union[
-        dict[str, np.ndarray],
-        Tuple[dict[str, np.ndarray], dict[str, np.ndarray]],
+        dict[str, np.ndarray[Any, Any]],
+        Tuple[dict[str, np.ndarray[Any, Any]], dict[str, np.ndarray[Any, Any]]],
     ]:
         del training
-        inputs = keras.tree.map_structure(
+        np_inputs: dict[str, np.ndarray[Any, Any]] = keras.tree.map_structure(
             lambda x: embedding_utils.convert_to_numpy(x, dtype=np.int32),
             inputs,
         )
 
         if weights is not None:
-            weights = keras.tree.map_structure(
-                lambda x: embedding_utils.convert_to_numpy(x, dtype=np.float32),
-                weights,
+            np_weights: dict[str, np.ndarray[Any, Any]] = (
+                keras.tree.map_structure(
+                    lambda x: embedding_utils.convert_to_numpy(
+                        x, dtype=np.float32
+                    ),
+                    weights,
+                )
             )
-            return inputs, weights
+            return np_inputs, np_weights
 
         # Unfortunately we cannot return a `None` object for preprocessed
         # weights, otherwise keras will try to distribute `None` across devices
         # and fail.  So we need to only return the inputs.
-        return inputs
+        return np_inputs
 
     def _sparsecore_preprocess(
         self,
@@ -750,7 +772,9 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
             # Aggregate variables across all processes/devices.
             max_across_cpus = jax.pmap(
-                lambda x: jax.lax.pmax(x, "all_cpus"),
+                lambda x: jax.lax.pmax(  # type: ignore[no-untyped-call]
+                    x, "all_cpus"
+                ),
                 axis_name="all_cpus",
                 devices=self._cpu_layout.device_mesh.backend_mesh.devices,
             )
@@ -811,12 +835,21 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             and "preprocessed_inputs_per_placement" in inputs
         ):
             preprocessed = True
-            inputs = inputs["preprocessed_inputs_per_placement"]
 
         if not preprocessed:
-            inputs = self.preprocess(inputs, weights, training)[
-                "preprocessed_inputs_per_placement"
-            ]
+            inputs = self.preprocess(inputs, weights, training)
+
+        inputs = typing.cast(
+            dict[
+                str,
+                dict[
+                    str,
+                    Union[types.Tensor, BackendPreprocessedInputs],
+                ],
+            ],
+            inputs,
+        )
+        inputs = inputs["preprocessed_inputs_per_placement"]
 
         # The preprocessed input is already separated by placement.
         placement_to_path_to_outputs = {}
@@ -852,9 +885,12 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
     def _sparsecore_call(
         self,
         inputs: dict[str, types.Tensor],
+        weights: Optional[dict[str, types.Tensor]] = None,
         training: bool = False,
         **kwargs: Any,
-    ):
+    ) -> dict[str, types.Tensor]:
+        assert weights is None
+
         if not self._sparsecore_built:
             self._sparsecore_build()
 
@@ -865,12 +901,12 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             lookup_func = jax.jit(
                 jte_embedding_lookup.embedding_lookup, static_argnames="config"
             )
-            out = lookup_func(
+            out: dict[str, types.Tensor] = lookup_func(
                 self._config, inputs, table_and_slots, self._iterations.value
             )
             return out
 
-    def set_embedding_tables(self, tables: Mapping[str, ArrayLike]):
+    def set_embedding_tables(self, tables: Mapping[str, ArrayLike]) -> None:
         """Sets the embedding tables to specific (unsharded) values.
 
         Args:
@@ -882,7 +918,9 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         if "sparsecore" in self._placement_to_path_to_feature_config:
             self._sparsecore_set_tables(tables)
 
-    def _default_device_set_tables(self, tables: Mapping[str, ArrayLike]):
+    def _default_device_set_tables(
+        self, tables: Mapping[str, ArrayLike]
+    ) -> None:
         if not self.built:
             raise ValueError("Layer must first be built before setting tables.")
 
@@ -906,7 +944,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                     # pylint: disable-next=protected-access
                     embedding_layer._embeddings.assign(table_values)
 
-    def _sparsecore_set_tables(self, tables: Mapping[str, ArrayLike]):
+    def _sparsecore_set_tables(self, tables: Mapping[str, ArrayLike]) -> None:
         if not self._sparsecore_built:
             self._sparsecore_build()
 
@@ -938,22 +976,6 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             device_tables,
         )
 
-    def get_embedding_tables(self) -> dict[str, ArrayLike]:
-        """Retrieves the current (unsharded) values of the embedding tables.
-
-        Returns:
-            Map if table_name: table for the individual tables associated with
-            this layer's features.
-        """
-        tables = {}
-        if "default_device" in self._placement_to_path_to_feature_config:
-            tables.update(self._default_device_get_embedding_tables())
-
-        if "sparsecore" in self._placement_to_path_to_feature_config:
-            tables.update(self._sparsecore_get_embedding_tables())
-
-        return tables
-
     def _sparsecore_get_embedding_tables(self) -> dict[str, ArrayLike]:
         if not self._sparsecore_built:
             self.sparsecore_build()
@@ -974,22 +996,3 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                 table_specs, table_variables, num_table_shards
             ),
         )
-
-    def _default_device_get_embedding_tables(self) -> dict[str, ArrayLike]:
-        tables = {}
-        if "default_device" in self._placement_to_path_to_feature_config:
-            table_to_embedding_layer = {}
-            for (
-                path,
-                feature_config,
-            ) in self._placement_to_path_to_feature_config[
-                "default_device"
-            ].items():
-                table_to_embedding_layer[feature_config.table] = (
-                    self._default_device_embedding_layers[path]
-                )
-
-            for table, embedding_layer in table_to_embedding_layer.items():
-                tables[table.name] = embedding_layer.embeddings.value
-
-        return tables

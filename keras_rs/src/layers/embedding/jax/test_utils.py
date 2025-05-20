@@ -1,22 +1,23 @@
 """JAX-specific test utilities for embedding layers."""
 
-from typing import Mapping, Optional, Sequence, Tuple, TypeVar, Union
+import typing
+from typing import Any, Mapping, Optional, Sequence, Tuple, TypeVar, Union
 
 import jax
 import numpy as np
 import tree
 from jax import numpy as jnp
 from jax_tpu_embedding.sparsecore.lib.nn import embedding_spec
+from jax_tpu_embedding.sparsecore.lib.nn.embedding_spec import FeatureSpec
+from jax_tpu_embedding.sparsecore.lib.nn.embedding_spec import TableSpec
 
 from keras_rs.src.layers.embedding.jax import embedding_utils
+from keras_rs.src.layers.embedding.jax.embedding_utils import FeatureSamples
 
 T = TypeVar("T")
 Nested = Union[T, Sequence[T], Mapping[str, T]]
-ArrayLike = Union[jax.Array, np.ndarray]
+ArrayLike = Union[jax.Array, np.ndarray[Any, Any]]
 Shape = Tuple[int, ...]
-FeatureSpec = embedding_spec.FeatureSpec
-TableSpec = embedding_spec.TableSpec
-FeatureSamples = embedding_utils.FeatureSamples
 
 
 def _round_up_to_multiple(value: int, multiple: int) -> int:
@@ -114,12 +115,13 @@ def create_tables(
         keys = jax.random.key(0)
 
     if tree.is_nested(table_specs) and not tree.is_nested(keys):
+        keys = typing.cast(ArrayLike, keys)
         tree_size = len(tree.flatten(table_specs))
         keys = jnp.unstack(jax.random.split(keys, tree_size))
         keys = tree.unflatten_as(table_specs, keys)
 
     # Initialize tables.
-    return tree.map_structure(
+    output: Nested[ArrayLike] = jax.tree.map(
         lambda table_spec, key: table_spec.initializer(
             key,
             (table_spec.vocabulary_size, table_spec.embedding_dim),
@@ -128,6 +130,7 @@ def create_tables(
         table_specs,
         keys,
     )
+    return output
 
 
 def create_table_and_slot_variables(
@@ -147,6 +150,7 @@ def create_table_and_slot_variables(
         keys = jax.random.key(0)
 
     if tree.is_nested(table_specs) and not tree.is_nested(keys):
+        keys = typing.cast(ArrayLike, keys)
         tree_size = len(tree.flatten(table_specs))
         keys = [key for key in jax.random.split(keys, tree_size)]
         keys = tree.unflatten_as(table_specs, keys)
@@ -154,7 +158,7 @@ def create_table_and_slot_variables(
     def _create_table_and_slot_variables(
         table_spec: TableSpec,
         key: ArrayLike,
-    ):
+    ) -> Tuple[jax.Array, Tuple[jax.Array, ...]]:
         slot_initializers = table_spec.optimizer.slot_variables_initializers()
         num_slot_variables = len(tree.flatten(slot_initializers))
         slot_keys = jnp.unstack(jax.random.split(key, num_slot_variables))
@@ -171,123 +175,12 @@ def create_table_and_slot_variables(
         return (table, slot_variables)
 
     # Initialize tables.
-    return tree.map_structure(
+    output: Nested[ArrayLike] = jax.tree.map(
         _create_table_and_slot_variables,
         table_specs,
         keys,
     )
-
-
-def create_feature_samples(
-    feature_specs: Nested[FeatureSpec],
-    max_samples: Nested[int] = 16,
-    ragged: bool = True,
-    keys: Optional[Nested[int]] = None,
-    sample_weight_initializer: Optional[
-        Nested[jax.nn.initializers.Initializer]
-    ] = None,
-) -> Nested[FeatureSamples]:
-    """Creates random feature samples for embedding lookup testing.
-
-    Args:
-      feature_specs: A nested collection of feature specifications.
-      max_samples: The maximum number of samples to generate per feature.
-      ragged: Whether to generate ragged or dense samples.
-      keys: A nested collection of keys to use for initialization.
-      sample_weight_initializer: The initializer to use for sample weights.
-
-    Returns:
-      The collection of generated feature samples.
-    """
-    sample_weight_initializer = (
-        sample_weight_initializer or jax.nn.initializers.uniform()
-    )
-
-    keys = keys or jax.random.key(0)
-
-    if tree.is_nested(feature_specs):
-        if not tree.is_nested(keys):
-            tree_size = len(tree.flatten(feature_specs))
-            keys = jnp.unstack(jax.random.split(keys, tree_size))
-            keys = tree.unflatten_as(feature_specs, keys)
-
-        # Extend properties to the entire tree.
-        if not tree.is_nested(max_samples):
-            max_samples = tree.map_structure(
-                lambda _: max_samples, feature_specs
-            )
-
-        if not tree.is_nested(sample_weight_initializer):
-            sample_weight_initializer = tree.map_structure(
-                lambda _: sample_weight_initializer, feature_specs
-            )
-
-    def _create_samples(
-        feature_spec: FeatureSpec,
-        feature_max_samples: int,
-        key: ArrayLike,
-        weight_initializer: jax.nn.initializers.Initializer,
-    ) -> FeatureSamples:
-        batch_size = feature_spec.input_shape[0]
-        sample_size = feature_spec.input_shape[1]
-        vocabulary_size = feature_spec.table_spec.vocabulary_size
-
-        if ragged:
-            # indptr
-            counts = jax.random.randint(
-                key,
-                minval=0,
-                maxval=feature_max_samples,
-                shape=(batch_size,),
-                dtype=jnp.int32,
-            )
-            samples = np.empty(batch_size, dtype=np.ndarray)
-            weights = np.empty(batch_size, dtype=np.ndarray)
-            keys = jax.random.split(key, batch_size)
-            for i in range(batch_size):
-                skey, dkey = jax.random.split(keys[i])
-                samples[i] = np.asarray(
-                    jax.random.randint(
-                        skey,
-                        minval=0,
-                        maxval=vocabulary_size,
-                        shape=counts[i].item(0),
-                        dtype=jnp.int32,
-                    )
-                )
-                weights[i] = np.asarray(
-                    weight_initializer(dkey, (counts[i],), jnp.float32)
-                )
-
-            return FeatureSamples(
-                samples,
-                weights,
-            )
-        else:
-            skey, dkey = jax.random.split(key)
-            samples = jax.random.randint(
-                skey,
-                minval=0,
-                maxval=vocabulary_size,
-                shape=(batch_size, sample_size),
-                dtype=jnp.int32,
-            )
-            weights = weight_initializer(
-                dkey, (batch_size, sample_size), dtype=jnp.float32
-            )
-            # Pad with zeros if beyond feature_max_samples.
-            idx = jnp.arange(sample_size)
-            samples = jnp.where(idx < feature_max_samples, samples, 0)
-            weights = jnp.where(idx < feature_max_samples, weights, 0)
-            return FeatureSamples(samples, weights)
-
-    return tree.map_structure(
-        _create_samples,
-        feature_specs,
-        max_samples,
-        keys,
-        sample_weight_initializer,
-    )
+    return output
 
 
 def stack_shard_and_put_tables(
@@ -299,7 +192,7 @@ def stack_shard_and_put_tables(
     sharded_tables = embedding_utils.stack_and_shard_tables(
         table_specs, tables, num_shards
     )
-    return jax.device_put(
+    output: dict[str, Nested[jax.Array]] = jax.device_put(
         jax.tree.map(
             # Flatten shard dimension to allow auto-sharding to split the array.
             lambda table: table.reshape((-1, table.shape[-1])),
@@ -307,11 +200,12 @@ def stack_shard_and_put_tables(
         ),
         sharding,
     )
+    return output
 
 
 def get_unshard_and_unstack_tables(
     table_specs: Nested[TableSpec],
-    sharded_tables: Nested[jax.Array],
+    sharded_tables: Mapping[str, jax.Array],
     num_shards: int,
 ) -> Nested[jax.Array]:
     sharded_tables = jax.device_get(sharded_tables)
@@ -360,14 +254,14 @@ def compute_expected_lookup(
         )
     }
 
-    return tree.map_structure_up_to(
-        feature_specs,
+    output: Nested[jax.Array] = jax.tree.map(
         lambda feature_spec, samples: _compute_expected_lookup(
             samples, table_map[feature_spec.table_spec.name]
         ),
         feature_specs,
         feature_samples,
     )
+    return output
 
 
 def _compute_expected_lookup_grad(
@@ -381,8 +275,8 @@ def _compute_expected_lookup_grad(
     embedding_dim = activation_gradients.shape[1]
     sample_lengths = jnp.array([len(sample) for sample in samples.tokens])
     rows = jnp.repeat(jnp.arange(batch_size), sample_lengths)
-    cols = jnp.concatenate(np.unstack(samples.tokens))
-    vals = jnp.concatenate(np.unstack(samples.weights)).reshape(-1, 1)
+    cols = jnp.concatenate(jnp.unstack(samples.tokens))
+    vals = jnp.concatenate(jnp.unstack(samples.weights)).reshape(-1, 1)
 
     # Compute: grad = samples^T * activation_gradients.
     grad = jnp.zeros(shape=(vocabulary_size, embedding_dim))
@@ -451,7 +345,7 @@ def compute_expected_lookup_grad(
 def _update_table_and_slot_variables(
     table_spec: TableSpec,
     grad: jax.Array,
-    table_and_slot_variables: Nested[jax.Array],
+    table_and_slot_variables: Tuple[jax.Array, Tuple[jax.Array, ...]],
 ) -> Tuple[
     jax.Array,
     Union[embedding_spec.SGDSlotVariables, embedding_spec.AdagradSlotVariables],
@@ -504,10 +398,10 @@ def compute_expected_updates(
     )
 
     # Apply updates per table.
-    return tree.map_structure_up_to(
-        table_specs,
+    output: Nested[jax.Array] = jax.tree.map(
         _update_table_and_slot_variables,
         table_specs,
         table_grads,
         table_and_slot_variables,
     )
+    return output
