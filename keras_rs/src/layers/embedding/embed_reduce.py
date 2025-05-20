@@ -127,7 +127,7 @@ class EmbedReduce(keras.layers.Embedding):
             single row. Currently `mean`, `sqrtn` and `sum` are supported.
             `mean` is the default. `sqrtn` often achieves good accuracy, in
             particular with bag-of-words columns.
-      **kwargs: Additional keyword arguments passed to `Embedding`.
+        **kwargs: Additional keyword arguments passed to `Embedding`.
     """
 
     def __init__(
