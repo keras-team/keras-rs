@@ -273,6 +273,30 @@ class EmbedReduce(keras.layers.Embedding):
                 x, ops.sqrt(ops.sum(ops.square(weights), axis=-2))
             )
 
+    def compute_output_shape(
+        self,
+        input_shape: types.Shape,
+        weights_shape: Optional[types.Shape] = None,
+    ) -> types.Shape:
+        del weights_shape
+
+        if len(input_shape) <= 1:
+            # No reduction
+            return (*input_shape, self.output_dim)
+        else:
+            # Reduce last dimension
+            return (*input_shape[0:-1], self.output_dim)
+
+    def compute_output_spec(
+        self,
+        inputs: keras.KerasTensor,
+        weights: Optional[keras.KerasTensor] = None,
+    ) -> keras.KerasTensor:
+        del weights
+
+        output_shape = self.compute_output_shape(inputs.shape)
+        return keras.KerasTensor(output_shape, dtype=self.compute_dtype)
+
     def get_config(self) -> dict[str, Any]:
         config: dict[str, Any] = super().get_config()
 
