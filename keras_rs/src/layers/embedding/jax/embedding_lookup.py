@@ -16,7 +16,7 @@ from jax_tpu_embedding.sparsecore.utils import utils as jte_utils
 from keras_rs.src.layers.embedding.jax import embedding_utils
 
 ShardedCooMatrix = embedding_utils.ShardedCooMatrix
-shard_map = jax.experimental.shard_map.shard_map
+shard_map = jax.experimental.shard_map.shard_map  # type: ignore[attr-defined]
 
 T = TypeVar("T")
 Nested = Union[T, Sequence[T], Mapping[str, T]]

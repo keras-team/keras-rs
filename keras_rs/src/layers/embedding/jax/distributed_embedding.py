@@ -30,7 +30,7 @@ from keras_rs.src.utils import keras_utils
 
 ArrayLike = Union[np.ndarray[Any, Any], jax.Array]
 FeatureConfig = config.FeatureConfig
-shard_map = jax.experimental.shard_map.shard_map
+shard_map = jax.experimental.shard_map.shard_map  # type: ignore[attr-defined]
 
 
 def _get_partition_spec(
