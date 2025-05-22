@@ -15,7 +15,7 @@ from absl.testing import absltest
 from absl.testing import parameterized
 
 from keras_rs.src import testing
-from keras_rs.src.layers import embedding
+from keras_rs.src.layers.embedding import distributed_embedding
 from keras_rs.src.layers.embedding import distributed_embedding_config as config
 
 FLAGS = flags.FLAGS
@@ -243,11 +243,11 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
         if placement == "sparsecore" and not self.on_tpu:
             with self.assertRaisesRegex(Exception, "sparsecore"):
                 with self._strategy.scope():
-                    embedding.DistributedEmbedding(feature_configs)
+                    distributed_embedding.DistributedEmbedding(feature_configs)
             return
 
         with self._strategy.scope():
-            layer = embedding.DistributedEmbedding(feature_configs)
+            layer = distributed_embedding.DistributedEmbedding(feature_configs)
 
         if keras.backend.backend() == "jax":
             preprocessed_inputs = layer.preprocess(inputs, weights)
@@ -329,7 +329,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
         )
 
         with self._strategy.scope():
-            layer = embedding.DistributedEmbedding(feature_configs)
+            layer = distributed_embedding.DistributedEmbedding(feature_configs)
 
         if keras.backend.backend() == "jax":
             # Set global distribution to ensure optimizer variables are
@@ -560,7 +560,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             weights = None
 
         with self._strategy.scope():
-            layer = embedding.DistributedEmbedding(feature_config)
+            layer = distributed_embedding.DistributedEmbedding(feature_config)
 
         if keras.backend.backend() == "jax":
             preprocessed = layer.preprocess(inputs, weights)
@@ -675,7 +675,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
         )
 
         with self._strategy.scope():
-            layer = embedding.DistributedEmbedding(embedding_config)
+            layer = distributed_embedding.DistributedEmbedding(embedding_config)
 
         res = self.run_with_strategy(layer.__call__, inputs)
 
@@ -709,7 +709,9 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             path = os.path.join(temp_dir, "model.keras")
 
             with self._strategy.scope():
-                layer = embedding.DistributedEmbedding(feature_configs)
+                layer = distributed_embedding.DistributedEmbedding(
+                    feature_configs
+                )
                 keras_outputs = layer(keras_inputs)
                 model = keras.Model(inputs=keras_inputs, outputs=keras_outputs)
 
