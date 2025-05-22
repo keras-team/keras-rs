@@ -4,8 +4,8 @@ import typing
 from typing import Any, Mapping, Optional, Sequence, Tuple, TypeVar, Union
 
 import jax
+import keras
 import numpy as np
-import tree
 from jax import numpy as jnp
 from jax_tpu_embedding.sparsecore.lib.nn import embedding_spec
 from jax_tpu_embedding.sparsecore.lib.nn.embedding_spec import FeatureSpec
@@ -121,11 +121,11 @@ def create_tables(
     if keys is None:
         keys = jax.random.key(0)
 
-    if tree.is_nested(table_specs) and not tree.is_nested(keys):
+    if keras.tree.is_nested(table_specs) and not keras.tree.is_nested(keys):
         keys = typing.cast(ArrayLike, keys)
-        tree_size = len(tree.flatten(table_specs))
+        tree_size = len(keras.tree.flatten(table_specs))
         keys = jnp.unstack(jax.random.split(keys, tree_size))
-        keys = tree.unflatten_as(table_specs, keys)
+        keys = keras.tree.pack_sequence_as(table_specs, keys)
 
     # Initialize tables.
     output: Nested[ArrayLike] = jax.tree.map(
@@ -156,23 +156,23 @@ def create_table_and_slot_variables(
     if keys is None:
         keys = jax.random.key(0)
 
-    if tree.is_nested(table_specs) and not tree.is_nested(keys):
+    if keras.tree.is_nested(table_specs) and not keras.tree.is_nested(keys):
         keys = typing.cast(ArrayLike, keys)
-        tree_size = len(tree.flatten(table_specs))
+        tree_size = len(keras.tree.flatten(table_specs))
         keys = [key for key in jax.random.split(keys, tree_size)]
-        keys = tree.unflatten_as(table_specs, keys)
+        keys = keras.tree.pack_sequence_as(table_specs, keys)
 
     def _create_table_and_slot_variables(
         table_spec: TableSpec,
         key: ArrayLike,
     ) -> Tuple[jax.Array, Tuple[jax.Array, ...]]:
         slot_initializers = table_spec.optimizer.slot_variables_initializers()
-        num_slot_variables = len(tree.flatten(slot_initializers))
+        num_slot_variables = len(keras.tree.flatten(slot_initializers))
         slot_keys = jnp.unstack(jax.random.split(key, num_slot_variables))
-        slot_keys = tree.unflatten_as(slot_initializers, slot_keys)
+        slot_keys = keras.tree.pack_sequence_as(slot_initializers, slot_keys)
         table_shape = (table_spec.vocabulary_size, table_spec.embedding_dim)
         table = table_spec.initializer(key, table_shape, dtype=jnp.float32)
-        slot_variables = tree.map_structure(
+        slot_variables = keras.tree.map_structure(
             lambda initializer, key: initializer(
                 key, table_shape, dtype=jnp.float32
             ),
@@ -223,20 +223,20 @@ def generate_feature_samples(
         keys,
     )
 
-    if tree.is_nested(feature_specs):
-        if not tree.is_nested(key_array):
-            tree_size = len(tree.flatten(feature_specs))
+    if keras.tree.is_nested(feature_specs):
+        if not keras.tree.is_nested(key_array):
+            tree_size = len(keras.tree.flatten(feature_specs))
             key_array = jnp.unstack(jax.random.split(key_array, tree_size))
-            key_array = tree.unflatten_as(feature_specs, key_array)
+            key_array = keras.tree.pack_sequence_as(feature_specs, key_array)
 
         # Extend properties to the entire tree.
-        if not tree.is_nested(max_samples):
-            max_samples = tree.map_structure(
+        if not keras.tree.is_nested(max_samples):
+            max_samples = keras.tree.map_structure(
                 lambda _: max_samples, feature_specs
             )
 
-        if not tree.is_nested(sample_weight_initializer):
-            sample_weight_initializer = tree.map_structure(
+        if not keras.tree.is_nested(sample_weight_initializer):
+            sample_weight_initializer = keras.tree.map_structure(
                 lambda _: sample_weight_initializer, feature_specs
             )
 
@@ -372,13 +372,13 @@ def compute_expected_lookup(
     Returns:
       The expected output of the embedding lookup.
     """
-    tree.assert_same_structure(table_specs, tables)
+    keras.tree.assert_same_structure(table_specs, tables)
 
     # Collect table information.
     table_map = {
         table_spec.name: table
         for table_spec, table in zip(
-            tree.flatten(table_specs), tree.flatten(tables)
+            keras.tree.flatten(table_specs), keras.tree.flatten(tables)
         )
     }
 
@@ -432,9 +432,9 @@ def compute_expected_lookup_grad(
     Returns:
       The gradients for the layer w.r.t. the feature samples and tables.
     """
-    tree.assert_same_structure(feature_specs, activation_gradients)
+    keras.tree.assert_same_structure(feature_specs, activation_gradients)
 
-    per_feature_table_grads = tree.map_structure_up_to(
+    per_feature_table_grads = keras.tree.map_structure_up_to(
         feature_specs,
         lambda feature_spec, samples, grad: _compute_expected_lookup_grad(
             samples, feature_spec.table_spec.vocabulary_size, grad
@@ -445,13 +445,11 @@ def compute_expected_lookup_grad(
     )
 
     # Accumulate across features to determine a per-table gradient.
-    per_feature_table_grads = tree.flatten_up_to(
-        feature_specs, per_feature_table_grads
-    )
-    flat_feature_specs = tree.flatten(feature_specs)
+    flat_per_feature_table_grads = keras.tree.flatten(per_feature_table_grads)
+    flat_feature_specs = keras.tree.flatten(feature_specs)
     table_grads = {}
     for feature_spec, per_feature_table_grad in zip(
-        flat_feature_specs, per_feature_table_grads
+        flat_feature_specs, flat_per_feature_table_grads
     ):
         table_name = feature_spec.table_spec.name
         if table_name not in table_grads:
@@ -461,7 +459,7 @@ def compute_expected_lookup_grad(
                 table_grads[table_name] + per_feature_table_grad
             )
 
-    table_grads = tree.map_structure(
+    table_grads = keras.tree.map_structure(
         lambda table_spec: table_grads[table_spec.name],
         table_specs,
     )
