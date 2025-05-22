@@ -11,6 +11,6 @@ torch>=2.1.0
 jax[cuda12_pip]==0.6.0
 
 # Support for large embeddings.
-jax-tpu-embedding
+jax-tpu-embedding;sys_platform == 'linux' and platform_machine == 'x86_64'
 
 -r requirements-common.txt
