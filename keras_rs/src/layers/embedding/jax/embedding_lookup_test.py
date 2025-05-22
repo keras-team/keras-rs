@@ -7,7 +7,6 @@ import jax.numpy as jnp
 import keras
 import numpy as np
 import pytest
-import tree
 from absl.testing import absltest
 from absl.testing import parameterized
 from jax_tpu_embedding.sparsecore.lib.nn import embedding
@@ -56,7 +55,7 @@ class TableInfo:
 )
 class EmbeddingLookupTest(parameterized.TestCase):
     def assert_allclose(self, a: Any, b: Any, rtol=1e-7, atol=0) -> None:
-        tree.map_structure(
+        keras.tree.map_structure(
             functools.partial(
                 np.testing.assert_allclose, rtol=rtol, atol=atol, strict=True
             ),
@@ -70,7 +69,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
         optimizer: Optional[embedding_spec.OptimizerSpec] = None,
         initializer: Optional[jax.nn.initializers.Initializer] = None,
     ) -> dict[str, embedding_spec.TableSpec]:
-        return tree.map_structure(
+        return keras.tree.map_structure(
             lambda info: test_utils.create_table_spec(
                 info.name,
                 info.vocabulary_size,
@@ -89,7 +88,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
         sample_size: int,
         table_specs: Nested[embedding_spec.TableSpec],
     ) -> Nested[embedding_spec.FeatureSpec]:
-        return tree.map_structure(
+        return keras.tree.map_structure(
             lambda table_spec: test_utils.create_feature_spec(
                 table_spec.name + "_feature",
                 table_spec,
@@ -498,15 +497,15 @@ class EmbeddingLookupTest(parameterized.TestCase):
         )
 
         # Generate random dense matrices for use in a predict function.
-        keys = tree.unflatten_as(
+        keys = keras.tree.unflatten_as(
             feature_specs,
             jnp.unstack(
                 jax.random.split(
-                    jax.random.key(0), len(tree.flatten(feature_specs))
+                    jax.random.key(0), len(keras.tree.flatten(feature_specs))
                 )
             ),
         )
-        dense_tables = tree.map_structure(
+        dense_tables = keras.tree.map_structure(
             lambda feature_spec, key: jax.random.uniform(
                 key=key,
                 shape=(feature_spec.table_spec.embedding_dim, 1),
@@ -524,7 +523,9 @@ class EmbeddingLookupTest(parameterized.TestCase):
                 config, lookups, lookup_tables
             )
             logits = sum(
-                tree.flatten(jax.tree.map(jnp.matmul, activations, dense_layer))
+                keras.tree.flatten(
+                    jax.tree.map(jnp.matmul, activations, dense_layer)
+                )
             )
             return logits
 
@@ -560,7 +561,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
         activations = embedding_lookup.embedding_lookup(
             config, sharded_samples, sharded_table_and_slot_variables
         )
-        lookup_res = tree.map_structure(
+        lookup_res = keras.tree.map_structure(
             jnp.matmul,
             activations,
             dense_grads,
