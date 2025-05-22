@@ -118,6 +118,58 @@ class EmbedReduceTest(testing.TestCase, parameterized.TestCase):
 
         self.assertAllClose(res, expected)
 
+    @parameterized.named_parameters(
+        [
+            (
+                (
+                    f"{input_type}_{input_rank}d"
+                    f"{'_weights' if use_weights else ''}"
+                ),
+                input_type,
+                input_rank,
+                use_weights,
+            )
+            for input_type, input_rank in (
+                ("dense", 1),
+                ("dense", 2),
+                ("ragged", 2),
+                ("sparse", 2),
+            )
+            for use_weights in (False, True)
+        ]
+    )
+    def test_symbolic_call(self, input_type, input_rank, use_weights):
+        if input_type == "ragged" and keras.backend.backend() != "tensorflow":
+            self.skipTest(f"ragged not supported on {keras.backend.backend()}")
+        if input_type == "sparse" and keras.backend.backend() not in (
+            "jax",
+            "tensorflow",
+        ):
+            self.skipTest(f"sparse not supported on {keras.backend.backend()}")
+
+        input = keras.layers.Input(
+            shape=(2,) if input_rank == 2 else (),
+            sparse=input_type == "sparse",
+            ragged=input_type == "ragged",
+            dtype="int32",
+        )
+
+        if use_weights:
+            weights = keras.layers.Input(
+                shape=(2,) if input_rank == 2 else (),
+                sparse=input_type == "sparse",
+                ragged=input_type == "ragged",
+                dtype="float32",
+            )
+            output = EmbedReduce(10, 20, dtype="float32")(input, weights)
+        else:
+            output = EmbedReduce(10, 20, dtype="float32")(input)
+
+        self.assertEqual(output.shape, (None, 20))
+        self.assertEqual(output.dtype, "float32")
+        self.assertFalse(output.sparse)
+        self.assertFalse(output.ragged)
+
     def test_predict(self):
         input = keras.random.randint((5, 7), minval=0, maxval=10)
         model = keras.models.Sequential([EmbedReduce(10, 20)])
