@@ -1,8 +1,16 @@
+import platform
+import sys
+
 import keras
 
 from keras_rs.src.api_export import keras_rs_export
 
-if keras.backend.backend() == "jax":
+# JAX TPU embedding is only available on linux_x86_64.
+if (
+    keras.backend.backend() == "jax"
+    and sys.platform == "linux"
+    and platform.machine().lower() == "x86_64"
+):
     from keras_rs.src.layers.embedding.jax.distributed_embedding import (
         DistributedEmbedding as BackendDistributedEmbedding,
     )
