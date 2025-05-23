@@ -313,11 +313,6 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         table_stacking: str | list[str] | list[list[str]],
         jit: bool,
     ):
-        if ragged and not test_utils.has_sparsecores():
-            self.skipTest(
-                "Ragged inputs are only supported on sparsecore devices."
-            )
-
         table_configs = keras_test_utils.create_random_table_configs(
             combiner=combiner, seed=10
         )
@@ -383,11 +378,6 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         ragged: bool,
         table_stacking: str | list[str] | list[list[str]],
     ):
-        if ragged and not test_utils.has_sparsecores():
-            self.skipTest(
-                "Ragged inputs are only supported on sparsecore devices."
-            )
-
         # Set global distribution to ensure optimizer variables are
         # replicated across all devices by default.
         keras.distribution.set_distribution(keras.distribution.DataParallel())
@@ -401,6 +391,7 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         feature_configs = keras_test_utils.create_random_feature_configs(
             table_configs=table_configs,
             batch_size=16,
+            max_ids_per_sample=20,
             seed=20,
         )
 

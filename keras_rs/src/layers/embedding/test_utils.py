@@ -91,6 +91,7 @@ def create_random_feature_configs(
     table_configs: Sequence[TableConfig] | None = None,
     max_features_per_table: int = 3,
     batch_size: int = 16,
+    max_ids_per_sample: int | None = None,
     seed: RandomSeed | None = None,
     name_prefix: str = "feature",
 ) -> list[FeatureConfig]:
@@ -102,6 +103,7 @@ def create_random_feature_configs(
         max_features_per_table: Maximum number of features to generate per
             table.  At least one feature will be generated regardless.
         batch_size: Input batch size for the feature.
+        max_ids_per_sample: Maximum number of IDs per sample row.
         seed: Random seed for generating features.
         name_prefix: Prefix for feature name.  The overall feature name will be
             `{table.name}:{name_prefix}:{feature_index}` if
@@ -130,7 +132,7 @@ def create_random_feature_configs(
                     table=table,
                     input_shape=(
                         batch_size,
-                        None,  # Ragged?  JTE never reads the 2nd dim size.
+                        max_ids_per_sample,
                     ),
                     output_shape=(batch_size, table.embedding_dim),
                 )
@@ -165,8 +167,10 @@ def create_random_samples(
     ) -> tuple[AnyNdArray, AnyNdArray]:
         batch_size = typing.cast(int, feature_config.input_shape[0])
         vocabulary_size = feature_config.table.vocabulary_size
+        # Use value from feature_config if available.
+        sample_length = feature_config.input_shape[1] or max_ids_per_sample
         counts = keras.random.randint(
-            shape=(batch_size,), minval=0, maxval=max_ids_per_sample, seed=seed
+            shape=(batch_size,), minval=0, maxval=sample_length, seed=seed
         )
         sample_ids = []
         sample_weights = []
@@ -195,20 +199,20 @@ def create_random_samples(
                 )
             else:
                 ids = keras.random.randint(
-                    shape=(max_ids_per_sample,),
+                    shape=(sample_length,),
                     minval=0,
                     maxval=vocabulary_size,
                     seed=seed,
                 )
                 weights = keras.random.uniform(
-                    shape=(max_ids_per_sample,),
+                    shape=(sample_length,),
                     minval=0,
                     maxval=1,
                     seed=seed,
                     dtype="float32",
                 )
                 # Mask-out tail of dense samples.
-                idx = keras.ops.arange(max_ids_per_sample)
+                idx = keras.ops.arange(sample_length)
                 ids = keras.ops.where(idx <= counts[i], ids, 0)
                 weights = keras.ops.where(idx <= counts[i], weights, 0)
                 sample_ids.append(np.asarray(ids))

@@ -3,6 +3,7 @@ import typing
 from typing import Any, Sequence
 
 import keras
+import numpy as np
 from keras.src import backend
 
 from keras_rs.src import types
@@ -21,6 +22,65 @@ SUPPORTED_PLACEMENTS = ("auto", "default_device", "sparsecore")
 PlacementAndPath = collections.namedtuple(
     "PlacementAndPath", ["placement", "path"]
 )
+
+
+def _ragged_to_dense_inputs(
+    inputs: Any, weights: Any | None = None, dense_row_length: int | None = None
+) -> Any:
+    """Converts a ragged set of inputs and weights to dense.
+
+    If inputs are ragged and weights are `None`, will create a dense set of
+    weights to mask out the new padded values.
+
+    If inputs are not ragged, returns the original `inputs` and `weights`
+    unmodified.
+
+    Args:
+        inputs: The inputs array.
+        weights: The optional weights array.
+        dense_row_length: The output dense row length.  If None, uses the length
+             of the longest row of the input.
+
+    Returns:
+        Tuple of new (inputs, weights).  If the input is a ragged array, returns
+        dense numpy arrays. Otherwise, returns the original input and weights.
+    """
+    x = inputs
+    w = weights
+    # tf.Ragged or other .numpy()-able types.
+    if hasattr(x, "numpy") and callable(getattr(x, "numpy")):
+        x = x.numpy()
+
+    # Ragged numpy array to dense numpy array.
+    if isinstance(x, np.ndarray) and len(x) > 0 and x.dtype == np.ndarray:
+        # Maybe convert weights to numpy.
+        if (
+            w is not None
+            and hasattr(w, "numpy")
+            and callable(getattr(w, "numpy"))
+        ):
+            w = w.numpy()
+
+        if dense_row_length is None:
+            # Use length of longest row.
+            dense_row_length = max([len(row) for row in x])
+
+        output = np.zeros((len(x), dense_row_length), dtype=x[0].dtype)
+        for i, row in enumerate(x):
+            output[i, : len(row)] = row
+
+        output_weights = np.zeros((len(x), dense_row_length), dtype=np.float32)
+        if w is None:
+            for i, row in enumerate(x):
+                output_weights[i, : len(row)] = 1.0
+        else:
+            for i, row in enumerate(w):
+                output_weights[i, : len(row)] = row
+
+        return output, output_weights
+
+    # If not a ragged numpy array, return the original, unmodified.
+    return inputs, weights
 
 
 class DistributedEmbedding(keras.layers.Layer):
@@ -411,9 +471,9 @@ class DistributedEmbedding(keras.layers.Layer):
     ) -> types.Nested[types.Tensor]:
         """Preprocesses and reformats the data for consumption by the model.
 
-        Calling `preprocess` explicitly is only required to enable `sparsecore`
-        placement with the JAX backend and `jit_compile = True`.  For all other
-        cases and backends, explicit use of `preprocess` is optional.
+        Calling `preprocess` explicitly is only required for the JAX backend
+        to enable `jit_compile = True`.  For all other cases and backends,
+        explicit use of `preprocess` is optional.
 
         In JAX, sparsecore usage requires specially formatted data that depends
         on properties of the available hardware.  This data reformatting
@@ -494,7 +554,7 @@ class DistributedEmbedding(keras.layers.Layer):
             }
 
         placement_to_path_to_preprocessed: dict[
-            str, dict[str, types.Nested[types.Tensor]]
+            str, dict[str, dict[str, types.Nested[types.Tensor]]]
         ] = {}
 
         # Preprocess for features placed on "sparsecore".
@@ -570,21 +630,19 @@ class DistributedEmbedding(keras.layers.Layer):
 
         # Call for features placed on "sparsecore".
         if "sparsecore" in preprocessed_inputs:
-            paths_to_inputs_and_weights = preprocessed_inputs["sparsecore"]
+            inputs_and_weights = preprocessed_inputs["sparsecore"]
             placement_to_path_to_outputs["sparsecore"] = self._sparsecore_call(
-                paths_to_inputs_and_weights["inputs"],
-                paths_to_inputs_and_weights.get("weights", None),
-                training,
+                **inputs_and_weights,
+                training=training,
             )
 
         # Call for features placed on "default_device".
         if "default_device" in preprocessed_inputs:
-            paths_to_inputs_and_weights = preprocessed_inputs["default_device"]
+            inputs_and_weights = preprocessed_inputs["default_device"]
             placement_to_path_to_outputs["default_device"] = (
                 self._default_device_call(
-                    paths_to_inputs_and_weights["inputs"],
-                    paths_to_inputs_and_weights.get("weights", None),
-                    training,
+                    **inputs_and_weights,
+                    training=training,
                 )
             )
 
@@ -655,8 +713,43 @@ class DistributedEmbedding(keras.layers.Layer):
         inputs: dict[str, types.Tensor],
         weights: dict[str, types.Tensor] | None,
         training: bool = False,
-    ) -> dict[str, types.Tensor]:
+    ) -> dict[str, dict[str, types.Tensor]]:
         del training
+
+        # NOTE: This JAX specialization is in the base layer so it is available
+        #       on all platforms.  The superclass jax.DistributedEmbedding layer
+        #       is currently only imported in linux_x86_64.
+        if keras.backend.backend() == "jax":
+            feature_configs = self._placement_to_path_to_feature_config[
+                "default_device"
+            ]
+
+            # Potentially track new weights.  For ragged inputs, if we
+            # densify, we will generate a dense weight tensor.
+            new_weights: dict[str, types.Tensor] = {}
+            use_weights = weights is not None
+
+            # Convert any ragged inputs to dense.
+            for path, config in feature_configs.items():
+                feature_inputs = inputs[path]
+                feature_weights = weights[path] if weights is not None else None
+
+                feature_valence = (
+                    None
+                    if len(config.input_shape) <= 1
+                    else config.input_shape[1]
+                )
+                feature_inputs, feature_weights = _ragged_to_dense_inputs(
+                    feature_inputs, feature_weights, feature_valence
+                )
+                # Converting to ragged may have introduced a weights array.
+                use_weights = use_weights or feature_weights is not None
+                inputs[path] = feature_inputs
+                new_weights[path] = feature_weights
+
+            if use_weights:
+                weights = new_weights
+
         output: dict[str, types.Tensor] = {"inputs": inputs}
         if weights is not None:
             output["weights"] = weights
@@ -713,7 +806,7 @@ class DistributedEmbedding(keras.layers.Layer):
         inputs: dict[str, types.Tensor],
         weights: dict[str, types.Tensor] | None,
         training: bool = False,
-    ) -> dict[str, types.Tensor]:
+    ) -> dict[str, dict[str, types.Tensor]]:
         del training
         output: dict[str, types.Tensor] = {"inputs": inputs}
         if weights is not None:

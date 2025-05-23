@@ -214,13 +214,6 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
         if keras.backend.backend() == "jax":
             if input_type == "sparse":
                 self.skipTest("Sparse inputs not supported on JAX.")
-            if input_type == "ragged" and (
-                placement == "default_device" or not self.on_tpu
-            ):
-                self.skipTest(
-                    "Ragged inputs not supported on JAX with default device "
-                    "placement."
-                )
         elif keras.backend.backend() != "tensorflow":
             if input_type in ("ragged", "sparse"):
                 self.skipTest(
@@ -287,12 +280,6 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
     )
     def test_model_fit(self, input_type, use_weights):
         if keras.backend.backend() == "jax":
-            if input_type == "ragged" and (
-                self.placement == "default" or not self.on_tpu
-            ):
-                self.skipTest(
-                    f"TODO {input_type} inputs on JAX with default placement."
-                )
             if input_type == "sparse":
                 self.skipTest("TODO sparse inputs on JAX.")
         elif keras.backend.backend() != "tensorflow":
@@ -455,12 +442,6 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
         self, combiner, input_type, input_rank, use_weights, jit_compile
     ):
         if keras.backend.backend() == "jax":
-            if input_type == "ragged" and (
-                self.placement == "default" or not self.on_tpu
-            ):
-                self.skipTest(
-                    f"TODO {input_type} inputs on JAX with default placement."
-                )
             if input_type == "sparse":
                 self.skipTest(f"TODO {input_type} inputs on JAX.")
         elif keras.backend.backend() == "tensorflow":
