@@ -1,6 +1,6 @@
 """Type definitions."""
 
-from typing import Any, Callable, Mapping, Sequence, TypeAlias, TypeVar
+from typing import Any, Callable, Mapping, Sequence, TypeAlias, TypeVar, Union
 
 import keras
 
@@ -51,5 +51,5 @@ RegularizerLike: TypeAlias = (
 
 T = TypeVar("T")
 Nested: TypeAlias = (
-    T | Sequence[T | "Nested[T]"] | Mapping[str, T | "Nested[T]"]
+    T | Sequence[Union[T, "Nested[T]"]] | Mapping[str, Union[T, "Nested[T]"]]
 )
