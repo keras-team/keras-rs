@@ -496,7 +496,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
         )
 
         # Generate random dense matrices for use in a predict function.
-        keys = keras.tree.unflatten_as(
+        keys = keras.tree.pack_sequence_as(
             feature_specs,
             jnp.unstack(
                 jax.random.split(
