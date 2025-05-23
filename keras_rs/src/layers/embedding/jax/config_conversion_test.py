@@ -1,6 +1,6 @@
 import inspect
 import typing
-from typing import Callable, Union
+from typing import Callable
 
 import jax
 import keras
@@ -21,12 +21,16 @@ from keras_rs.src.layers.embedding.jax import config_conversion
 class ConfigConversionTest(parameterized.TestCase):
     def assert_initializers_equal(
         self,
-        initializer_a: Union[
-            str, keras.initializers.Initializer, jax.nn.initializers.Initializer
-        ],
-        initializer_b: Union[
-            str, keras.initializers.Initializer, jax.nn.initializers.Initializer
-        ],
+        initializer_a: (
+            str
+            | keras.initializers.Initializer
+            | jax.nn.initializers.Initializer
+        ),
+        initializer_b: (
+            str
+            | keras.initializers.Initializer
+            | jax.nn.initializers.Initializer
+        ),
     ):
         """Compare two initializers to ensure they are equivalent."""
         if isinstance(initializer_a, str):
@@ -62,12 +66,12 @@ class ConfigConversionTest(parameterized.TestCase):
 
     def assert_optimizers_equal(
         self,
-        optimizer_a: Union[
-            str, keras.optimizers.Optimizer, embedding_spec.OptimizerSpec
-        ],
-        optimizer_b: Union[
-            str, keras.optimizers.Optimizer, embedding_spec.OptimizerSpec
-        ],
+        optimizer_a: (
+            str | keras.optimizers.Optimizer | embedding_spec.OptimizerSpec
+        ),
+        optimizer_b: (
+            str | keras.optimizers.Optimizer | embedding_spec.OptimizerSpec
+        ),
     ):
         """Compare two optimizers to ensure they are equivalent."""
         if isinstance(optimizer_a, str):
@@ -100,8 +104,8 @@ class ConfigConversionTest(parameterized.TestCase):
 
     def assert_table_configs_equal(
         self,
-        table_a: Union[config.TableConfig, embedding_spec.TableSpec],
-        table_b: Union[config.TableConfig, embedding_spec.TableSpec],
+        table_a: config.TableConfig | embedding_spec.TableSpec,
+        table_b: config.TableConfig | embedding_spec.TableSpec,
     ):
         """Compare two table configs to ensure they are equivalent."""
         self.assertEqual(table_a.name, table_b.name)
@@ -119,7 +123,7 @@ class ConfigConversionTest(parameterized.TestCase):
         self.assert_optimizers_equal(table_a.optimizer, table_b.optimizer)
 
     def get_learning_rate(
-        self, learning_rate: Union[float, Callable[..., float]], step: int
+        self, learning_rate: float | Callable[..., float], step: int
     ):
         """Gets the learning rate at the provided iteration step.
 
@@ -168,7 +172,7 @@ class ConfigConversionTest(parameterized.TestCase):
         ),
     )
     def test_learning_rate_conversion(
-        self, learning_rate: Union[float, Callable[..., float]]
+        self, learning_rate: float | Callable[..., float]
     ):
         jte_learning_rate = config_conversion.keras_to_jte_learning_rate(
             learning_rate
@@ -199,7 +203,7 @@ class ConfigConversionTest(parameterized.TestCase):
         ("zeros", "zeros"),
     )
     def test_initializer_conversion(
-        self, initializer: Union[keras.initializers.Initializer, str]
+        self, initializer: keras.initializers.Initializer | str
     ):
         jte_initializer = typing.cast(
             config_conversion.WrappedKerasInitializer,
@@ -239,7 +243,7 @@ class ConfigConversionTest(parameterized.TestCase):
     )
     def test_optimizer_conversion(
         self,
-        lazy_optimizer: Callable[..., Union[keras.optimizers.Optimizer, str]],
+        lazy_optimizer: Callable[..., keras.optimizers.Optimizer | str],
     ):
         optimizer = lazy_optimizer()
         jte_optimizer = config_conversion.keras_to_jte_optimizer(optimizer)

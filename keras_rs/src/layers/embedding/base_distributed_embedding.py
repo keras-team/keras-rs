@@ -1,6 +1,6 @@
 import collections
 import typing
-from typing import Any, Optional, Sequence, Union
+from typing import Any, Sequence
 
 import keras
 from keras.src import backend
@@ -248,9 +248,9 @@ class DistributedEmbedding(keras.layers.Layer):
         self,
         feature_configs: types.Nested[FeatureConfig],
         *,
-        table_stacking: Union[
-            str, Sequence[str], Sequence[Sequence[str]]
-        ] = "auto",
+        table_stacking: (
+            str | Sequence[str] | Sequence[Sequence[str]]
+        ) = "auto",
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -406,7 +406,7 @@ class DistributedEmbedding(keras.layers.Layer):
     def preprocess(
         self,
         inputs: types.Nested[types.Tensor],
-        weights: Optional[types.Nested[types.Tensor]] = None,
+        weights: types.Nested[types.Tensor] | None = None,
         training: bool = False,
     ) -> types.Nested[types.Tensor]:
         """Preprocesses and reformats the data for consumption by the model.
@@ -530,7 +530,7 @@ class DistributedEmbedding(keras.layers.Layer):
     def call(
         self,
         inputs: types.Nested[types.Tensor],
-        weights: Optional[types.Nested[types.Tensor]] = None,
+        weights: types.Nested[types.Tensor] | None = None,
         training: bool = False,
     ) -> types.Nested[types.Tensor]:
         """Lookup features in embedding tables and apply reduction.
@@ -619,8 +619,8 @@ class DistributedEmbedding(keras.layers.Layer):
 
     def _default_device_init(
         self,
-        feature_configs: dict[str, Union[FeatureConfig]],
-        table_stacking: Union[str, Sequence[Sequence[str]]],
+        feature_configs: dict[str, FeatureConfig],
+        table_stacking: str | Sequence[Sequence[str]],
     ) -> None:
         del table_stacking
         table_to_embedding_layer: dict[TableConfig, EmbedReduce] = {}
@@ -653,7 +653,7 @@ class DistributedEmbedding(keras.layers.Layer):
     def _default_device_preprocess(
         self,
         inputs: dict[str, types.Tensor],
-        weights: Optional[dict[str, types.Tensor]],
+        weights: dict[str, types.Tensor] | None,
         training: bool = False,
     ) -> dict[str, types.Tensor]:
         del training
@@ -666,7 +666,7 @@ class DistributedEmbedding(keras.layers.Layer):
     def _default_device_call(
         self,
         inputs: dict[str, types.Tensor],
-        weights: Optional[dict[str, types.Tensor]] = None,
+        weights: dict[str, types.Tensor] | None = None,
         training: bool = False,
     ) -> dict[str, types.Tensor]:
         del training  # Unused by default.
@@ -699,7 +699,7 @@ class DistributedEmbedding(keras.layers.Layer):
     def _sparsecore_init(
         self,
         feature_configs: dict[str, FeatureConfig],
-        table_stacking: Union[str, Sequence[Sequence[str]]],
+        table_stacking: str | Sequence[Sequence[str]],
     ) -> None:
         del feature_configs, table_stacking
         raise self._unsupported_placement_error("sparsecore")
@@ -711,7 +711,7 @@ class DistributedEmbedding(keras.layers.Layer):
     def _sparsecore_preprocess(
         self,
         inputs: dict[str, types.Tensor],
-        weights: Optional[dict[str, types.Tensor]],
+        weights: dict[str, types.Tensor] | None,
         training: bool = False,
     ) -> dict[str, types.Tensor]:
         del training
@@ -724,7 +724,7 @@ class DistributedEmbedding(keras.layers.Layer):
     def _sparsecore_call(
         self,
         inputs: dict[str, types.Tensor],
-        weights: Optional[dict[str, types.Tensor]] = None,
+        weights: dict[str, types.Tensor] | None = None,
         training: bool = False,
     ) -> dict[str, types.Tensor]:
         del inputs, weights, training
@@ -792,13 +792,13 @@ class DistributedEmbedding(keras.layers.Layer):
         # The serialized `TableConfig` objects.
         table_config_dicts: list[dict[str, Any]] = config.pop("tables")
         # The deserialized `TableConfig` objects at the same indices.
-        table_configs: list[Optional[TableConfig]] = [None] * len(
+        table_configs: list[TableConfig | None] = [None] * len(
             table_config_dicts
         )
 
         def deserialize_feature_config(
             feature_config_dict: dict[str, Any],
-        ) -> Optional[FeatureConfig]:
+        ) -> FeatureConfig | None:
             # Look for a "name" attribute which is a string to detect a
             # `FeatureConfig` leaf node. If not, keep recursing.
             if "name" not in feature_config_dict or not isinstance(

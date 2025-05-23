@@ -1,31 +1,24 @@
 """Useful utilities for tests."""
 
 import typing
-from typing import (
-    Any,
-    Callable,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import Any, Callable, Mapping, Sequence, TypeAlias
 
 import keras
 import numpy as np
 
-from keras_rs.src.layers.embedding import distributed_embedding_config as config
+from keras_rs.src.layers.embedding.distributed_embedding_config import (
+    FeatureConfig,
+)
+from keras_rs.src.layers.embedding.distributed_embedding_config import (
+    TableConfig,
+)
 from keras_rs.src.types import Nested
 
-T = TypeVar("T")
-RandomSeed = Union[int, keras.random.SeedGenerator]
-FeatureConfig = config.FeatureConfig
-TableConfig = config.TableConfig
-AnyNdArray = np.ndarray[Any, Any]
+RandomSeed: TypeAlias = int | keras.random.SeedGenerator
+AnyNdArray: TypeAlias = np.ndarray[Any, Any]
 
 
-def _make_rng(seed: Optional[RandomSeed]) -> keras.random.SeedGenerator:
+def _make_rng(seed: RandomSeed | None) -> keras.random.SeedGenerator:
     """Make a seed generator for use in generating random configurations."""
     if seed is None:
         seed = keras.random.SeedGenerator()
@@ -38,13 +31,13 @@ def create_random_table_configs(
     count: int = 3,
     max_vocabulary_size: int = 1024,
     max_embedding_dim: int = 128,
-    initializer: Optional[Union[str, keras.initializers.Initializer]] = None,
-    optimizer: Union[str, keras.optimizers.Optimizer] = "sgd",
+    initializer: str | keras.initializers.Initializer | None = None,
+    optimizer: str | keras.optimizers.Optimizer = "sgd",
     combiner: str = "mean",
     placement: str = "auto",
     max_ids_per_partition: int = 256,
     max_unique_ids_per_partition: int = 256,
-    seed: Optional[RandomSeed] = None,
+    seed: RandomSeed | None = None,
     name_prefix: str = "table",
 ) -> list[TableConfig]:
     """Creates a list of random TableConfigs for use in tests.
@@ -95,10 +88,10 @@ def create_random_table_configs(
 
 
 def create_random_feature_configs(
-    table_configs: Optional[Sequence[TableConfig]] = None,
+    table_configs: Sequence[TableConfig] | None = None,
     max_features_per_table: int = 3,
     batch_size: int = 16,
-    seed: Optional[RandomSeed] = None,
+    seed: RandomSeed | None = None,
     name_prefix: str = "feature",
 ) -> list[FeatureConfig]:
     """Creates a list of random FeatureConfigs for tests.
@@ -150,8 +143,8 @@ def create_random_samples(
     feature_configs: Nested[FeatureConfig],
     ragged: bool = True,
     max_ids_per_sample: int = 20,
-    seed: Optional[RandomSeed] = None,
-) -> Tuple[Nested[AnyNdArray], Nested[AnyNdArray]]:
+    seed: RandomSeed | None = None,
+) -> tuple[Nested[AnyNdArray], Nested[AnyNdArray]]:
     """Creates random feature samples.
 
     Args:
@@ -169,7 +162,7 @@ def create_random_samples(
 
     def _generate_samples(
         feature_config: FeatureConfig,
-    ) -> Tuple[AnyNdArray, AnyNdArray]:
+    ) -> tuple[AnyNdArray, AnyNdArray]:
         batch_size = typing.cast(int, feature_config.input_shape[0])
         vocabulary_size = feature_config.table.vocabulary_size
         counts = keras.random.randint(
@@ -337,7 +330,7 @@ class RandomInputSampleDataset(keras.utils.PyDataset):
         max_ids_per_sample: int = 20,
         num_batches: int = 1000,
         seed: int = 0,
-        preprocessor: Optional[Callable[..., Any]] = None,
+        preprocessor: Callable[..., Any] | None = None,
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
@@ -354,7 +347,7 @@ class RandomInputSampleDataset(keras.utils.PyDataset):
     def __len__(self) -> int:
         return self._num_batches
 
-    def __getitem__(self, idx: int) -> Tuple[Any, Any]:
+    def __getitem__(self, idx: int) -> tuple[Any, Any]:
         sample_ids, sample_weights = create_random_samples(
             self._feature_configs,
             self._ragged,

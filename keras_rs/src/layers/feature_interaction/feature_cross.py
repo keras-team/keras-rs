@@ -1,4 +1,4 @@
-from typing import Any, Optional, Text, Union
+from typing import Any
 
 import keras
 from keras import ops
@@ -92,20 +92,18 @@ class FeatureCross(keras.layers.Layer):
 
     def __init__(
         self,
-        projection_dim: Optional[int] = None,
-        diag_scale: Optional[float] = 0.0,
+        projection_dim: int | None = None,
+        diag_scale: float | None = 0.0,
         use_bias: bool = True,
-        pre_activation: Optional[Union[str, keras.layers.Activation]] = None,
-        kernel_initializer: Union[
-            Text, keras.initializers.Initializer
-        ] = "glorot_uniform",
-        bias_initializer: Union[Text, keras.initializers.Initializer] = "zeros",
-        kernel_regularizer: Union[
-            Text, None, keras.regularizers.Regularizer
-        ] = None,
-        bias_regularizer: Union[
-            Text, None, keras.regularizers.Regularizer
-        ] = None,
+        pre_activation: str | keras.layers.Activation | None = None,
+        kernel_initializer: (
+            str | keras.initializers.Initializer
+        ) = "glorot_uniform",
+        bias_initializer: str | keras.initializers.Initializer = "zeros",
+        kernel_regularizer: (
+            str | None | keras.regularizers.Regularizer
+        ) = None,
+        bias_regularizer: (str | None | keras.regularizers.Regularizer) = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -155,7 +153,7 @@ class FeatureCross(keras.layers.Layer):
         self.built = True
 
     def call(
-        self, x0: types.Tensor, x: Optional[types.Tensor] = None
+        self, x0: types.Tensor, x: types.Tensor | None = None
     ) -> types.Tensor:
         """Forward pass of the cross layer.
 

@@ -1,4 +1,4 @@
-from typing import Any, Optional, Union
+from typing import Any
 
 import keras
 
@@ -55,8 +55,8 @@ class BruteForceRetrieval(Retrieval):
 
     def __init__(
         self,
-        candidate_embeddings: Optional[types.Tensor] = None,
-        candidate_ids: Optional[types.Tensor] = None,
+        candidate_embeddings: types.Tensor | None = None,
+        candidate_ids: types.Tensor | None = None,
         k: int = 10,
         return_scores: bool = True,
         **kwargs: Any,
@@ -81,7 +81,7 @@ class BruteForceRetrieval(Retrieval):
     def update_candidates(
         self,
         candidate_embeddings: types.Tensor,
-        candidate_ids: Optional[types.Tensor] = None,
+        candidate_ids: types.Tensor | None = None,
     ) -> None:
         """Update the set of candidates and optionally their candidate IDs.
 
@@ -125,7 +125,7 @@ class BruteForceRetrieval(Retrieval):
 
     def call(
         self, inputs: types.Tensor
-    ) -> Union[types.Tensor, tuple[types.Tensor, types.Tensor]]:
+    ) -> types.Tensor | tuple[types.Tensor, types.Tensor]:
         """Returns the top candidates for the query passed as input.
 
         Args:

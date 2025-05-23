@@ -1,7 +1,7 @@
 """JAX-specific test utilities for embedding layers."""
 
 import typing
-from typing import Any, Mapping, Optional, Sequence, Tuple, TypeVar, Union
+from typing import Any, Mapping, TypeAlias, Union
 
 import jax
 import keras
@@ -13,11 +13,10 @@ from jax_tpu_embedding.sparsecore.lib.nn.embedding_spec import TableSpec
 
 from keras_rs.src.layers.embedding.jax import embedding_utils
 from keras_rs.src.layers.embedding.jax.embedding_utils import FeatureSamples
+from keras_rs.src.types import Nested
 
-T = TypeVar("T")
-Nested = Union[T, Sequence[T], Mapping[str, T]]
-ArrayLike = Union[jax.Array, np.ndarray[Any, Any]]
-Shape = Tuple[int, ...]
+ArrayLike: TypeAlias = Union[jax.Array, np.ndarray[Any, Any]]
+Shape: TypeAlias = tuple[int, ...]
 
 
 def has_sparsecores() -> bool:
@@ -37,8 +36,8 @@ def create_table_spec(
     embedding_dim: int,
     max_ids_per_partition: int = 0,
     max_unique_ids_per_partition: int = 0,
-    initializer: Optional[jax.nn.initializers.Initializer] = None,
-    optimizer: Optional[embedding_spec.OptimizerSpec] = None,
+    initializer: jax.nn.initializers.Initializer | None = None,
+    optimizer: embedding_spec.OptimizerSpec | None = None,
     combiner: str = "sum",
 ) -> TableSpec:
     """Creates a TableSpec with appropriate defaults."""
@@ -107,7 +106,7 @@ def _get_stacked_table_spec(
 
 def create_tables(
     table_specs: Nested[TableSpec],
-    keys: Optional[Nested[ArrayLike]] = None,
+    keys: Nested[ArrayLike] | None = None,
 ) -> Nested[ArrayLike]:
     """Creates and initializes embedding tables.
 
@@ -142,7 +141,7 @@ def create_tables(
 
 def create_table_and_slot_variables(
     table_specs: Nested[TableSpec],
-    keys: Optional[Nested[ArrayLike]] = None,
+    keys: Nested[ArrayLike] | None = None,
 ) -> Nested[ArrayLike]:
     """Creates and initializes embedding tables and slot variables.
 
@@ -165,7 +164,7 @@ def create_table_and_slot_variables(
     def _create_table_and_slot_variables(
         table_spec: TableSpec,
         key: ArrayLike,
-    ) -> Tuple[jax.Array, Tuple[jax.Array, ...]]:
+    ) -> tuple[jax.Array, tuple[jax.Array, ...]]:
         slot_initializers = table_spec.optimizer.slot_variables_initializers()
         num_slot_variables = len(keras.tree.flatten(slot_initializers))
         slot_keys = jnp.unstack(jax.random.split(key, num_slot_variables))
@@ -194,10 +193,9 @@ def generate_feature_samples(
     feature_specs: Nested[FeatureSpec],
     max_samples: Nested[int] = 16,
     ragged: bool = True,
-    keys: Optional[Nested[int]] = None,
-    sample_weight_initializer: Optional[
-        Nested[jax.nn.initializers.Initializer]
-    ] = None,
+    keys: Nested[int] | None = None,
+    sample_weight_initializer: None
+    | (Nested[jax.nn.initializers.Initializer]) = None,
 ) -> Nested[FeatureSamples]:
     """Generates random feature samples for embedding lookup testing.
 
@@ -419,7 +417,7 @@ def compute_expected_lookup_grad(
     feature_samples: Nested[FeatureSamples],
     activation_gradients: Nested[jax.Array],
     table_specs: Nested[TableSpec],
-) -> Tuple[None, Nested[jax.Array]]:
+) -> tuple[None, Nested[jax.Array]]:
     """Computes the expected gradient of an embedding lookup.
 
     Args:
@@ -471,10 +469,10 @@ def compute_expected_lookup_grad(
 def _update_table_and_slot_variables(
     table_spec: TableSpec,
     grad: jax.Array,
-    table_and_slot_variables: Tuple[jax.Array, Tuple[jax.Array, ...]],
-) -> Tuple[
+    table_and_slot_variables: tuple[jax.Array, tuple[jax.Array, ...]],
+) -> tuple[
     jax.Array,
-    Union[embedding_spec.SGDSlotVariables, embedding_spec.AdagradSlotVariables],
+    embedding_spec.SGDSlotVariables | embedding_spec.AdagradSlotVariables,
 ]:
     """Updates a table and its slot variables based on the gradient."""
     table = table_and_slot_variables[0]

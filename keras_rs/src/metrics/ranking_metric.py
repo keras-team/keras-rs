@@ -1,5 +1,5 @@
 import abc
-from typing import Any, Optional, Union
+from typing import Any
 
 import keras
 from keras import ops
@@ -39,9 +39,9 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
 
     def __init__(
         self,
-        k: Optional[int] = None,
+        k: int | None = None,
         shuffle_ties: bool = True,
-        seed: Optional[Union[int, keras.random.SeedGenerator]] = None,
+        seed: int | keras.random.SeedGenerator | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -73,7 +73,7 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
         self,
         y_true: types.Tensor,
         y_pred: types.Tensor,
-        sample_weight: Optional[types.Tensor] = None,
+        sample_weight: types.Tensor | None = None,
     ) -> None:
         """
         Accumulates statistics for the ranking metric.

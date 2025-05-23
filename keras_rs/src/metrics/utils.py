@@ -1,5 +1,3 @@
-from typing import Optional
-
 from keras import ops
 
 from keras_rs.src import types
@@ -10,9 +8,9 @@ from keras_rs.src.utils.keras_utils import check_shapes_compatible
 def standardize_call_inputs_ranks(
     y_true: types.Tensor,
     y_pred: types.Tensor,
-    mask: Optional[types.Tensor] = None,
+    mask: types.Tensor | None = None,
     check_y_true_rank: bool = True,
-) -> tuple[types.Tensor, types.Tensor, Optional[types.Tensor], bool]:
+) -> tuple[types.Tensor, types.Tensor, types.Tensor | None, bool]:
     """
     Utility function for processing inputs for losses and metrics.
 
