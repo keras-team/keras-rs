@@ -1,4 +1,4 @@
-from typing import Any, Callable, Optional, Sequence, Union
+from typing import Any, Callable, Sequence, TypeAlias
 
 import keras
 import tensorflow as tf
@@ -13,7 +13,7 @@ FeatureConfig = distributed_embedding_config.FeatureConfig
 TableConfig = distributed_embedding_config.TableConfig
 
 # Placeholder of tf.tpu.experimental.embedding._Optimizer which is not exposed.
-TfTpuOptimizer = Any
+TfTpuOptimizer: TypeAlias = Any
 
 
 GRADIENT_TRAP_DUMMY_NAME = "_gradient_trap_dummy"
@@ -29,12 +29,12 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
     def __init__(
         self,
         feature_configs: types.Nested[
-            Union[FeatureConfig, tf.tpu.experimental.embedding.FeatureConfig]
+            FeatureConfig | tf.tpu.experimental.embedding.FeatureConfig
         ],
         *,
-        table_stacking: Union[
-            str, Sequence[str], Sequence[Sequence[str]]
-        ] = "auto",
+        table_stacking: (
+            str | Sequence[str] | Sequence[Sequence[str]]
+        ) = "auto",
         **kwargs: Any,
     ) -> None:
         # Intercept arguments that are supported only on TensorFlow.
@@ -77,9 +77,9 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         self,
         feature_configs: dict[
             str,
-            Union[FeatureConfig, tf.tpu.experimental.embedding.FeatureConfig],
+            FeatureConfig | tf.tpu.experimental.embedding.FeatureConfig,
         ],
-        table_stacking: Union[str, Sequence[str], Sequence[Sequence[str]]],
+        table_stacking: str | Sequence[str] | Sequence[Sequence[str]],
     ) -> None:
         self._table_stacking = table_stacking
 
@@ -246,7 +246,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
     def _sparsecore_call(
         self,
         inputs: dict[str, types.Tensor],
-        weights: Optional[dict[str, types.Tensor]] = None,
+        weights: dict[str, types.Tensor] | None = None,
         training: bool = False,
     ) -> dict[str, types.Tensor]:
         del training  # Unused.
@@ -321,7 +321,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         self,
         tpu_embedding: tf.tpu.experimental.embedding.TPUEmbedding,
         inputs: dict[str, types.Tensor],
-        weights: Optional[dict[str, types.Tensor]] = None,
+        weights: dict[str, types.Tensor] | None = None,
     ) -> dict[str, types.Tensor]:
         # Each call to this function increments the _v1_call_id by 1, this
         # allows us to tag each of the main embedding ops with this call id so
@@ -372,7 +372,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         self,
         tpu_embedding: tf.tpu.experimental.embedding.TPUEmbeddingV2,
         inputs: dict[str, types.Tensor],
-        weights: Optional[dict[str, types.Tensor]] = None,
+        weights: dict[str, types.Tensor] | None = None,
     ) -> dict[str, types.Tensor]:
         @tf.custom_gradient  # type: ignore
         def gradient_trap(

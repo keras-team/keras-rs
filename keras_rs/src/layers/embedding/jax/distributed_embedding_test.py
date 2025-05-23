@@ -1,5 +1,5 @@
 import typing
-from typing import Any, Tuple, Union
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -70,7 +70,7 @@ class ShardedInitializerTest(parameterized.TestCase):
         ],
     )
     def test_wrap_and_call(
-        self, initializer: Union[keras.initializers.Initializer, str]
+        self, initializer: keras.initializers.Initializer | str
     ):
         device_count = jax.device_count()
         layout = _create_sparsecore_layout()
@@ -275,7 +275,7 @@ class StackedTableInitializerTest(parameterized.TestCase):
             stacked_table_spec.stack_embedding_dim,
         )
 
-        def my_initializer(shape: Tuple[int, int], dtype: Any):
+        def my_initializer(shape: tuple[int, int], dtype: Any):
             layout = _create_sparsecore_layout()
             initializer = jax_distributed_embedding.StackedTableInitializer(
                 table_specs, num_table_shards, layout
@@ -310,7 +310,7 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         self,
         ragged: bool,
         combiner: str,
-        table_stacking: Union[str, list[str], list[list[str]]],
+        table_stacking: str | list[str] | list[list[str]],
         jit: bool,
     ):
         if ragged and not test_utils.has_sparsecores():
@@ -381,7 +381,7 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
     def test_fit(
         self,
         ragged: bool,
-        table_stacking: Union[str, list[str], list[list[str]]],
+        table_stacking: str | list[str] | list[list[str]],
     ):
         if ragged and not test_utils.has_sparsecores():
             self.skipTest(

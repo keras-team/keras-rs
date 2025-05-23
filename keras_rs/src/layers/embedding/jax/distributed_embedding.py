@@ -2,7 +2,7 @@
 
 import math
 import typing
-from typing import Any, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Mapping, Sequence, Union
 
 import jax
 import keras
@@ -34,12 +34,12 @@ shard_map = jax.experimental.shard_map.shard_map  # type: ignore[attr-defined]
 
 
 def _get_partition_spec(
-    layout: Union[
-        keras.distribution.TensorLayout,
-        jax_layout.Layout,
-        jax.sharding.NamedSharding,
-        jax.sharding.PartitionSpec,
-    ],
+    layout: (
+        keras.distribution.TensorLayout
+        | jax_layout.Layout
+        | jax.sharding.NamedSharding
+        | jax.sharding.PartitionSpec
+    ),
 ) -> Any:
     """Extracts the partition spec from a layout or sharding."""
     if isinstance(layout, keras.distribution.TensorLayout):
@@ -63,8 +63,8 @@ class ShardedInitializer(keras.initializers.Initializer):
 
     def __init__(
         self,
-        initializer: Union[keras.initializers.Initializer, str],
-        layout: Optional[keras.distribution.TensorLayout],
+        initializer: keras.initializers.Initializer | str,
+        layout: keras.distribution.TensorLayout | None,
     ):
         if isinstance(initializer, str):
             initializer = keras.initializers.get(initializer)
@@ -73,7 +73,7 @@ class ShardedInitializer(keras.initializers.Initializer):
         self._layout = layout
 
     def __call__(
-        self, shape: types.Shape, dtype: Optional[types.DType] = None
+        self, shape: types.Shape, dtype: types.DType | None = None
     ) -> jax.Array:
         if self._layout is not None:
             compiled_initializer = jax.jit(
@@ -96,7 +96,7 @@ class StackedTableInitializer(keras.initializers.Initializer):
         table_specs: Nested[embedding_spec.TableSpec],
         num_shards: int,
         layout: keras.distribution.TensorLayout,
-        seed: Union[int, keras.random.SeedGenerator, jax.Array] = 0,
+        seed: int | keras.random.SeedGenerator | jax.Array = 0,
     ):
         # Sort table specs so we can simply concatenate them when assembling the
         # stacked table.
@@ -113,7 +113,7 @@ class StackedTableInitializer(keras.initializers.Initializer):
     def _initialize_shard(
         self,
         keys: jax.Array,
-        shape: Tuple[int, int],
+        shape: tuple[int, int],
         dtype: Any,
         num_shards_per_device: int,
     ) -> jax.Array:
@@ -137,7 +137,7 @@ class StackedTableInitializer(keras.initializers.Initializer):
         return jnp.concatenate(table_shards, axis=0)
 
     def __call__(
-        self, shape: types.Shape, dtype: Optional[types.DType] = None
+        self, shape: types.Shape, dtype: types.DType | None = None
     ) -> jax.Array:
         stacked_table_spec = typing.cast(
             embedding_spec.StackedTableSpec,
@@ -195,7 +195,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
     def _create_sparsecore_distribution(
         self, sparsecore_axis_name: str = "sparsecore"
-    ) -> Tuple[
+    ) -> tuple[
         keras.distribution.ModelParallel, keras.distribution.TensorLayout
     ]:
         """SparseCore requires a specific layout.
@@ -242,7 +242,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
     def _create_cpu_distribution(
         self, cpu_axis_name: str = "cpu"
-    ) -> Tuple[
+    ) -> tuple[
         keras.distribution.ModelParallel, keras.distribution.TensorLayout
     ]:
         """Share a variable across all CPU processes."""
@@ -260,7 +260,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
     def _add_sparsecore_weight(
         self,
         name: str,
-        shape: Tuple[int, int],
+        shape: tuple[int, int],
         initializer: jax.nn.initializers.Initializer,
         dtype: Any,
         overwrite_with_gradient: bool,
@@ -276,7 +276,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         table_specs: Sequence[embedding_spec.TableSpec],
         num_shards: int,
         add_slot_variables: bool,
-    ) -> Tuple[keras.Variable, Optional[Tuple[keras.Variable, ...]]]:
+    ) -> tuple[keras.Variable, tuple[keras.Variable, ...] | None]:
         stacked_table_spec = typing.cast(
             embedding_spec.StackedTableSpec, table_specs[0].stacked_table_spec
         )
@@ -357,7 +357,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
     def _sparsecore_init(
         self,
         feature_configs: dict[str, FeatureConfig],
-        table_stacking: Union[str, Sequence[str], Sequence[Sequence[str]]],
+        table_stacking: str | Sequence[str] | Sequence[Sequence[str]],
     ) -> None:
         if not self._has_sparsecore():
             raise ValueError(
@@ -380,13 +380,13 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         self._table_stacking = table_stacking
 
     def _sparsecore_build(
-        self, input_shapes: Optional[Nested[types.Shape]] = None
+        self, input_shapes: Nested[types.Shape] | None = None
     ) -> None:
         self.sparsecore_build(input_shapes)
 
     @keras_utils.no_automatic_dependency_tracking
     def sparsecore_build(
-        self, input_shapes: Optional[Nested[types.Shape]] = None
+        self, input_shapes: Nested[types.Shape] | None = None
     ) -> None:
         del input_shapes  # Unused.
 
@@ -559,7 +559,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
     def _sparsecore_preprocess(
         self,
         inputs: dict[str, types.Tensor],
-        weights: Optional[dict[str, types.Tensor]],
+        weights: dict[str, types.Tensor] | None,
         training: bool = False,
     ) -> dict[str, dict[str, embedding_utils.ShardedCooMatrix]]:
         if any(
@@ -711,7 +711,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
     def _sparsecore_call(
         self,
         inputs: dict[str, types.Tensor],
-        weights: Optional[dict[str, types.Tensor]] = None,
+        weights: dict[str, types.Tensor] | None = None,
         training: bool = False,
         **kwargs: Any,
     ) -> dict[str, types.Tensor]:

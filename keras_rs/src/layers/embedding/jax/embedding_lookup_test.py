@@ -1,6 +1,6 @@
 import functools
 import typing
-from typing import Any, Mapping, Optional, Sequence, Tuple, TypeVar, Union
+from typing import Any, TypeAlias
 
 import jax
 import jax.numpy as jnp
@@ -17,12 +17,11 @@ from jax_tpu_embedding.sparsecore.utils import utils as jte_utils
 from keras_rs.src.layers.embedding.jax import embedding_lookup
 from keras_rs.src.layers.embedding.jax import embedding_utils
 from keras_rs.src.layers.embedding.jax import test_utils
+from keras_rs.src.types import Nested
 
 shard_map = jax.experimental.shard_map.shard_map
 
-Shape = Tuple[int, ...]
-T = TypeVar("T")
-Nested = Union[T, Sequence[T], Mapping[str, T]]
+Shape: TypeAlias = tuple[int, ...]
 
 
 class TableInfo:
@@ -65,9 +64,9 @@ class EmbeddingLookupTest(parameterized.TestCase):
 
     def _create_test_tables(
         self,
-        table_info: Optional[Nested[TableInfo]],
-        optimizer: Optional[embedding_spec.OptimizerSpec] = None,
-        initializer: Optional[jax.nn.initializers.Initializer] = None,
+        table_info: Nested[TableInfo] | None,
+        optimizer: embedding_spec.OptimizerSpec | None = None,
+        initializer: jax.nn.initializers.Initializer | None = None,
     ) -> dict[str, embedding_spec.TableSpec]:
         return keras.tree.map_structure(
             lambda info: test_utils.create_table_spec(
@@ -100,8 +99,8 @@ class EmbeddingLookupTest(parameterized.TestCase):
 
     def _create_table_and_feature_specs(
         self,
-        table_initializer: Optional[jax.nn.initializers.Initializer] = None,
-        optimizer: Optional[embedding_spec.OptimizerSpec] = None,
+        table_initializer: jax.nn.initializers.Initializer | None = None,
+        optimizer: embedding_spec.OptimizerSpec | None = None,
     ):
         table_specs = self._create_test_tables(
             {
@@ -480,7 +479,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
             )
         )
         sharded_table_and_slot_variables = typing.cast(
-            dict[str, Tuple[jax.Array, ...]], sharded_table_and_slot_variables
+            dict[str, tuple[jax.Array, ...]], sharded_table_and_slot_variables
         )
 
         # Shard samples for lookup query.
