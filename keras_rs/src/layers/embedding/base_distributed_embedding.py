@@ -291,6 +291,141 @@ class DistributedEmbedding(keras.layers.Layer):
             result = strategy.run(step, args=(next(iterator),))
 
     run_loop(iter(dataset))
+
+    ### Usage with JAX on TPU with SpareCore
+
+    #### Setup
+
+    To use `DistributedEmbedding` on TPUs with JAX, one must create and set a
+    Keras `Distribution`.
+    ```
+    distribution = keras.distribution.DataParallel(devices=jax.device("tpu))
+    keras.distribution.set_distribution(distribution)
+    ```
+
+    #### Inputs
+
+    For JAX, inputs can either be dense tensors, or ragged (nested) NumPy
+    arrays.  To enable `jit_compile = True`, one must explicitly call
+    `layer.preprocess(...)` on the inputs, and then feed the preprocessed
+    output to the model.  See the next section on preprocessing for details.
+
+    Ragged input arrays must be ragged in the dimension with index 1. Note that
+    if weights are passed, each weight tensor must be of the same class as the
+    inputs for that particular feature and use the exact same ragged row lengths
+    for ragged tensors. All the output of `DistributedEmbedding` are dense
+    tensors.
+
+    #### Preprocessing
+
+    In JAX, SparseCore usage requires specially formatted data that depends
+    on properties of the available hardware.  This data reformatting
+    currently does not support jit-compilation, so must be applied _prior_
+    to passing data into a model.
+
+    Preprocessing works on dense or ragged NumPy arrays, or on tensors that are
+    convertible to dense or ragged NumPy arrays like `tf.RaggedTensor`.
+
+    One simple way to add preprocessing is to append the function to an input
+    pipeline by using a python generator.
+    ```python
+    # Create the embedding layer.
+    embedding_layer = DistributedEmbedding(feature_configs)
+
+    # Add preprocessing to a data input pipeline.
+    def train_dataset_generator():
+        for (inputs, weights), labels in iter(train_dataset):
+            yield embedding_layer.preprocess(
+                inputs, weights, training=True
+            ), labels
+
+    preprocessed_train_dataset = train_dataset_generator()
+    ```
+    This explicit preprocessing stage combines the input and optional weights,
+    so the new data can be passed directly into the `inputs` argument of the
+    layer or model.
+
+    #### Usage in a Keras model
+
+    Once the global distribution is set and the input preprocessing pipeline
+    is defined, model training can proceed as normal.  For example:
+    ```python
+    # Construct, compile, and fit the model using the preprocessed data.
+    model = keras.Sequential(
+      [
+        embedding_layer,
+        keras.layers.Dense(2),
+        keras.layers.Dense(3),
+        keras.layers.Dense(4),
+      ]
+    )
+    model.compile(optimizer="adam", loss="mse", jit_compile=True)
+    model.fit(preprocessed_train_dataset, epochs=10)
+    ```
+
+    #### Direct invocation
+
+    The `DistributedEmbedding` layer can also be invoked directly.  Explicit
+    preprocessing is required when used with JIT compilation.
+    ```python
+    # Call the layer directly.
+    activations = embedding_layer(my_inputs, my_weights)
+
+    # Call the layer with JIT compilation and explicitly preprocessed inputs.
+    embedding_layer_jit = jax.jit(embedding_layer)
+    preprocessed_inputs = embedding_layer.preprocess(my_inputs, my_weights)
+    activations = embedding_layer_jit(preprocessed_inputs)
+    ```
+
+    Similarly, for custom training loops, preprocessing must be applied prior
+    to passing the data to the JIT-compiled training step.
+    ```python
+    # Create an optimizer and loss function.
+    optimizer = keras.optimizers.Adam(learning_rate=1e-3)
+
+    def loss_and_updates(trainable_variables, non_trainable_variables, x, y):
+        y_pred, non_trainable_variables = model.stateless_call(
+            trainable_variables, non_trainable_variables, x, training=True
+        )
+        loss = keras.losses.mean_squared_error(y, y_pred)
+        return loss, non_trainable_variables
+
+    grad_fn = jax.value_and_grad(loss_and_updates, has_aux=True)
+
+    # Create a JIT-compiled training step.
+    @jax.jit
+    def train_step(state, x, y):
+        (
+          trainable_variables,
+          non_trainable_variables,
+          optimizer_variables,
+        ) = state
+        (loss, non_trainable_variables), grads = grad_fn(
+            trainable_variables, non_trainable_variables, x, y
+        )
+        trainable_variables, optimizer_variables = optimizer.stateless_apply(
+            optimizer_variables, grads, trainable_variables
+        )
+        return loss, (
+            trainable_variables,
+            non_trainable_variables,
+            optimizer_variables,
+        )
+
+    # Build optimizer variables.
+    optimizer.build(model.trainable_variables)
+
+    # Assemble the training state.
+    trainable_variables = model.trainable_variables
+    non_trainable_variables = model.non_trainable_variables
+    optimizer_variables = optimizer.variables
+    state = trainable_variables, non_trainable_variables, optimizer_variables
+
+    # Training loop.
+    for (inputs, weights), labels in train_dataset:
+        # Explicitly preprocess the data.
+        preprocessed_inputs = embedding_layer.preprocess(inputs, weights)
+        loss, state = train_step(state, preprocessed_inputs, labels)
     ```
 
     Args:
@@ -471,41 +606,9 @@ class DistributedEmbedding(keras.layers.Layer):
     ) -> types.Nested[types.Tensor]:
         """Preprocesses and reformats the data for consumption by the model.
 
-        Calling `preprocess` explicitly is only required for the JAX backend
-        to enable `jit_compile = True`.  For all other cases and backends,
-        explicit use of `preprocess` is optional.
-
-        In JAX, sparsecore usage requires specially formatted data that depends
-        on properties of the available hardware.  This data reformatting
-        currently does not support jit-compilation, so must be applied _prior_
-        to feeding data into a model.
-
-        An example usage might look like:
-        ```python
-        # Create the embedding layer.
-        embedding_layer = DistributedEmbedding(feature_configs)
-
-        # Add preprocessing to a data input pipeline.
-        def training_dataset_generator():
-            for (inputs, weights), labels in iter(training_dataset):
-                yield embedding_layer.preprocess(
-                    inputs, weights, training=True
-                ), labels
-
-        preprocessed_training_dataset = training_dataset_generate()
-
-        # Construct, compile, and fit the model using the preprocessed data.
-        model = keras.Sequential(
-          [
-            embedding_layer,
-            keras.layers.Dense(2),
-            keras.layers.Dense(3),
-            keras.layers.Dense(4),
-          ]
-        )
-        model.compile(optimizer="adam", loss="mse", jit_compile=True)
-        model.fit(preprocessed_training_dataset, epochs=10)
-        ```
+        For the JAX backend, converts the input data to a hardward-dependent
+        format required for use with SparseCores.  Calling `preprocess`
+        explicitly is only necessary to enable `jit_compile = True`.
 
         For non-JAX backends, preprocessing will bundle together the inputs and
         weights, and separate the inputs by device placement.  This step is

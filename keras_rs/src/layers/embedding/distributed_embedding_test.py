@@ -326,15 +326,12 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             )
 
             # Call preprocess on dataset inputs/weights.
-            def preprocess(inputs_and_labels):
+            def preprocess(inputs, labels):
                 # Extract inputs, weights and labels.
                 weights = None
-                inputs, labels = inputs_and_labels
-                labels = keras.tree.map_structure(lambda x: x.numpy(), labels)
                 if use_weights:
                     inputs, weights = inputs
-                preprocessed = layer.preprocess(inputs, weights, training=True)
-                return preprocessed, labels
+                return layer.preprocess(inputs, weights, training=True), labels
 
             # Create a dataset generator that applies the preprocess function.
             # We need to create an intermediary tf_dataset to avoid
@@ -343,16 +340,16 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             tf_train_dataset = train_dataset.repeat(16)
 
             def train_dataset_generator():
-                for inputs_and_labels in iter(tf_train_dataset):
-                    yield preprocess(inputs_and_labels)
+                for inputs, labels in iter(tf_train_dataset):
+                    yield preprocess(inputs, labels)
 
             train_dataset = train_dataset_generator()
 
             tf_test_dataset = test_dataset.repeat(16)
 
             def test_dataset_generator():
-                for inputs in iter(tf_test_dataset):
-                    yield preprocess(inputs)
+                for inputs, labels in iter(tf_test_dataset):
+                    yield preprocess(inputs, labels)
 
             test_dataset = test_dataset_generator()
             model = keras.Sequential([layer])
