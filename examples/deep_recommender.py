@@ -535,9 +535,7 @@ class QueryModel(keras.Model):
                 self.user_embedding(inputs["user_id"]),
                 self.gender_embedding(inputs["user_gender"]),
                 self.age_embedding(inputs["raw_user_age"]),
-                self.gender_x_age_embedding(
-                    inputs["user_gender_X_raw_user_age"]
-                ),
+                self.gender_x_age_embedding(keras.ops.squeeze(inputs["user_gender_X_raw_user_age"], axis=-1)),
                 self.occupation_embedding(inputs["user_occupation_label"]),
             ],
             axis=1,
