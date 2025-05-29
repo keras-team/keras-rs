@@ -469,7 +469,6 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             stack_name: stack[0].stacked_table_spec
             for stack_name, stack in table_stacks.items()
         }
-        self._stacked_table_specs = stacked_table_specs
 
         # Create variables for all stacked tables and slot variables.
         with sparsecore_distribution.scope():
@@ -556,6 +555,73 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
         self._sparsecore_built = True
 
+    def _sparsecore_symbolic_preprocess(
+        self,
+        inputs: dict[str, types.Tensor],
+        weights: dict[str, types.Tensor] | None,
+        training: bool = False,
+    ) -> dict[str, dict[str, embedding_utils.ShardedCooMatrix]]:
+        """Allow preprocess(...) with `keras.Input`s.
+
+        This is to support creating functional models via:
+        ```python
+        inputs = keras.Input(shape=(None), dtype="int32")
+        weights = keras.Input(shape=(None), dtype="float32")
+        preprocessed_inputs = distributed_embedding.preprocess(inputs, weights)
+        outputs = distributed_embedding(preprocessed_inputs)
+        model = keras.Model(inputs=preprocessed_inputs, outputs=outputs)
+        ```
+
+        Args:
+            inputs: SparseCore path->tensor input ID's tensors.
+            weights: Optional Sparsecore path->tensor input weights tensors.
+            training: Whether the layer is training or not.
+
+        Returns:
+            Symbolic preprocessed input tensors to the layer/model.
+        """
+        # Arguments are currently ignored since the input shape is governed
+        # by the stacked table configuration.
+        del inputs, weights, training
+
+        # Each stacked-table gets a ShardedCooMatrix.
+        table_specs = embedding_utils.get_table_specs(
+            self._config.feature_specs
+        )
+        table_stacks = embedding_utils.get_table_stacks(table_specs)
+        stacked_table_specs = {
+            stack_name: stack[0].stacked_table_spec
+            for stack_name, stack in table_stacks.items()
+        }
+
+        def _compute_table_output_spec(
+            stacked_table_spec: embedding_spec.StackedTableSpec,
+        ) -> embedding_utils.ShardedCooMatrix:
+            # The true shape of the components in the ShardedCooMatrix depends
+            # on the hardware configuration (# devices, sparsecores),
+            # properties of the input data (# max IDs, unique IDs), and other
+            # hints like a suggested internal buffer size.  Some of the
+            # calculations are currently a bit in flux as we experiment with
+            # memory trade-offs.  For the purposes of input/output sizes,
+            # however, the size could be viewed as dynamic 1D without affecting
+            # the output spec sizes.
+            del stacked_table_spec
+            return embedding_utils.ShardedCooMatrix(
+                # Mark these as `Input`s since that's how they will be used when
+                # constructing a functional Keras model.
+                shard_starts=keras.Input(shape=tuple(), dtype="int32"),
+                shard_ends=keras.Input(shape=tuple(), dtype="int32"),
+                col_ids=keras.Input(shape=tuple(), dtype="int32"),
+                row_ids=keras.Input(shape=tuple(), dtype="int32"),
+                values=keras.Input(shape=tuple(), dtype="float32"),
+            )
+
+        preprocessed = keras.tree.map_structure(
+            _compute_table_output_spec, stacked_table_specs
+        )
+
+        return {"inputs": preprocessed}
+
     def _sparsecore_preprocess(
         self,
         inputs: dict[str, types.Tensor],
@@ -572,6 +638,14 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
         if not self._sparsecore_built:
             self._sparsecore_build()
+
+        # Support symbolic KerasTensors (i.e. keras.Input).
+        if any(
+            isinstance(x, keras.KerasTensor) for x in keras.tree.flatten(inputs)
+        ):
+            return self._sparsecore_symbolic_preprocess(
+                inputs, weights, training
+            )
 
         samples = embedding_utils.create_feature_samples(
             self._config.feature_specs, inputs, weights

@@ -582,8 +582,8 @@ def stack_and_shard_samples(
     tables_names = preprocessed_inputs.lhs_row_pointers.keys()
     for table_name in tables_names:
         shard_ends = preprocessed_inputs.lhs_row_pointers[table_name]
-        shard_starts = jnp.concatenate(
-            [jnp.asarray([0]), _round_up_to_multiple(shard_ends[:-1], 8)]
+        shard_starts = np.concatenate(
+            [np.asarray([0]), _round_up_to_multiple(shard_ends[:-1], 8)]
         )
         out[table_name] = ShardedCooMatrix(
             shard_starts=shard_starts,

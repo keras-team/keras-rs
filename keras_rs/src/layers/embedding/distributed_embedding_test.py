@@ -15,6 +15,7 @@ from absl.testing import absltest
 from absl.testing import parameterized
 
 from keras_rs.src import testing
+from keras_rs.src import types
 from keras_rs.src.layers.embedding import distributed_embedding
 from keras_rs.src.layers.embedding import distributed_embedding_config as config
 
@@ -301,6 +302,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             )
         )
 
+        dataset_has_weights = use_weights
         if use_weights:
             train_model_inputs = (train_inputs, train_weights)
             test_model_inputs = (test_inputs, test_weights)
@@ -317,6 +319,34 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
 
         with self._strategy.scope():
             layer = distributed_embedding.DistributedEmbedding(feature_configs)
+
+        def _create_keras_input(
+            feature_config: config.FeatureConfig, dtype: types.DType
+        ) -> keras.KerasTensor:
+            # JAX doesn't allow us to directly mark an input as ragged, since
+            # Keras+JAX doesn't directly support ragged tensors.
+            # To work around this, instead mark ragged inputs as sparse on JAX.
+            ragged = input_type == "ragged" and keras.backend.backend() != "jax"
+            sparse = input_type == "sparse" or (
+                input_type == "ragged" and keras.backend.backend() == "jax"
+            )
+            return keras.layers.Input(
+                feature_config.input_shape[1:],
+                dtype=dtype,
+                ragged=ragged,
+                sparse=sparse,
+            )
+
+        keras_inputs = keras.tree.map_structure(
+            lambda fc: _create_keras_input(fc, "int32"),
+            feature_configs,
+        )
+        keras_weights = None
+        if use_weights:
+            keras_weights = keras.tree.map_structure(
+                lambda fc: _create_keras_input(fc, "float32"),
+                feature_configs,
+            )
 
         if keras.backend.backend() == "jax":
             # Set global distribution to ensure optimizer variables are
@@ -335,9 +365,8 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
 
             # Create a dataset generator that applies the preprocess function.
             # We need to create an intermediary tf_dataset to avoid
-            # self-references in the generator. Repeat data so we can shard
-            # across devices.
-            tf_train_dataset = train_dataset.repeat(16)
+            # self-references in the generator.
+            tf_train_dataset = train_dataset
 
             def train_dataset_generator():
                 for inputs, labels in iter(tf_train_dataset):
@@ -345,14 +374,19 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
 
             train_dataset = train_dataset_generator()
 
-            tf_test_dataset = test_dataset.repeat(16)
+            tf_test_dataset = test_dataset
 
             def test_dataset_generator():
                 for inputs, labels in iter(tf_test_dataset):
                     yield preprocess(inputs, labels)
 
             test_dataset = test_dataset_generator()
-            model = keras.Sequential([layer])
+
+            # Update model inputs.
+            keras_inputs = layer.preprocess(keras_inputs, keras_weights)
+            keras_weights = None
+            # New preprocessed data removes the `weights` component.
+            dataset_has_weights = False
         else:
             train_dataset = self._strategy.experimental_distribute_dataset(
                 train_dataset,
@@ -360,34 +394,14 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
                     experimental_fetch_to_device=False
                 ),
             )
-            keras_inputs = keras.tree.map_structure(
-                lambda fc: keras.layers.Input(
-                    fc.input_shape[1:],
-                    dtype="int32",
-                    sparse=input_type == "sparse",
-                    ragged=input_type == "ragged",
-                ),
-                feature_configs,
-            )
-            if use_weights:
-                keras_weights = keras.tree.map_structure(
-                    lambda fc: keras.layers.Input(
-                        fc.input_shape[1:],
-                        dtype="float32",
-                        sparse=input_type == "sparse",
-                        ragged=input_type == "ragged",
-                    ),
-                    feature_configs,
-                )
-                keras_model_inputs = (keras_inputs, keras_weights)
-            else:
-                keras_weights = None
-                keras_model_inputs = keras_inputs
 
-            keras_model_outputs = layer(keras_inputs, keras_weights)
-            model = keras.Model(
-                inputs=keras_model_inputs, outputs=keras_model_outputs
-            )
+        keras_model_inputs = keras_inputs
+        if dataset_has_weights:
+            keras_model_inputs = (keras_inputs, keras_weights)
+        keras_model_outputs = layer(keras_inputs, keras_weights)
+        model = keras.Model(
+            inputs=keras_model_inputs, outputs=keras_model_outputs
+        )
 
         with self._strategy.scope():
             model.compile(optimizer="adam", loss="mse")
@@ -397,7 +411,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
                 model.__call__, model_inputs
             )
 
-            model.fit(train_dataset, epochs=1)
+            model.fit(train_dataset, steps_per_epoch=1, epochs=1)
 
             test_output_after = self.run_with_strategy(
                 model.__call__, model_inputs
