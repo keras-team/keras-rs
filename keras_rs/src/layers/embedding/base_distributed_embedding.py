@@ -79,7 +79,12 @@ def _ragged_to_dense_inputs(
 
         return output, output_weights
 
-    # If not a ragged numpy array, return the original, unmodified.
+    # Convert symbolic ragged/sparse keras tensors to dense tensors.
+    if isinstance(x, keras.KerasTensor) and (x.ragged or x.sparse):
+        inputs = keras.ops.convert_to_tensor(x, ragged=False)
+        weights = keras.ops.convert_to_tensor(x, dtype="float32", ragged=False)
+
+    # If not a ragged array, return the original, unmodified.
     return inputs, weights
 
 
@@ -690,6 +695,15 @@ class DistributedEmbedding(keras.layers.Layer):
         }
         return output
 
+    def _is_preprocessed(
+        self, inputs: types.Nested[types.Tensor | types.Shape]
+    ) -> bool:
+        """Checks if the input is already preprocessed."""
+        return (
+            isinstance(inputs, dict)
+            and "preprocessed_inputs_per_placement" in inputs
+        )
+
     def call(
         self,
         inputs: types.Nested[types.Tensor],
@@ -715,10 +729,7 @@ class DistributedEmbedding(keras.layers.Layer):
         """
         preprocessed_inputs = inputs
         # Preprocess if not already done.
-        if (
-            not isinstance(inputs, dict)
-            or "preprocessed_inputs_per_placement" not in inputs
-        ):
+        if not self._is_preprocessed(inputs):
             preprocessed_inputs = self.preprocess(inputs, weights, training)
 
         preprocessed_inputs = typing.cast(
@@ -1034,6 +1045,22 @@ class DistributedEmbedding(keras.layers.Layer):
         Args:
           input_shapes: The structure of input shapes to verify.
         """
+        # Support preprocessing.
+        if self._is_preprocessed(input_shapes):
+            # Structure should be :
+            # {
+            #   placement: {
+            #     inputs: {path: Any},
+            #     weights: {path: Any}
+            #   }
+            # }
+            #
+            # But the `Any` values could be nested tensors with varying
+            # structure, depending on hardware constraints.  This complicates
+            # checking shapes via keras.tree methods.  So, assume the
+            # input is a result of explicitly calling the `preprocess(...)`
+            # function, in which case the structure has already been verified.
+            return
 
         def _verify_input_shape(
             feature_config: FeatureConfig,
