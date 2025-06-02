@@ -347,12 +347,6 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
         return table_variable, slot_variables
 
-    def _has_sparsecore(self) -> bool:
-        device_kind = jax.devices()[0].device_kind
-        if device_kind in ["TPU v5", "TPU v6 lite"]:
-            return True
-        return False
-
     @keras_utils.no_automatic_dependency_tracking
     def _sparsecore_init(
         self,
