@@ -1,4 +1,5 @@
 import collections
+import importlib.util
 import typing
 from typing import Any, Sequence
 
@@ -304,7 +305,7 @@ class DistributedEmbedding(keras.layers.Layer):
     To use `DistributedEmbedding` on TPUs with JAX, one must create and set a
     Keras `Distribution`.
     ```
-    distribution = keras.distribution.DataParallel(devices=jax.device("tpu))
+    distribution = keras.distribution.DataParallel(devices=jax.device("tpu"))
     keras.distribution.set_distribution(distribution)
     ```
 
@@ -901,6 +902,24 @@ class DistributedEmbedding(keras.layers.Layer):
         return tables
 
     def _has_sparsecore(self) -> bool:
+        # Explicitly check for SparseCore availability.
+        # We need this check here rather than in jax/distributed_embedding.py
+        # so that we can warn the user about missing dependencies.
+        if keras.backend.backend() == "jax":
+            # Check if SparseCores are available.
+            try:
+                import jax
+
+                tpu_devices = jax.devices("tpu")
+            except RuntimeError:
+                # No TPUs available.
+                return False
+
+            if len(tpu_devices) > 0:
+                device_kind = tpu_devices[0].device_kind
+                if device_kind in ["TPU v5", "TPU v6 lite"]:
+                    return True
+
         return False
 
     def _sparsecore_init(
@@ -909,6 +928,17 @@ class DistributedEmbedding(keras.layers.Layer):
         table_stacking: str | Sequence[Sequence[str]],
     ) -> None:
         del feature_configs, table_stacking
+
+        if keras.backend.backend() == "jax":
+            jax_tpu_embedding_spec = importlib.util.find_spec(
+                "jax_tpu_embedding"
+            )
+            if jax_tpu_embedding_spec is None:
+                raise ImportError(
+                    "Please install jax-tpu-embedding to use "
+                    "DistributedEmbedding on sparsecore devices."
+                )
+
         raise self._unsupported_placement_error("sparsecore")
 
     def _sparsecore_build(self, input_shapes: dict[str, types.Shape]) -> None:
