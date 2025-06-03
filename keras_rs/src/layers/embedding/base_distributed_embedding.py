@@ -1,8 +1,10 @@
 import collections
+import importlib.util
 import typing
-from typing import Any, Optional, Sequence, Union
+from typing import Any, Sequence
 
 import keras
+import numpy as np
 from keras.src import backend
 
 from keras_rs.src import types
@@ -23,6 +25,70 @@ PlacementAndPath = collections.namedtuple(
 )
 
 
+def _ragged_to_dense_inputs(
+    inputs: Any, weights: Any | None = None, dense_row_length: int | None = None
+) -> Any:
+    """Converts a ragged set of inputs and weights to dense.
+
+    If inputs are ragged and weights are `None`, will create a dense set of
+    weights to mask out the new padded values.
+
+    If inputs are not ragged, returns the original `inputs` and `weights`
+    unmodified.
+
+    Args:
+        inputs: The inputs array.
+        weights: The optional weights array.
+        dense_row_length: The output dense row length.  If None, uses the length
+             of the longest row of the input.
+
+    Returns:
+        Tuple of new (inputs, weights).  If the input is a ragged array, returns
+        dense numpy arrays. Otherwise, returns the original input and weights.
+    """
+    x = inputs
+    w = weights
+    # tf.Ragged or other .numpy()-able types.
+    if hasattr(x, "numpy") and callable(getattr(x, "numpy")):
+        x = x.numpy()
+
+    # Ragged numpy array to dense numpy array.
+    if isinstance(x, np.ndarray) and len(x) > 0 and x.dtype == np.ndarray:
+        # Maybe convert weights to numpy.
+        if (
+            w is not None
+            and hasattr(w, "numpy")
+            and callable(getattr(w, "numpy"))
+        ):
+            w = w.numpy()
+
+        if dense_row_length is None:
+            # Use length of longest row.
+            dense_row_length = max([len(row) for row in x])
+
+        output = np.zeros((len(x), dense_row_length), dtype=x[0].dtype)
+        for i, row in enumerate(x):
+            output[i, : len(row)] = row
+
+        output_weights = np.zeros((len(x), dense_row_length), dtype=np.float32)
+        if w is None:
+            for i, row in enumerate(x):
+                output_weights[i, : len(row)] = 1.0
+        else:
+            for i, row in enumerate(w):
+                output_weights[i, : len(row)] = row
+
+        return output, output_weights
+
+    # Convert symbolic ragged/sparse keras tensors to dense tensors.
+    if isinstance(x, keras.KerasTensor) and (x.ragged or x.sparse):
+        inputs = keras.ops.convert_to_tensor(x, ragged=False)
+        weights = keras.ops.convert_to_tensor(x, dtype="float32", ragged=False)
+
+    # If not a ragged array, return the original, unmodified.
+    return inputs, weights
+
+
 class DistributedEmbedding(keras.layers.Layer):
     """DistributedEmbedding, a layer for accelerated large embedding lookups.
 
@@ -32,7 +98,25 @@ class DistributedEmbedding(keras.layers.Layer):
 
     ---
 
-    ## Configuration
+    `DistributedEmbedding` is a layer optimized for TPU chips with SparseCore
+    and can dramatically improve the speed of embedding lookups and embedding
+    training. It works by combining multiple lookups into one invocation, and by
+    sharding the embedding tables across the available chips. Note that one will
+    only see performance benefits for embedding tables that are large enough to
+    to require sharding because they don't fit on a single chip. More details
+    are provided in the "Placement" section below.
+
+    On other hardware, GPUs, CPUs and TPUs without SparseCore,
+    `DistributedEmbedding` provides the same API without any specific
+    acceleration. No particular distribution scheme is applied besides the one
+    set via `keras.distribution.set_distribution`.
+
+    `DistributedEmbedding` embeds sequences of inputs and reduces them to a
+    single embedding by applying a configurable combiner function.
+
+    ### Configuration
+
+    #### Features and tables
 
     A `DistributedEmbedding` embedding layer is configured via a set of
     `keras_rs.layers.FeatureConfig` objects, which themselves refer to
@@ -50,11 +134,13 @@ class DistributedEmbedding(keras.layers.Layer):
         name="table1",
         vocabulary_size=TABLE1_VOCABULARY_SIZE,
         embedding_dim=TABLE1_EMBEDDING_SIZE,
+        placement="auto",
     )
     table2 = keras_rs.layers.TableConfig(
         name="table2",
         vocabulary_size=TABLE2_VOCABULARY_SIZE,
         embedding_dim=TABLE2_EMBEDDING_SIZE,
+        placement="auto",
     )
 
     feature1 = keras_rs.layers.FeatureConfig(
@@ -78,21 +164,275 @@ class DistributedEmbedding(keras.layers.Layer):
     embedding = keras_rs.layers.DistributedEmbedding(feature_configs)
     ```
 
-    ## Optimizers
+    #### Optimizers
 
     Each embedding table within `DistributedEmbedding` uses its own optimizer
     for training, which is independent from the optimizer set on the model via
     `model.compile()`.
 
     Note that not all optimizers are supported. Currently, the following are
-    always supported (i.e. on all backends and accelerators):
+    supported on all backends and accelerators:
 
     - `keras.optimizers.Adagrad`
     - `keras.optimizers.SGD`
 
-    Additionally, not all parameters of the optimizers are supported (e.g. the
+    The following are additionally available when using the TensorFlow backend:
+
+    - `keras.optimizers.Adam`
+    - `keras.optimizers.Ftrl`
+
+    Also, not all parameters of the optimizers are supported (e.g. the
     `nesterov` option of `SGD`). An error is raised when an unsupported
     optimizer or an unsupported optimizer parameter is used.
+
+    #### Placement
+
+    Each embedding table within `DistributedEmbedding` can be either placed on
+    the SparseCore chip or the default device placement for the accelerator
+    (e.g. HBM of the Tensor Cores on TPU). This is controlled by the `placement`
+    attribute of `keras_rs.layers.TableConfig`.
+
+    - A placement of `"sparsecore"` indicates that the table should be placed on
+      the SparseCore chips. An error is raised if this option is selected and
+      there are no SparseCore chips.
+    - A placement of `"default_device"` indicates that the table should not be
+      placed on SparseCore, even if available. Instead the table is placed on
+      the device where the model normally goes, i.e. the HBM on TPUs and GPUs.
+      In this case, if applicable, the table is distributed using the scheme set
+      via `keras.distribution.set_distribution`. On GPUs, CPUs and TPUs without
+      SparseCore, this is the only placement available, and is the one selected
+      by `"auto"`.
+    - A placement of `"auto"` indicates to use `"sparsecore"` if available, and
+      `"default_device"` otherwise. This is the default when not specified.
+
+    To optimize performance on TPU:
+
+    - Tables that are so large that they need to be sharded should use the
+      `"sparsecore"` placement.
+    - Tables that are small enough should use `"default_device"` and should
+      typically be replicated across TPUs by using the
+      `keras.distribution.DataParallel` distribution option.
+
+    ### Usage with TensorFlow on TPU with SpareCore
+
+    #### Inputs
+
+    In addition to `tf.Tensor`, `DistributedEmbedding` accepts `tf.RaggedTensor`
+    and `tf.SparseTensor` as inputs for the embedding lookups. Ragged tensors
+    must be ragged in the dimension with index 1. Note that if weights are
+    passed, each weight tensor must be of the same class as the inputs for that
+    particular feature and use the exact same ragged row lenghts for ragged
+    tensors, and the same indices for sparse tensors. All the output of
+    `DistributedEmbedding` are dense tensors.
+
+    #### Setup
+
+    To use `DistributedEmbedding` on TPUs with TensorFlow, one must use a
+    `tf.distribute.TPUStrategy`. The `DistributedEmbedding` layer must be
+    created under the `TPUStrategy`.
+
+    ```python
+    resolver = tf.distribute.cluster_resolver.TPUClusterResolver(tpu="local")
+    topology = tf.tpu.experimental.initialize_tpu_system(resolver)
+    device_assignment = tf.tpu.experimental.DeviceAssignment.build(
+        topology, num_replicas=resolver.get_tpu_system_metadata().num_cores
+    )
+    strategy = tf.distribute.TPUStrategy(
+        resolver, experimental_device_assignment=device_assignment
+    )
+
+    with strategy.scope():
+        embedding = keras_rs.layers.DistributedEmbedding(feature_configs)
+    ```
+
+    #### Usage in a Keras model
+
+    To use Keras' `model.fit()`, one must compile the model under the
+    `TPUStrategy`. Then, `model.fit()`, `model.evaluate()` or `model.predict()`
+    can be called directly. The Keras model takes care of running the model
+    using the strategy and also automatically distributes the dataset.
+
+    ```python
+    with strategy.scope():
+        embedding = keras_rs.layers.DistributedEmbedding(feature_configs)
+        model = create_model(embedding)
+        model.compile(loss=keras.losses.MeanSquaredError(), optimizer="adam")
+
+    model.fit(dataset, epochs=10)
+    ```
+
+    #### Direct invocation
+
+    `DistributedEmbedding` must be invoked via a `strategy.run` call nested in a
+    `tf.function`.
+
+    ```python
+    @tf.function
+    def embedding_wrapper(tf_fn_inputs, tf_fn_weights=None):
+        def strategy_fn(st_fn_inputs, st_fn_weights):
+            return embedding(st_fn_inputs, st_fn_weights)
+
+        return strategy.run(strategy_fn, args=(tf_fn_inputs, tf_fn_weights)))
+
+    embedding_wrapper(my_inputs, my_weights)
+    ```
+
+    When using a dataset, the dataset must be distributed. The iterator can then
+    be passed to the `tf.function` that uses `strategy.run`.
+
+    ```python
+    dataset = strategy.experimental_distribute_dataset(dataset)
+
+    @tf.function
+    def run_loop(iterator):
+        def step(data):
+            (inputs, weights), labels = data
+            with tf.GradientTape() as tape:
+                result = embedding(inputs, weights)
+                loss = keras.losses.mean_squared_error(labels, result)
+            tape.gradient(loss, embedding.trainable_variables)
+            return result
+
+        for _ in tf.range(4):
+            result = strategy.run(step, args=(next(iterator),))
+
+    run_loop(iter(dataset))
+
+    ### Usage with JAX on TPU with SpareCore
+
+    #### Setup
+
+    To use `DistributedEmbedding` on TPUs with JAX, one must create and set a
+    Keras `Distribution`.
+    ```
+    distribution = keras.distribution.DataParallel(devices=jax.device("tpu"))
+    keras.distribution.set_distribution(distribution)
+    ```
+
+    #### Inputs
+
+    For JAX, inputs can either be dense tensors, or ragged (nested) NumPy
+    arrays.  To enable `jit_compile = True`, one must explicitly call
+    `layer.preprocess(...)` on the inputs, and then feed the preprocessed
+    output to the model.  See the next section on preprocessing for details.
+
+    Ragged input arrays must be ragged in the dimension with index 1. Note that
+    if weights are passed, each weight tensor must be of the same class as the
+    inputs for that particular feature and use the exact same ragged row lengths
+    for ragged tensors. All the output of `DistributedEmbedding` are dense
+    tensors.
+
+    #### Preprocessing
+
+    In JAX, SparseCore usage requires specially formatted data that depends
+    on properties of the available hardware.  This data reformatting
+    currently does not support jit-compilation, so must be applied _prior_
+    to passing data into a model.
+
+    Preprocessing works on dense or ragged NumPy arrays, or on tensors that are
+    convertible to dense or ragged NumPy arrays like `tf.RaggedTensor`.
+
+    One simple way to add preprocessing is to append the function to an input
+    pipeline by using a python generator.
+    ```python
+    # Create the embedding layer.
+    embedding_layer = DistributedEmbedding(feature_configs)
+
+    # Add preprocessing to a data input pipeline.
+    def train_dataset_generator():
+        for (inputs, weights), labels in iter(train_dataset):
+            yield embedding_layer.preprocess(
+                inputs, weights, training=True
+            ), labels
+
+    preprocessed_train_dataset = train_dataset_generator()
+    ```
+    This explicit preprocessing stage combines the input and optional weights,
+    so the new data can be passed directly into the `inputs` argument of the
+    layer or model.
+
+    #### Usage in a Keras model
+
+    Once the global distribution is set and the input preprocessing pipeline
+    is defined, model training can proceed as normal.  For example:
+    ```python
+    # Construct, compile, and fit the model using the preprocessed data.
+    model = keras.Sequential(
+      [
+        embedding_layer,
+        keras.layers.Dense(2),
+        keras.layers.Dense(3),
+        keras.layers.Dense(4),
+      ]
+    )
+    model.compile(optimizer="adam", loss="mse", jit_compile=True)
+    model.fit(preprocessed_train_dataset, epochs=10)
+    ```
+
+    #### Direct invocation
+
+    The `DistributedEmbedding` layer can also be invoked directly.  Explicit
+    preprocessing is required when used with JIT compilation.
+    ```python
+    # Call the layer directly.
+    activations = embedding_layer(my_inputs, my_weights)
+
+    # Call the layer with JIT compilation and explicitly preprocessed inputs.
+    embedding_layer_jit = jax.jit(embedding_layer)
+    preprocessed_inputs = embedding_layer.preprocess(my_inputs, my_weights)
+    activations = embedding_layer_jit(preprocessed_inputs)
+    ```
+
+    Similarly, for custom training loops, preprocessing must be applied prior
+    to passing the data to the JIT-compiled training step.
+    ```python
+    # Create an optimizer and loss function.
+    optimizer = keras.optimizers.Adam(learning_rate=1e-3)
+
+    def loss_and_updates(trainable_variables, non_trainable_variables, x, y):
+        y_pred, non_trainable_variables = model.stateless_call(
+            trainable_variables, non_trainable_variables, x, training=True
+        )
+        loss = keras.losses.mean_squared_error(y, y_pred)
+        return loss, non_trainable_variables
+
+    grad_fn = jax.value_and_grad(loss_and_updates, has_aux=True)
+
+    # Create a JIT-compiled training step.
+    @jax.jit
+    def train_step(state, x, y):
+        (
+          trainable_variables,
+          non_trainable_variables,
+          optimizer_variables,
+        ) = state
+        (loss, non_trainable_variables), grads = grad_fn(
+            trainable_variables, non_trainable_variables, x, y
+        )
+        trainable_variables, optimizer_variables = optimizer.stateless_apply(
+            optimizer_variables, grads, trainable_variables
+        )
+        return loss, (
+            trainable_variables,
+            non_trainable_variables,
+            optimizer_variables,
+        )
+
+    # Build optimizer variables.
+    optimizer.build(model.trainable_variables)
+
+    # Assemble the training state.
+    trainable_variables = model.trainable_variables
+    non_trainable_variables = model.non_trainable_variables
+    optimizer_variables = optimizer.variables
+    state = trainable_variables, non_trainable_variables, optimizer_variables
+
+    # Training loop.
+    for (inputs, weights), labels in train_dataset:
+        # Explicitly preprocess the data.
+        preprocessed_inputs = embedding_layer.preprocess(inputs, weights)
+        loss, state = train_step(state, preprocessed_inputs, labels)
+    ```
 
     Args:
         feature_configs: A nested structure of `keras_rs.layers.FeatureConfig`.
@@ -109,9 +449,9 @@ class DistributedEmbedding(keras.layers.Layer):
         self,
         feature_configs: types.Nested[FeatureConfig],
         *,
-        table_stacking: Union[
-            str, Sequence[str], Sequence[Sequence[str]]
-        ] = "auto",
+        table_stacking: (
+            str | Sequence[str] | Sequence[Sequence[str]]
+        ) = "auto",
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -267,46 +607,14 @@ class DistributedEmbedding(keras.layers.Layer):
     def preprocess(
         self,
         inputs: types.Nested[types.Tensor],
-        weights: Optional[types.Nested[types.Tensor]] = None,
+        weights: types.Nested[types.Tensor] | None = None,
         training: bool = False,
     ) -> types.Nested[types.Tensor]:
         """Preprocesses and reformats the data for consumption by the model.
 
-        Calling `preprocess` explicitly is only required to enable `sparsecore`
-        placement with the JAX backend and `jit_compile = True`.  For all other
-        cases and backends, explicit use of `preprocess` is optional.
-
-        In JAX, sparsecore usage requires specially formatted data that depends
-        on properties of the available hardware.  This data reformatting
-        currently does not support jit-compilation, so must be applied _prior_
-        to feeding data into a model.
-
-        An example usage might look like:
-        ```
-        # Create the embedding layer.
-        embedding_layer = DistributedEmbedding(feature_configs)
-
-        # Add preprocessing to a data input pipeline.
-        def training_dataset_generator():
-            for (inputs, weights), labels in iter(training_dataset):
-                yield embedding_layer.preprocess(
-                    inputs, weights, training=True
-                ), labels
-
-        preprocessed_training_dataset = training_dataset_generate()
-
-        # Construct, compile, and fit the model using the preprocessed data.
-        model = keras.Sequential(
-          [
-            embedding_layer,
-            keras.layers.Dense(2),
-            keras.layers.Dense(3),
-            keras.layers.Dense(4),
-          ]
-        )
-        model.compile(optimizer="adam", loss="mse", jit_compile=True)
-        model.fit(preprocessed_training_dataset, epochs=10)
-        ```
+        For the JAX backend, converts the input data to a hardward-dependent
+        format required for use with SparseCores.  Calling `preprocess`
+        explicitly is only necessary to enable `jit_compile = True`.
 
         For non-JAX backends, preprocessing will bundle together the inputs and
         weights, and separate the inputs by device placement.  This step is
@@ -355,7 +663,7 @@ class DistributedEmbedding(keras.layers.Layer):
             }
 
         placement_to_path_to_preprocessed: dict[
-            str, dict[str, types.Nested[types.Tensor]]
+            str, dict[str, dict[str, types.Nested[types.Tensor]]]
         ] = {}
 
         # Preprocess for features placed on "sparsecore".
@@ -388,10 +696,19 @@ class DistributedEmbedding(keras.layers.Layer):
         }
         return output
 
+    def _is_preprocessed(
+        self, inputs: types.Nested[types.Tensor | types.Shape]
+    ) -> bool:
+        """Checks if the input is already preprocessed."""
+        return (
+            isinstance(inputs, dict)
+            and "preprocessed_inputs_per_placement" in inputs
+        )
+
     def call(
         self,
         inputs: types.Nested[types.Tensor],
-        weights: Optional[types.Nested[types.Tensor]] = None,
+        weights: types.Nested[types.Tensor] | None = None,
         training: bool = False,
     ) -> types.Nested[types.Tensor]:
         """Lookup features in embedding tables and apply reduction.
@@ -413,10 +730,7 @@ class DistributedEmbedding(keras.layers.Layer):
         """
         preprocessed_inputs = inputs
         # Preprocess if not already done.
-        if (
-            not isinstance(inputs, dict)
-            or "preprocessed_inputs_per_placement" not in inputs
-        ):
+        if not self._is_preprocessed(inputs):
             preprocessed_inputs = self.preprocess(inputs, weights, training)
 
         preprocessed_inputs = typing.cast(
@@ -431,21 +745,19 @@ class DistributedEmbedding(keras.layers.Layer):
 
         # Call for features placed on "sparsecore".
         if "sparsecore" in preprocessed_inputs:
-            paths_to_inputs_and_weights = preprocessed_inputs["sparsecore"]
+            inputs_and_weights = preprocessed_inputs["sparsecore"]
             placement_to_path_to_outputs["sparsecore"] = self._sparsecore_call(
-                paths_to_inputs_and_weights["inputs"],
-                paths_to_inputs_and_weights.get("weights", None),
-                training,
+                **inputs_and_weights,
+                training=training,
             )
 
         # Call for features placed on "default_device".
         if "default_device" in preprocessed_inputs:
-            paths_to_inputs_and_weights = preprocessed_inputs["default_device"]
+            inputs_and_weights = preprocessed_inputs["default_device"]
             placement_to_path_to_outputs["default_device"] = (
                 self._default_device_call(
-                    paths_to_inputs_and_weights["inputs"],
-                    paths_to_inputs_and_weights.get("weights", None),
-                    training,
+                    **inputs_and_weights,
+                    training=training,
                 )
             )
 
@@ -480,8 +792,8 @@ class DistributedEmbedding(keras.layers.Layer):
 
     def _default_device_init(
         self,
-        feature_configs: dict[str, Union[FeatureConfig]],
-        table_stacking: Union[str, Sequence[Sequence[str]]],
+        feature_configs: dict[str, FeatureConfig],
+        table_stacking: str | Sequence[Sequence[str]],
     ) -> None:
         del table_stacking
         table_to_embedding_layer: dict[TableConfig, EmbedReduce] = {}
@@ -514,10 +826,45 @@ class DistributedEmbedding(keras.layers.Layer):
     def _default_device_preprocess(
         self,
         inputs: dict[str, types.Tensor],
-        weights: Optional[dict[str, types.Tensor]],
+        weights: dict[str, types.Tensor] | None,
         training: bool = False,
-    ) -> dict[str, types.Tensor]:
+    ) -> dict[str, dict[str, types.Tensor]]:
         del training
+
+        # NOTE: This JAX specialization is in the base layer so it is available
+        #       on all platforms.  The superclass jax.DistributedEmbedding layer
+        #       is currently only imported in linux_x86_64.
+        if keras.backend.backend() == "jax":
+            feature_configs = self._placement_to_path_to_feature_config[
+                "default_device"
+            ]
+
+            # Potentially track new weights.  For ragged inputs, if we
+            # densify, we will generate a dense weight tensor.
+            new_weights: dict[str, types.Tensor] = {}
+            use_weights = weights is not None
+
+            # Convert any ragged inputs to dense.
+            for path, config in feature_configs.items():
+                feature_inputs = inputs[path]
+                feature_weights = weights[path] if weights is not None else None
+
+                feature_valence = (
+                    None
+                    if len(config.input_shape) <= 1
+                    else config.input_shape[1]
+                )
+                feature_inputs, feature_weights = _ragged_to_dense_inputs(
+                    feature_inputs, feature_weights, feature_valence
+                )
+                # Converting to ragged may have introduced a weights array.
+                use_weights = use_weights or feature_weights is not None
+                inputs[path] = feature_inputs
+                new_weights[path] = feature_weights
+
+            if use_weights:
+                weights = new_weights
+
         output: dict[str, types.Tensor] = {"inputs": inputs}
         if weights is not None:
             output["weights"] = weights
@@ -527,7 +874,7 @@ class DistributedEmbedding(keras.layers.Layer):
     def _default_device_call(
         self,
         inputs: dict[str, types.Tensor],
-        weights: Optional[dict[str, types.Tensor]] = None,
+        weights: dict[str, types.Tensor] | None = None,
         training: bool = False,
     ) -> dict[str, types.Tensor]:
         del training  # Unused by default.
@@ -555,14 +902,43 @@ class DistributedEmbedding(keras.layers.Layer):
         return tables
 
     def _has_sparsecore(self) -> bool:
+        # Explicitly check for SparseCore availability.
+        # We need this check here rather than in jax/distributed_embedding.py
+        # so that we can warn the user about missing dependencies.
+        if keras.backend.backend() == "jax":
+            # Check if SparseCores are available.
+            try:
+                import jax
+
+                tpu_devices = jax.devices("tpu")
+            except RuntimeError:
+                # No TPUs available.
+                return False
+
+            if len(tpu_devices) > 0:
+                device_kind = tpu_devices[0].device_kind
+                if device_kind in ["TPU v5", "TPU v6 lite"]:
+                    return True
+
         return False
 
     def _sparsecore_init(
         self,
         feature_configs: dict[str, FeatureConfig],
-        table_stacking: Union[str, Sequence[Sequence[str]]],
+        table_stacking: str | Sequence[Sequence[str]],
     ) -> None:
         del feature_configs, table_stacking
+
+        if keras.backend.backend() == "jax":
+            jax_tpu_embedding_spec = importlib.util.find_spec(
+                "jax_tpu_embedding"
+            )
+            if jax_tpu_embedding_spec is None:
+                raise ImportError(
+                    "Please install jax-tpu-embedding to use "
+                    "DistributedEmbedding on sparsecore devices."
+                )
+
         raise self._unsupported_placement_error("sparsecore")
 
     def _sparsecore_build(self, input_shapes: dict[str, types.Shape]) -> None:
@@ -572,9 +948,9 @@ class DistributedEmbedding(keras.layers.Layer):
     def _sparsecore_preprocess(
         self,
         inputs: dict[str, types.Tensor],
-        weights: Optional[dict[str, types.Tensor]],
+        weights: dict[str, types.Tensor] | None,
         training: bool = False,
-    ) -> dict[str, types.Tensor]:
+    ) -> dict[str, dict[str, types.Tensor]]:
         del training
         output: dict[str, types.Tensor] = {"inputs": inputs}
         if weights is not None:
@@ -585,7 +961,7 @@ class DistributedEmbedding(keras.layers.Layer):
     def _sparsecore_call(
         self,
         inputs: dict[str, types.Tensor],
-        weights: Optional[dict[str, types.Tensor]] = None,
+        weights: dict[str, types.Tensor] | None = None,
         training: bool = False,
     ) -> dict[str, types.Tensor]:
         del inputs, weights, training
@@ -653,13 +1029,13 @@ class DistributedEmbedding(keras.layers.Layer):
         # The serialized `TableConfig` objects.
         table_config_dicts: list[dict[str, Any]] = config.pop("tables")
         # The deserialized `TableConfig` objects at the same indices.
-        table_configs: list[Optional[TableConfig]] = [None] * len(
+        table_configs: list[TableConfig | None] = [None] * len(
             table_config_dicts
         )
 
         def deserialize_feature_config(
             feature_config_dict: dict[str, Any],
-        ) -> Optional[FeatureConfig]:
+        ) -> FeatureConfig | None:
             # Look for a "name" attribute which is a string to detect a
             # `FeatureConfig` leaf node. If not, keep recursing.
             if "name" not in feature_config_dict or not isinstance(
@@ -699,6 +1075,22 @@ class DistributedEmbedding(keras.layers.Layer):
         Args:
           input_shapes: The structure of input shapes to verify.
         """
+        # Support preprocessing.
+        if self._is_preprocessed(input_shapes):
+            # Structure should be :
+            # {
+            #   placement: {
+            #     inputs: {path: Any},
+            #     weights: {path: Any}
+            #   }
+            # }
+            #
+            # But the `Any` values could be nested tensors with varying
+            # structure, depending on hardware constraints.  This complicates
+            # checking shapes via keras.tree methods.  So, assume the
+            # input is a result of explicitly calling the `preprocess(...)`
+            # function, in which case the structure has already been verified.
+            return
 
         def _verify_input_shape(
             feature_config: FeatureConfig,

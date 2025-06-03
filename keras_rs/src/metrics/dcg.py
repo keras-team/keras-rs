@@ -1,4 +1,4 @@
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from keras import ops
 from keras.saving import deserialize_keras_object
@@ -25,7 +25,7 @@ from keras_rs.src.utils.doc_string_utils import format_docstring
 class DCG(RankingMetric):
     def __init__(
         self,
-        k: Optional[int] = None,
+        k: int | None = None,
         gain_fn: Callable[[types.Tensor], types.Tensor] = default_gain_fn,
         rank_discount_fn: Callable[
             [types.Tensor], types.Tensor

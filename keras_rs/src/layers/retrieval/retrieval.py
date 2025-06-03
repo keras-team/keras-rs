@@ -1,5 +1,5 @@
 import abc
-from typing import Any, Optional, Union
+from typing import Any
 
 import keras
 
@@ -35,7 +35,7 @@ class Retrieval(keras.layers.Layer, abc.ABC):
     def _validate_candidate_embeddings_and_ids(
         self,
         candidate_embeddings: types.Tensor,
-        candidate_ids: Optional[types.Tensor] = None,
+        candidate_ids: types.Tensor | None = None,
     ) -> None:
         """Validates inputs to `update_candidates()`."""
 
@@ -71,7 +71,7 @@ class Retrieval(keras.layers.Layer, abc.ABC):
     def update_candidates(
         self,
         candidate_embeddings: types.Tensor,
-        candidate_ids: Optional[types.Tensor] = None,
+        candidate_ids: types.Tensor | None = None,
     ) -> None:
         """Update the set of candidates and optionally their candidate IDs.
 
@@ -85,7 +85,7 @@ class Retrieval(keras.layers.Layer, abc.ABC):
     @abc.abstractmethod
     def call(
         self, inputs: types.Tensor
-    ) -> Union[types.Tensor, tuple[types.Tensor, types.Tensor]]:
+    ) -> types.Tensor | tuple[types.Tensor, types.Tensor]:
         """Returns the top candidates for the query passed as input.
 
         Args:

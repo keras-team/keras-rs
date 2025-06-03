@@ -29,7 +29,7 @@ class RetrievalTest(testing.TestCase, parameterized.TestCase):
             "embeddings_smaller_than_k",
             keras.random.normal(shape=(3, 10)),
             None,
-            "The number of candidates provided \(3\) is less than",
+            "The number of candidates provided \\(3\\) is less than",
         ),
         (
             "embeddings_ids_shape",

@@ -1,5 +1,3 @@
-from typing import Optional
-
 from keras import ops
 
 from keras_rs.src import types
@@ -20,7 +18,7 @@ class PairwiseMeanSquaredError(PairwiseLoss):
         self,
         labels: types.Tensor,
         logits: types.Tensor,
-        mask: Optional[types.Tensor] = None,
+        mask: types.Tensor | None = None,
     ) -> tuple[types.Tensor, types.Tensor]:
         # Override `PairwiseLoss.compute_unreduced_loss` since pairwise weights
         # for MSE are computed differently.

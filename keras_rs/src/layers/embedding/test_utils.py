@@ -1,31 +1,24 @@
 """Useful utilities for tests."""
 
 import typing
-from typing import (
-    Any,
-    Callable,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import Any, Callable, Mapping, Sequence, TypeAlias
 
 import keras
 import numpy as np
 
-from keras_rs.src.layers.embedding import distributed_embedding_config as config
+from keras_rs.src.layers.embedding.distributed_embedding_config import (
+    FeatureConfig,
+)
+from keras_rs.src.layers.embedding.distributed_embedding_config import (
+    TableConfig,
+)
 from keras_rs.src.types import Nested
 
-T = TypeVar("T")
-RandomSeed = Union[int, keras.random.SeedGenerator]
-FeatureConfig = config.FeatureConfig
-TableConfig = config.TableConfig
-AnyNdArray = np.ndarray[Any, Any]
+RandomSeed: TypeAlias = int | keras.random.SeedGenerator
+AnyNdArray: TypeAlias = np.ndarray[Any, Any]
 
 
-def _make_rng(seed: Optional[RandomSeed]) -> keras.random.SeedGenerator:
+def _make_rng(seed: RandomSeed | None) -> keras.random.SeedGenerator:
     """Make a seed generator for use in generating random configurations."""
     if seed is None:
         seed = keras.random.SeedGenerator()
@@ -38,13 +31,13 @@ def create_random_table_configs(
     count: int = 3,
     max_vocabulary_size: int = 1024,
     max_embedding_dim: int = 128,
-    initializer: Optional[Union[str, keras.initializers.Initializer]] = None,
-    optimizer: Union[str, keras.optimizers.Optimizer] = "sgd",
+    initializer: str | keras.initializers.Initializer | None = None,
+    optimizer: str | keras.optimizers.Optimizer = "sgd",
     combiner: str = "mean",
     placement: str = "auto",
     max_ids_per_partition: int = 256,
     max_unique_ids_per_partition: int = 256,
-    seed: Optional[RandomSeed] = None,
+    seed: RandomSeed | None = None,
     name_prefix: str = "table",
 ) -> list[TableConfig]:
     """Creates a list of random TableConfigs for use in tests.
@@ -95,10 +88,11 @@ def create_random_table_configs(
 
 
 def create_random_feature_configs(
-    table_configs: Optional[Sequence[TableConfig]] = None,
+    table_configs: Sequence[TableConfig] | None = None,
     max_features_per_table: int = 3,
     batch_size: int = 16,
-    seed: Optional[RandomSeed] = None,
+    max_ids_per_sample: int | None = None,
+    seed: RandomSeed | None = None,
     name_prefix: str = "feature",
 ) -> list[FeatureConfig]:
     """Creates a list of random FeatureConfigs for tests.
@@ -109,6 +103,7 @@ def create_random_feature_configs(
         max_features_per_table: Maximum number of features to generate per
             table.  At least one feature will be generated regardless.
         batch_size: Input batch size for the feature.
+        max_ids_per_sample: Maximum number of IDs per sample row.
         seed: Random seed for generating features.
         name_prefix: Prefix for feature name.  The overall feature name will be
             `{table.name}:{name_prefix}:{feature_index}` if
@@ -137,7 +132,7 @@ def create_random_feature_configs(
                     table=table,
                     input_shape=(
                         batch_size,
-                        None,  # Ragged?  JTE never reads the 2nd dim size.
+                        max_ids_per_sample,
                     ),
                     output_shape=(batch_size, table.embedding_dim),
                 )
@@ -150,8 +145,8 @@ def create_random_samples(
     feature_configs: Nested[FeatureConfig],
     ragged: bool = True,
     max_ids_per_sample: int = 20,
-    seed: Optional[RandomSeed] = None,
-) -> Tuple[Nested[AnyNdArray], Nested[AnyNdArray]]:
+    seed: RandomSeed | None = None,
+) -> tuple[Nested[AnyNdArray], Nested[AnyNdArray]]:
     """Creates random feature samples.
 
     Args:
@@ -169,11 +164,13 @@ def create_random_samples(
 
     def _generate_samples(
         feature_config: FeatureConfig,
-    ) -> Tuple[AnyNdArray, AnyNdArray]:
+    ) -> tuple[AnyNdArray, AnyNdArray]:
         batch_size = typing.cast(int, feature_config.input_shape[0])
         vocabulary_size = feature_config.table.vocabulary_size
+        # Use value from feature_config if available.
+        sample_length = feature_config.input_shape[1] or max_ids_per_sample
         counts = keras.random.randint(
-            shape=(batch_size,), minval=0, maxval=max_ids_per_sample, seed=seed
+            shape=(batch_size,), minval=0, maxval=sample_length, seed=seed
         )
         sample_ids = []
         sample_weights = []
@@ -202,20 +199,20 @@ def create_random_samples(
                 )
             else:
                 ids = keras.random.randint(
-                    shape=(max_ids_per_sample,),
+                    shape=(sample_length,),
                     minval=0,
                     maxval=vocabulary_size,
                     seed=seed,
                 )
                 weights = keras.random.uniform(
-                    shape=(max_ids_per_sample,),
+                    shape=(sample_length,),
                     minval=0,
                     maxval=1,
                     seed=seed,
                     dtype="float32",
                 )
                 # Mask-out tail of dense samples.
-                idx = keras.ops.arange(max_ids_per_sample)
+                idx = keras.ops.arange(sample_length)
                 ids = keras.ops.where(idx <= counts[i], ids, 0)
                 weights = keras.ops.where(idx <= counts[i], weights, 0)
                 sample_ids.append(np.asarray(ids))
@@ -337,7 +334,7 @@ class RandomInputSampleDataset(keras.utils.PyDataset):
         max_ids_per_sample: int = 20,
         num_batches: int = 1000,
         seed: int = 0,
-        preprocessor: Optional[Callable[..., Any]] = None,
+        preprocessor: Callable[..., Any] | None = None,
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
@@ -354,7 +351,7 @@ class RandomInputSampleDataset(keras.utils.PyDataset):
     def __len__(self) -> int:
         return self._num_batches
 
-    def __getitem__(self, idx: int) -> Tuple[Any, Any]:
+    def __getitem__(self, idx: int) -> tuple[Any, Any]:
         sample_ids, sample_weights = create_random_samples(
             self._feature_configs,
             self._ragged,

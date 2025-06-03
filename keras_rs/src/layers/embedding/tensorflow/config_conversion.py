@@ -1,5 +1,5 @@
 import collections
-from typing import Any, Optional, Sequence, Union
+from typing import Any, Sequence, TypeAlias
 
 import keras
 import tensorflow as tf
@@ -11,7 +11,7 @@ FeatureConfig = distributed_embedding_config.FeatureConfig
 TableConfig = distributed_embedding_config.TableConfig
 
 # Placeholder of tf.tpu.experimental.embedding._Optimizer which is not exposed.
-TfTpuOptimizer = Any
+TfTpuOptimizer: TypeAlias = Any
 
 
 OptimizerMapping = collections.namedtuple(
@@ -55,7 +55,7 @@ OPTIMIZER_MAPPINGS = {
 
 def translate_keras_rs_configuration(
     feature_configs: types.Nested[FeatureConfig],
-    table_stacking: Union[str, Sequence[str], Sequence[Sequence[str]]],
+    table_stacking: str | Sequence[str] | Sequence[Sequence[str]],
 ) -> tuple[
     types.Nested[tf.tpu.experimental.embedding.FeatureConfig],
     tf.tpu.experimental.embedding.SparseCoreEmbeddingConfig,
@@ -226,7 +226,7 @@ def translate_keras_optimizer(
 
 
 def translate_optimizer(
-    optimizer: Optional[Union[str, keras.optimizers.Optimizer, TfTpuOptimizer]],
+    optimizer: str | keras.optimizers.Optimizer | TfTpuOptimizer | None,
 ) -> TfTpuOptimizer:
     """Translates a Keras optimizer into a TensorFlow TPU `_Optimizer`.
 

@@ -3,7 +3,7 @@
 import inspect
 import math
 import random as python_random
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable
 
 import jax
 import jax.numpy as jnp
@@ -24,7 +24,7 @@ class WrappedKerasInitializer(jax.nn.initializers.Initializer):
             initializer = keras.initializers.get(initializer)
         self.initializer = initializer
 
-    def key(self) -> Union[jax.Array, None]:
+    def key(self) -> jax.Array | None:
         """Extract a key from the underlying keras initializer."""
         # All built-in keras initializers have a `seed` attribute.
         # Extract this and turn it into a key for use with JAX.
@@ -36,8 +36,13 @@ class WrappedKerasInitializer(jax.nn.initializers.Initializer):
         return None
 
     def __call__(
-        self, key: Any, shape: Any, dtype: Any = jnp.float_
+        self,
+        key: Any,
+        shape: Any,
+        dtype: Any = jnp.float_,
+        out_sharding: Any = None,
     ) -> jax.Array:
+        del out_sharding
         # Force use of provided key.  The JAX backend for random initializers
         # forwards the `seed` attribute to the underlying JAX random functions.
         if key is not None and hasattr(self.initializer, "seed"):
@@ -66,7 +71,7 @@ class WrappedJaxInitializer(keras.initializers.Initializer):
     def __init__(
         self,
         initializer: jax.nn.initializers.Initializer,
-        seed: Optional[Union[int, keras.random.SeedGenerator]] = None,
+        seed: int | keras.random.SeedGenerator | None = None,
     ):
         self.initializer = initializer
         if seed is None:
@@ -89,7 +94,7 @@ class WrappedJaxInitializer(keras.initializers.Initializer):
     def __call__(
         self,
         shape: types.Shape,
-        dtype: Optional[types.DType] = None,
+        dtype: types.DType | None = None,
         **kwargs: Any,
     ) -> jax.Array:
         del kwargs  # Unused.
@@ -97,7 +102,7 @@ class WrappedJaxInitializer(keras.initializers.Initializer):
 
 
 def keras_to_jax_initializer(
-    initializer: Union[str, keras.initializers.Initializer],
+    initializer: str | keras.initializers.Initializer,
 ) -> jax.nn.initializers.Initializer:
     """Converts a Keras initializer to a JAX initializer.
 
@@ -129,8 +134,8 @@ def jax_to_keras_initializer(
 
 
 def keras_to_jte_learning_rate(
-    learning_rate: Union[keras.Variable, float, Callable[..., float]],
-) -> Union[float, Callable[..., float]]:
+    learning_rate: keras.Variable | float | Callable[..., float],
+) -> float | Callable[..., float]:
     """Converts a Keras learning rate to a JAX TPU Embedding learning rate.
 
     Args:
@@ -172,8 +177,8 @@ def keras_to_jte_learning_rate(
 
 
 def jte_to_keras_learning_rate(
-    learning_rate: Union[float, Callable[..., float]],
-) -> Union[float, Callable[..., float]]:
+    learning_rate: float | Callable[..., float],
+) -> float | Callable[..., float]:
     """Converts a JAX TPU Embedding learning rate to a Keras learning rate.
 
     Args:
@@ -204,7 +209,7 @@ def jte_to_keras_learning_rate(
 
 
 def keras_to_jte_optimizer(
-    optimizer: Union[keras.optimizers.Optimizer, str],
+    optimizer: keras.optimizers.Optimizer | str,
 ) -> embedding_spec.OptimizerSpec:
     """Converts a Keras optimizer to a JAX TPU Embedding optimizer.
 

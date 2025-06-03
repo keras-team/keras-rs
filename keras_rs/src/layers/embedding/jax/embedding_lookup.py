@@ -4,7 +4,7 @@ Implementation details for use in JAX models.
 """
 
 import functools
-from typing import Any, Mapping, Optional, Sequence, Tuple, TypeVar, Union
+from typing import Any, Mapping, TypeAlias
 
 import jax
 import numpy as np
@@ -14,14 +14,13 @@ from jax_tpu_embedding.sparsecore.lib.nn import embedding_spec
 from jax_tpu_embedding.sparsecore.utils import utils as jte_utils
 
 from keras_rs.src.layers.embedding.jax import embedding_utils
+from keras_rs.src.types import Nested
 
 ShardedCooMatrix = embedding_utils.ShardedCooMatrix
-shard_map = jax.experimental.shard_map.shard_map
+shard_map = jax.experimental.shard_map.shard_map  # type: ignore[attr-defined]
 
-T = TypeVar("T")
-Nested = Union[T, Sequence[T], Mapping[str, T]]
-ArrayLike = Union[jax.Array, np.ndarray[Any, Any]]
-JaxLayout = Union[jax.sharding.NamedSharding, layout.Layout]
+ArrayLike: TypeAlias = jax.Array | np.ndarray[Any, Any]
+JaxLayout: TypeAlias = jax.sharding.NamedSharding | layout.Layout
 
 
 class EmbeddingLookupConfiguration:
@@ -38,14 +37,14 @@ class EmbeddingLookupConfiguration:
     def __init__(
         self,
         feature_specs: embedding.Nested[embedding_spec.FeatureSpec],
-        mesh: Optional[jax.sharding.Mesh] = None,
+        mesh: jax.sharding.Mesh | None = None,
         table_sharding_strategy: str = "MOD",
-        num_sc_per_device: Optional[int] = None,
+        num_sc_per_device: int | None = None,
         sharding_axis: str = "sparsecore_sharding",
-        samples_partition: Optional[jax.sharding.PartitionSpec] = None,
-        samples_layout: Optional[JaxLayout] = None,
-        table_partition: Optional[jax.sharding.PartitionSpec] = None,
-        table_layout: Optional[JaxLayout] = None,
+        samples_partition: jax.sharding.PartitionSpec | None = None,
+        samples_layout: JaxLayout | None = None,
+        table_partition: jax.sharding.PartitionSpec | None = None,
+        table_layout: JaxLayout | None = None,
     ):
         self.mesh = mesh or jax.sharding.Mesh(jax.devices(), sharding_axis)
         self.feature_specs = feature_specs
@@ -79,7 +78,7 @@ def embedding_lookup(
     config: EmbeddingLookupConfiguration,
     lookups: Mapping[str, ShardedCooMatrix],
     tables: Nested[jax.Array],
-    step: Optional[jax.Array] = None,
+    step: jax.Array | None = None,
 ) -> Nested[jax.Array]:
     """Embedding lookup function with custom gradient.
 
@@ -138,10 +137,10 @@ def embedding_lookup_fwd(
     config: EmbeddingLookupConfiguration,
     lookups: Mapping[str, ShardedCooMatrix],
     table: Nested[jax.Array],
-    step: Optional[jax.Array] = None,
-) -> Tuple[
+    step: jax.Array | None = None,
+) -> tuple[
     Nested[jax.Array],
-    Tuple[Nested[ShardedCooMatrix], Nested[jax.Array], Optional[jax.Array]],
+    tuple[Nested[ShardedCooMatrix], Nested[jax.Array], jax.Array | None],
 ]:
     """Forward pass for embedding lookup."""
     return embedding_lookup(config, lookups, table, step), (
@@ -153,13 +152,13 @@ def embedding_lookup_fwd(
 
 def embedding_lookup_bwd(
     config: EmbeddingLookupConfiguration,
-    res: Tuple[
+    res: tuple[
         Mapping[str, ShardedCooMatrix],  # Lookups.
         Mapping[str, Nested[jax.Array]],  # Tables.
-        Optional[jax.Array],  # Step.
+        jax.Array | None,  # Step.
     ],
     gradients: Nested[jax.Array],
-) -> Tuple[None, Nested[jax.Array], Optional[jax.Array]]:
+) -> tuple[None, Nested[jax.Array], jax.Array | None]:
     """Backward pass for embedding lookup.
 
     Args:
@@ -199,7 +198,7 @@ def embedding_lookup_bwd(
         gradients: Nested[jax.Array],
         sparse_input: embedding.SparseDenseMatmulInput,
         tables: Mapping[str, embedding.EmbeddingVariables],
-        step: Optional[jax.Array],
+        step: jax.Array | None,
     ) -> Mapping[str, embedding.EmbeddingVariables]:
         output: Mapping[str, embedding.EmbeddingVariables] = (
             embedding.tpu_sparse_dense_matmul_grad(

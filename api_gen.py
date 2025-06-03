@@ -54,7 +54,14 @@ def build() -> None:
         os.chdir(build_dir)
         # Generates `keras_rs/api` directory.
         open(build_api_init_fname, "w").close()
-        namex.generate_api_files("keras_rs", code_directory="src")
+        namex.generate_api_files(
+            "keras_rs",
+            code_directory="src",
+            exclude_directories=[
+                os.path.join("src", "layers", "embedding", "jax"),
+                os.path.join("src", "layers", "embedding", "tensorflow"),
+            ],
+        )
         # Add `__version__` to `keras_rs/__init__.py`.
         export_version_string(build_api_init_fname)
         # Copy back `keras_rs` from build dir to `api` excluding `src/`.

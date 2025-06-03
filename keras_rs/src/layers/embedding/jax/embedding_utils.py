@@ -3,16 +3,7 @@
 import collections
 import dataclasses
 import typing
-from typing import (
-    Any,
-    Mapping,
-    NamedTuple,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import Any, Mapping, NamedTuple, Sequence, TypeAlias, TypeVar
 
 import jax
 import numpy as np
@@ -22,13 +13,13 @@ from jax_tpu_embedding.sparsecore.lib.nn.embedding_spec import FeatureSpec
 from jax_tpu_embedding.sparsecore.lib.nn.embedding_spec import StackedTableSpec
 from jax_tpu_embedding.sparsecore.lib.nn.embedding_spec import TableSpec
 
+from keras_rs.src.types import Nested
+
 T = TypeVar("T")
-U = TypeVar("U")
-Nested = Union[T, Sequence[T], Mapping[str, T]]
 
 # Any to support tf.Ragged without needing an explicit TF dependency.
-ArrayLike = Union[jax.Array, np.ndarray, Any]  # type: ignore
-Shape = Tuple[int, ...]
+ArrayLike: TypeAlias = jax.Array | np.ndarray | Any  # type: ignore
+Shape: TypeAlias = tuple[int, ...]
 
 
 class FeatureSamples(NamedTuple):
@@ -165,7 +156,7 @@ def stack_and_shard_tables(
     # Gather stacked table information.
     stacked_table_map: dict[
         str,
-        Tuple[StackedTableSpec, list[TableSpec]],
+        tuple[StackedTableSpec, list[TableSpec]],
     ] = {}
 
     def collect_stacked_tables(table_spec: TableSpec) -> None:
@@ -396,7 +387,7 @@ def update_stacked_table_specs(
 
 
 def convert_to_numpy(
-    ragged_or_dense: Union[np.ndarray[Any, Any], Sequence[Sequence[Any]], Any],
+    ragged_or_dense: np.ndarray[Any, Any] | Sequence[Sequence[Any]] | Any,
     dtype: Any,
 ) -> np.ndarray[Any, Any]:
     """Converts a ragged or dense list of inputs to a ragged/dense numpy array.
@@ -480,12 +471,9 @@ def ones_like(
 
 def create_feature_samples(
     feature_structure: Nested[T],
-    feature_ids: Nested[
-        Union[ArrayLike, Sequence[int], Sequence[Sequence[int]]]
-    ],
-    feature_weights: Optional[
-        Nested[Union[ArrayLike, Sequence[float], Sequence[Sequence[float]]]]
-    ],
+    feature_ids: Nested[ArrayLike | Sequence[int] | Sequence[Sequence[int]]],
+    feature_weights: None
+    | (Nested[ArrayLike | Sequence[float] | Sequence[Sequence[float]]]),
 ) -> Nested[FeatureSamples]:
     """Constructs a collection of sample tuples from provided IDs and weights.
 
@@ -545,8 +533,8 @@ def stack_and_shard_samples(
     local_device_count: int,
     global_device_count: int,
     num_sc_per_device: int,
-    static_buffer_size: Optional[Union[int, Mapping[str, int]]] = None,
-) -> Tuple[dict[str, ShardedCooMatrix], embedding.SparseDenseMatmulInputStats]:
+    static_buffer_size: int | Mapping[str, int] | None = None,
+) -> tuple[dict[str, ShardedCooMatrix], embedding.SparseDenseMatmulInputStats]:
     """Prepares input samples for use in embedding lookups.
 
     Args:
@@ -594,8 +582,8 @@ def stack_and_shard_samples(
     tables_names = preprocessed_inputs.lhs_row_pointers.keys()
     for table_name in tables_names:
         shard_ends = preprocessed_inputs.lhs_row_pointers[table_name]
-        shard_starts = jnp.concatenate(
-            [jnp.asarray([0]), _round_up_to_multiple(shard_ends[:-1], 8)]
+        shard_starts = np.concatenate(
+            [np.asarray([0]), _round_up_to_multiple(shard_ends[:-1], 8)]
         )
         out[table_name] = ShardedCooMatrix(
             shard_starts=shard_starts,

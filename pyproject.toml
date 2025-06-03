@@ -61,6 +61,7 @@ single-line-exclusions = ["typing"]
 known-first-party = ["keras_rs"]
 
 [tool.mypy]
+python_version = "3.10"
 strict = "True"
 exclude = ["_test\\.py$", "^examples/"]
 untyped_calls_exclude = ["ml_dtypes"]

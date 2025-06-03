@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 import keras
 from keras import ops
@@ -34,7 +34,7 @@ def _is_supported_sparse(x: types.Tensor) -> bool:
 
 
 def _sparse_ones_like(
-    x: types.Tensor, dtype: Optional[types.DType] = None
+    x: types.Tensor, dtype: types.DType | None = None
 ) -> types.Tensor:
     """Creates a tensor of ones with the same sparsity as the input.
 
@@ -135,8 +135,8 @@ class EmbedReduce(keras.layers.Embedding):
         input_dim: int,
         output_dim: int,
         embeddings_initializer: types.InitializerLike = "uniform",
-        embeddings_regularizer: Optional[types.RegularizerLike] = None,
-        embeddings_constraint: Optional[types.ConstraintLike] = None,
+        embeddings_regularizer: types.RegularizerLike | None = None,
+        embeddings_constraint: types.ConstraintLike | None = None,
         mask_zero: bool = False,
         weights: types.Tensor = None,
         combiner: str = "mean",
@@ -162,7 +162,7 @@ class EmbedReduce(keras.layers.Embedding):
     def call(
         self,
         inputs: types.Tensor,
-        weights: Optional[types.Tensor] = None,
+        weights: types.Tensor | None = None,
     ) -> types.Tensor:
         """Apply embedding and reduction.
 
@@ -272,6 +272,30 @@ class EmbedReduce(keras.layers.Embedding):
             return ops.divide_no_nan(
                 x, ops.sqrt(ops.sum(ops.square(weights), axis=-2))
             )
+
+    def compute_output_shape(
+        self,
+        input_shape: types.Shape,
+        weights_shape: types.Shape | None = None,
+    ) -> types.Shape:
+        del weights_shape
+
+        if len(input_shape) <= 1:
+            # No reduction
+            return (*input_shape, self.output_dim)
+        else:
+            # Reduce last dimension
+            return (*input_shape[0:-1], self.output_dim)
+
+    def compute_output_spec(
+        self,
+        inputs: keras.KerasTensor,
+        weights: keras.KerasTensor | None = None,
+    ) -> keras.KerasTensor:
+        del weights
+
+        output_shape = self.compute_output_shape(inputs.shape)
+        return keras.KerasTensor(output_shape, dtype=self.compute_dtype)
 
     def get_config(self) -> dict[str, Any]:
         config: dict[str, Any] = super().get_config()

@@ -1,7 +1,7 @@
 """Configuration for TPU embedding layer."""
 
 import dataclasses
-from typing import Any, Union
+from typing import Any
 
 import keras
 
@@ -51,10 +51,10 @@ class TableConfig:
     name: str
     vocabulary_size: int
     embedding_dim: int
-    initializer: Union[str, keras.initializers.Initializer] = (
+    initializer: str | keras.initializers.Initializer = (
         keras.initializers.VarianceScaling(mode="fan_out")
     )
-    optimizer: Union[str, keras.optimizers.Optimizer] = "adam"
+    optimizer: str | keras.optimizers.Optimizer = "adam"
     combiner: str = "mean"
     placement: str = "auto"
     max_ids_per_partition: int = 256

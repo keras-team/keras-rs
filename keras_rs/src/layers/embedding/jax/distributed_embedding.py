@@ -2,7 +2,7 @@
 
 import math
 import typing
-from typing import Any, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Mapping, Sequence, Union
 
 import jax
 import keras
@@ -30,16 +30,16 @@ from keras_rs.src.utils import keras_utils
 
 ArrayLike = Union[np.ndarray[Any, Any], jax.Array]
 FeatureConfig = config.FeatureConfig
-shard_map = jax.experimental.shard_map.shard_map
+shard_map = jax.experimental.shard_map.shard_map  # type: ignore[attr-defined]
 
 
 def _get_partition_spec(
-    layout: Union[
-        keras.distribution.TensorLayout,
-        jax_layout.Layout,
-        jax.sharding.NamedSharding,
-        jax.sharding.PartitionSpec,
-    ],
+    layout: (
+        keras.distribution.TensorLayout
+        | jax_layout.Layout
+        | jax.sharding.NamedSharding
+        | jax.sharding.PartitionSpec
+    ),
 ) -> Any:
     """Extracts the partition spec from a layout or sharding."""
     if isinstance(layout, keras.distribution.TensorLayout):
@@ -63,8 +63,8 @@ class ShardedInitializer(keras.initializers.Initializer):
 
     def __init__(
         self,
-        initializer: Union[keras.initializers.Initializer, str],
-        layout: Optional[keras.distribution.TensorLayout],
+        initializer: keras.initializers.Initializer | str,
+        layout: keras.distribution.TensorLayout | None,
     ):
         if isinstance(initializer, str):
             initializer = keras.initializers.get(initializer)
@@ -73,7 +73,7 @@ class ShardedInitializer(keras.initializers.Initializer):
         self._layout = layout
 
     def __call__(
-        self, shape: types.Shape, dtype: Optional[types.DType] = None
+        self, shape: types.Shape, dtype: types.DType | None = None
     ) -> jax.Array:
         if self._layout is not None:
             compiled_initializer = jax.jit(
@@ -96,7 +96,7 @@ class StackedTableInitializer(keras.initializers.Initializer):
         table_specs: Nested[embedding_spec.TableSpec],
         num_shards: int,
         layout: keras.distribution.TensorLayout,
-        seed: Union[int, keras.random.SeedGenerator, jax.Array] = 0,
+        seed: int | keras.random.SeedGenerator | jax.Array = 0,
     ):
         # Sort table specs so we can simply concatenate them when assembling the
         # stacked table.
@@ -113,7 +113,7 @@ class StackedTableInitializer(keras.initializers.Initializer):
     def _initialize_shard(
         self,
         keys: jax.Array,
-        shape: Tuple[int, int],
+        shape: tuple[int, int],
         dtype: Any,
         num_shards_per_device: int,
     ) -> jax.Array:
@@ -137,7 +137,7 @@ class StackedTableInitializer(keras.initializers.Initializer):
         return jnp.concatenate(table_shards, axis=0)
 
     def __call__(
-        self, shape: types.Shape, dtype: Optional[types.DType] = None
+        self, shape: types.Shape, dtype: types.DType | None = None
     ) -> jax.Array:
         stacked_table_spec = typing.cast(
             embedding_spec.StackedTableSpec,
@@ -195,7 +195,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
     def _create_sparsecore_distribution(
         self, sparsecore_axis_name: str = "sparsecore"
-    ) -> Tuple[
+    ) -> tuple[
         keras.distribution.ModelParallel, keras.distribution.TensorLayout
     ]:
         """SparseCore requires a specific layout.
@@ -242,7 +242,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
     def _create_cpu_distribution(
         self, cpu_axis_name: str = "cpu"
-    ) -> Tuple[
+    ) -> tuple[
         keras.distribution.ModelParallel, keras.distribution.TensorLayout
     ]:
         """Share a variable across all CPU processes."""
@@ -260,7 +260,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
     def _add_sparsecore_weight(
         self,
         name: str,
-        shape: Tuple[int, int],
+        shape: tuple[int, int],
         initializer: jax.nn.initializers.Initializer,
         dtype: Any,
         overwrite_with_gradient: bool,
@@ -276,7 +276,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         table_specs: Sequence[embedding_spec.TableSpec],
         num_shards: int,
         add_slot_variables: bool,
-    ) -> Tuple[keras.Variable, Optional[Tuple[keras.Variable, ...]]]:
+    ) -> tuple[keras.Variable, tuple[keras.Variable, ...] | None]:
         stacked_table_spec = typing.cast(
             embedding_spec.StackedTableSpec, table_specs[0].stacked_table_spec
         )
@@ -347,17 +347,11 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
         return table_variable, slot_variables
 
-    def _has_sparsecore(self) -> bool:
-        device_kind = jax.devices()[0].device_kind
-        if device_kind in ["TPU v5", "TPU v6 lite"]:
-            return True
-        return False
-
     @keras_utils.no_automatic_dependency_tracking
     def _sparsecore_init(
         self,
         feature_configs: dict[str, FeatureConfig],
-        table_stacking: Union[str, Sequence[str], Sequence[Sequence[str]]],
+        table_stacking: str | Sequence[str] | Sequence[Sequence[str]],
     ) -> None:
         if not self._has_sparsecore():
             raise ValueError(
@@ -380,13 +374,13 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         self._table_stacking = table_stacking
 
     def _sparsecore_build(
-        self, input_shapes: Optional[Nested[types.Shape]] = None
+        self, input_shapes: Nested[types.Shape] | None = None
     ) -> None:
         self.sparsecore_build(input_shapes)
 
     @keras_utils.no_automatic_dependency_tracking
     def sparsecore_build(
-        self, input_shapes: Optional[Nested[types.Shape]] = None
+        self, input_shapes: Nested[types.Shape] | None = None
     ) -> None:
         del input_shapes  # Unused.
 
@@ -469,7 +463,6 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             stack_name: stack[0].stacked_table_spec
             for stack_name, stack in table_stacks.items()
         }
-        self._stacked_table_specs = stacked_table_specs
 
         # Create variables for all stacked tables and slot variables.
         with sparsecore_distribution.scope():
@@ -556,10 +549,77 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
         self._sparsecore_built = True
 
+    def _sparsecore_symbolic_preprocess(
+        self,
+        inputs: dict[str, types.Tensor],
+        weights: dict[str, types.Tensor] | None,
+        training: bool = False,
+    ) -> dict[str, dict[str, embedding_utils.ShardedCooMatrix]]:
+        """Allow preprocess(...) with `keras.Input`s.
+
+        This is to support creating functional models via:
+        ```python
+        inputs = keras.Input(shape=(None), dtype="int32")
+        weights = keras.Input(shape=(None), dtype="float32")
+        preprocessed_inputs = distributed_embedding.preprocess(inputs, weights)
+        outputs = distributed_embedding(preprocessed_inputs)
+        model = keras.Model(inputs=preprocessed_inputs, outputs=outputs)
+        ```
+
+        Args:
+            inputs: SparseCore path->tensor input ID's tensors.
+            weights: Optional Sparsecore path->tensor input weights tensors.
+            training: Whether the layer is training or not.
+
+        Returns:
+            Symbolic preprocessed input tensors to the layer/model.
+        """
+        # Arguments are currently ignored since the input shape is governed
+        # by the stacked table configuration.
+        del inputs, weights, training
+
+        # Each stacked-table gets a ShardedCooMatrix.
+        table_specs = embedding_utils.get_table_specs(
+            self._config.feature_specs
+        )
+        table_stacks = embedding_utils.get_table_stacks(table_specs)
+        stacked_table_specs = {
+            stack_name: stack[0].stacked_table_spec
+            for stack_name, stack in table_stacks.items()
+        }
+
+        def _compute_table_output_spec(
+            stacked_table_spec: embedding_spec.StackedTableSpec,
+        ) -> embedding_utils.ShardedCooMatrix:
+            # The true shape of the components in the ShardedCooMatrix depends
+            # on the hardware configuration (# devices, sparsecores),
+            # properties of the input data (# max IDs, unique IDs), and other
+            # hints like a suggested internal buffer size.  Some of the
+            # calculations are currently a bit in flux as we experiment with
+            # memory trade-offs.  For the purposes of input/output sizes,
+            # however, the size could be viewed as dynamic 1D without affecting
+            # the output spec sizes.
+            del stacked_table_spec
+            return embedding_utils.ShardedCooMatrix(
+                # Mark these as `Input`s since that's how they will be used when
+                # constructing a functional Keras model.
+                shard_starts=keras.Input(shape=tuple(), dtype="int32"),
+                shard_ends=keras.Input(shape=tuple(), dtype="int32"),
+                col_ids=keras.Input(shape=tuple(), dtype="int32"),
+                row_ids=keras.Input(shape=tuple(), dtype="int32"),
+                values=keras.Input(shape=tuple(), dtype="float32"),
+            )
+
+        preprocessed = keras.tree.map_structure(
+            _compute_table_output_spec, stacked_table_specs
+        )
+
+        return {"inputs": preprocessed}
+
     def _sparsecore_preprocess(
         self,
         inputs: dict[str, types.Tensor],
-        weights: Optional[dict[str, types.Tensor]],
+        weights: dict[str, types.Tensor] | None,
         training: bool = False,
     ) -> dict[str, dict[str, embedding_utils.ShardedCooMatrix]]:
         if any(
@@ -572,6 +632,14 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
         if not self._sparsecore_built:
             self._sparsecore_build()
+
+        # Support symbolic KerasTensors (i.e. keras.Input).
+        if any(
+            isinstance(x, keras.KerasTensor) for x in keras.tree.flatten(inputs)
+        ):
+            return self._sparsecore_symbolic_preprocess(
+                inputs, weights, training
+            )
 
         samples = embedding_utils.create_feature_samples(
             self._config.feature_specs, inputs, weights
@@ -711,7 +779,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
     def _sparsecore_call(
         self,
         inputs: dict[str, types.Tensor],
-        weights: Optional[dict[str, types.Tensor]] = None,
+        weights: dict[str, types.Tensor] | None = None,
         training: bool = False,
         **kwargs: Any,
     ) -> dict[str, types.Tensor]:
