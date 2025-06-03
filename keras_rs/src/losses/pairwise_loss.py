@@ -1,5 +1,5 @@
 import abc
-from typing import Any, Optional
+from typing import Any
 
 import keras
 from keras import ops
@@ -43,7 +43,7 @@ class PairwiseLoss(keras.losses.Loss, abc.ABC):
         self,
         labels: types.Tensor,
         logits: types.Tensor,
-        mask: Optional[types.Tensor] = None,
+        mask: types.Tensor | None = None,
     ) -> tuple[types.Tensor, types.Tensor]:
         # Mask all values less than 0 (since less than 0 implies invalid
         # labels).

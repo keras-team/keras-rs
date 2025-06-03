@@ -8,7 +8,7 @@ torch>=2.1.0
 
 # Jax.
 jax[cpu]
-jax-tpu-embedding
+jax-tpu-embedding;sys_platform == 'linux' and platform_machine == 'x86_64'
 
 # pre-commit checks (formatting, linting, etc.)
 pre-commit
