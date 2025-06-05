@@ -297,6 +297,7 @@ class DistributedEmbedding(keras.layers.Layer):
             result = strategy.run(step, args=(next(iterator),))
 
     run_loop(iter(dataset))
+    ```
 
     ### Usage with JAX on TPU with SpareCore
 
