@@ -39,9 +39,13 @@ def ignore_files(path: str, filenames: list[str]) -> list[str]:
 
 
 def update_version_for_nightly(build_path: pathlib.Path, version: str) -> str:
-    """Export Version and Package Name."""
+    """Rewrite library version with the nightly package version."""
     date = datetime.datetime.now()
-    version += f".dev{date:%Y%m%d%H}"
+    version = re.sub(
+        r"([0-9]+\.[0-9]+\.[0-9]+).*",  # Match version without suffix.
+        r"\1.dev" + date.strftime("%Y%m%d%H%M"),  # Add dev{date} suffix.
+        version,
+    )
     # Update `name = "keras-rs"` with "keras-rs-nightly"
     pyproj_pth = build_path / "pyproject.toml"
     pyproj_str_before = pyproj_pth.read_text()
