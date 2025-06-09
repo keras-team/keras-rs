@@ -1,3 +1,6 @@
+import dataclasses
+import os
+import tempfile
 import typing
 from typing import Any
 
@@ -10,10 +13,13 @@ from absl.testing import absltest
 from absl.testing import parameterized
 from jax.experimental import layout as jax_layout
 from jax_tpu_embedding.sparsecore.lib.nn import embedding_spec
-from jax_tpu_embedding.sparsecore.lib.nn import table_stacking
+from jax_tpu_embedding.sparsecore.lib.nn import (
+    table_stacking as table_stacking_lib,
+)
 from jax_tpu_embedding.sparsecore.utils import utils as jte_utils
 
 from keras_rs.src.layers.embedding import test_utils as keras_test_utils
+from keras_rs.src.layers.embedding.jax import checkpoint_utils
 from keras_rs.src.layers.embedding.jax import config_conversion
 from keras_rs.src.layers.embedding.jax import (
     distributed_embedding as jax_distributed_embedding,
@@ -131,7 +137,7 @@ class StackedTableInitializerTest(parameterized.TestCase):
             feature_spec.table_spec.name: feature_spec.table_spec
             for feature_spec in feature_specs
         }
-        table_stacking.stack_tables(
+        table_stacking_lib.stack_tables(
             feature_specs,
             table_names=[table_config.name for table_config in table_configs],
             global_device_count=device_count,
@@ -198,7 +204,7 @@ class StackedTableInitializerTest(parameterized.TestCase):
         num_sc_per_device = _num_sparsecores_per_device()
         num_table_shards = device_count * num_sc_per_device
 
-        table_stacking.stack_tables(
+        table_stacking_lib.stack_tables(
             feature_specs,
             table_names=[
                 table_spec.name for table_spec in table_specs.values()
@@ -257,7 +263,7 @@ class StackedTableInitializerTest(parameterized.TestCase):
         num_sc_per_device = _num_sparsecores_per_device()
         num_table_shards = device_count * num_sc_per_device
 
-        table_stacking.stack_tables(
+        table_stacking_lib.stack_tables(
             feature_specs,
             table_names=[
                 table_spec.name for table_spec in table_specs.values()
@@ -457,6 +463,130 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         # Evaluate final loss.
         loss_after = model.evaluate(evaluation_dataset)
         np.testing.assert_array_less(loss_after, loss_before)
+
+    @parameterized.product(
+        ragged=[False, True],
+        target_stacking=[
+            "auto",
+            [["table:0", "table:1", "table:2"]],
+        ],
+    )
+    def test_save_and_restore(
+        self,
+        ragged: bool,
+        target_stacking: str | list[str] | list[list[str]],
+    ):
+        keras.distribution.set_distribution(keras.distribution.DataParallel())
+
+        table_configs = keras_test_utils.create_random_table_configs(
+            max_vocabulary_size=64,
+            max_embedding_dim=8,
+            optimizer=keras.optimizers.SGD(learning_rate=0.1),
+            seed=10,
+        )
+        feature_configs = keras_test_utils.create_random_feature_configs(
+            table_configs=table_configs,
+            batch_size=16,
+            seed=20,
+        )
+        feature_configs_dict = {
+            feature_config.name: feature_config
+            for feature_config in feature_configs
+        }
+
+        # Create tables for generating labels.
+        seed = keras.random.SeedGenerator(40)
+        tables = {
+            table_config.name: keras.random.uniform(
+                shape=(
+                    table_config.vocabulary_size,
+                    table_config.embedding_dim,
+                ),
+                minval=-5,
+                maxval=5,
+                dtype="float32",
+                seed=seed,
+            )
+            for table_config in table_configs
+        }
+
+        # Fit and evaluate.
+        def loss_fn(y_true, y_pred):
+            return jnp.mean(jnp.square(y_true - y_pred))
+
+        embedding_layer_name = "distributed_embedding_chkpt_test"
+        layer = jax_distributed_embedding.DistributedEmbedding(
+            feature_configs_dict,
+            table_stacking=target_stacking,
+            name=embedding_layer_name,
+        )
+        model = keras.Sequential([layer])
+        model.compile(jit_compile=True, loss=loss_fn)
+
+        # Fit model to different dataset.
+        training_dataset = keras_test_utils.RandomInputSampleDataset(
+            feature_configs_dict,
+            tables,
+            ragged=ragged,
+            num_batches=100,
+            seed=42,
+            preprocessor=lambda inputs, weights: layer.preprocess(
+                inputs, weights, training=True
+            ),
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            chkpt_path = os.path.join(tmp_dir, "checkpoint")
+
+        model.fit(
+            training_dataset,
+            epochs=2,
+            steps_per_epoch=1,
+            callbacks=[
+                checkpoint_utils.JaxKeras3CheckpointCallback(
+                    model,
+                    chkpt_path,
+                    max_to_keep=1,
+                    steps_per_epoch=1,
+                )
+            ],
+        )
+        # Setup a model with a zero initializer but otherwise the same
+        # feature configs to test restore. Keep the same embedding layer name to
+        # ensure the correct weights are restored.
+        feature_configs_with_zero_init = {
+            feature_config.name: dataclasses.replace(
+                feature_config,
+                table=dataclasses.replace(
+                    feature_config.table, initializer="zeros"
+                ),
+            )
+            for feature_config in feature_configs
+        }
+        layer_for_restore = jax_distributed_embedding.DistributedEmbedding(
+            feature_configs_with_zero_init,
+            table_stacking=target_stacking,
+            name=embedding_layer_name,
+        )
+        input_shapes = jax.tree.map(
+            lambda f: f.input_shape, feature_configs_with_zero_init
+        )
+        layer_for_restore.build(input_shapes)
+        model_for_restore = keras.Sequential([layer_for_restore])
+        manager_for_restore = checkpoint_utils.JaxKeras3CheckpointManager(
+            model_for_restore,
+            chkpt_path,
+            max_to_keep=1,
+            steps_per_epoch=1,
+        )
+        model_for_restore.compile(jit_compile=True, loss=loss_fn)
+        model_for_restore.build()
+        model_for_restore.optimizer.build(model_for_restore.trainable_variables)
+        manager_for_restore.restore_state()
+        jax.tree.map(
+            np.testing.assert_array_equal,
+            model.trainable_variables,
+            model_for_restore.trainable_variables,
+        )
 
 
 if __name__ == "__main__":
