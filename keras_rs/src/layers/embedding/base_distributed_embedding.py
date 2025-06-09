@@ -305,7 +305,7 @@ class DistributedEmbedding(keras.layers.Layer):
 
     To use `DistributedEmbedding` on TPUs with JAX, one must create and set a
     Keras `Distribution`.
-    ```
+    ```python
     distribution = keras.distribution.DataParallel(devices=jax.device("tpu"))
     keras.distribution.set_distribution(distribution)
     ```
