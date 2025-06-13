@@ -384,7 +384,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
     ) -> None:
         del input_shapes  # Unused.
 
-        if self._sparsecore_built:
+        if getattr(self, "_sparsecore_built", False):
             return
 
         feature_specs = config_conversion.keras_to_jte_feature_configs(
