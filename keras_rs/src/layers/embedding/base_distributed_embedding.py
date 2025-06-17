@@ -174,12 +174,9 @@ class DistributedEmbedding(keras.layers.Layer):
     supported on all backends and accelerators:
 
     - `keras.optimizers.Adagrad`
-    - `keras.optimizers.SGD`
-
-    The following are additionally available when using the TensorFlow backend:
-
     - `keras.optimizers.Adam`
     - `keras.optimizers.Ftrl`
+    - `keras.optimizers.SGD`
 
     Also, not all parameters of the optimizers are supported (e.g. the
     `nesterov` option of `SGD`). An error is raised when an unsupported

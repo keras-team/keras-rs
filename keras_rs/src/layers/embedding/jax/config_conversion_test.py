@@ -239,6 +239,13 @@ class ConfigConversionTest(parameterized.TestCase):
             ),
         ),
         ("Adagrad", lambda: keras.optimizers.Adagrad(learning_rate=0.02)),
+        ("Adam", lambda: keras.optimizers.Adam(learning_rate=0.03)),
+        (
+            "Ftrl",
+            lambda: keras.optimizers.Ftrl(
+                learning_rate=0.05,
+            ),
+        ),
         ("string", lambda: "adagrad"),
     )
     def test_optimizer_conversion(
