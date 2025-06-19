@@ -36,7 +36,7 @@ shard_map = jax.experimental.shard_map.shard_map  # type: ignore[attr-defined]
 def _get_partition_spec(
     layout: (
         keras.distribution.TensorLayout
-        | jax_layout.Layout
+        | jax_layout.Format
         | jax.sharding.NamedSharding
         | jax.sharding.PartitionSpec
     ),
@@ -45,7 +45,7 @@ def _get_partition_spec(
     if isinstance(layout, keras.distribution.TensorLayout):
         layout = layout.backend_layout
 
-    if isinstance(layout, jax_layout.Layout):
+    if isinstance(layout, jax_layout.Format):
         layout = layout.sharding
 
     if isinstance(layout, jax.sharding.NamedSharding):
@@ -217,7 +217,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         sparsecore_layout = keras.distribution.TensorLayout(axes, device_mesh)
         # Custom sparsecore layout with tiling.
         # pylint: disable-next=protected-access
-        sparsecore_layout._backend_layout = jax_layout.Layout(
+        sparsecore_layout._backend_layout = jax_layout.Format(
             jax_layout.DeviceLocalLayout(
                 major_to_minor=(0, 1),
                 _tiling=((8,),),

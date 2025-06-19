@@ -8,7 +8,7 @@ from typing import Any, Mapping, TypeAlias
 
 import jax
 import numpy as np
-from jax.experimental import layout
+from jax.experimental import layout as jax_layout
 from jax_tpu_embedding.sparsecore.lib.nn import embedding
 from jax_tpu_embedding.sparsecore.lib.nn import embedding_spec
 from jax_tpu_embedding.sparsecore.utils import utils as jte_utils
@@ -20,7 +20,7 @@ ShardedCooMatrix = embedding_utils.ShardedCooMatrix
 shard_map = jax.experimental.shard_map.shard_map  # type: ignore[attr-defined]
 
 ArrayLike: TypeAlias = jax.Array | np.ndarray[Any, Any]
-JaxLayout: TypeAlias = jax.sharding.NamedSharding | layout.Layout
+JaxLayout: TypeAlias = jax.sharding.NamedSharding | jax_layout.Format
 
 
 class EmbeddingLookupConfiguration:

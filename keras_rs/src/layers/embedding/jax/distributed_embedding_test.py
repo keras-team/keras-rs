@@ -41,7 +41,7 @@ def _create_sparsecore_layout(
     )
     sparsecore_layout = keras.distribution.TensorLayout(axes, device_mesh)
     # Custom sparsecore layout with tiling.
-    sparsecore_layout._backend_layout = jax_layout.Layout(  # pylint: disable=protected-access
+    sparsecore_layout._backend_layout = jax_layout.Format(  # pylint: disable=protected-access
         jax_layout.DeviceLocalLayout(
             major_to_minor=(0, 1),
             _tiling=((8,),),
