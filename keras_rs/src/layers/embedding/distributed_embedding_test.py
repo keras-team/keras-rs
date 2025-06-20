@@ -560,10 +560,10 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
                 # Determine explicit shardings/layouts for jit compilation
                 # (required for sparsecore computations).
                 trainable_layouts = keras.tree.map_structure(
-                    lambda x: x.value.layout, layer.trainable_variables
+                    lambda x: x.value.format, layer.trainable_variables
                 )
                 non_trainable_layouts = keras.tree.map_structure(
-                    lambda x: x.value.layout, layer.non_trainable_variables
+                    lambda x: x.value.format, layer.non_trainable_variables
                 )
                 # Input/output data involved in sparsecore operations are
                 # sharded across all sparse-core-capable devices.
