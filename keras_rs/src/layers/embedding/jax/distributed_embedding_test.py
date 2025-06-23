@@ -44,7 +44,7 @@ def _create_sparsecore_layout(
     LayoutClass = (
         jax_layout.Layout
         if jax.__version_info__ >= (0, 6, 3)
-        else jax_layout.DeviceLocalLayout
+        else jax_layout.DeviceLocalLayout  # type: ignore
     )
     # pylint: disable-next=protected-access
     sparsecore_layout._backend_layout = jax_layout.Format(
