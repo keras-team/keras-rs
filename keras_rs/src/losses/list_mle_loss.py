@@ -14,7 +14,8 @@ class ListMLELoss(keras.losses.Loss):
     ListMLE loss is a listwise ranking loss that maximizes the likelihood of
     the ground truth ranking. It works by:
     1. Sorting items by their relevance scores (labels)
-    2. Computing the probability of observing this ranking given the predicted scores
+    2. Computing the probability of observing this ranking given the 
+       predicted scores
     3. Maximizing this likelihood (minimizing negative log-likelihood)
 
     The loss is computed as the negative log-likelihood of the ground truth
@@ -32,7 +33,8 @@ class ListMLELoss(keras.losses.Loss):
         reduction: Type of reduction to apply to the loss. In almost all cases
             this should be `"sum_over_batch_size"`. Supported options are
             `"sum"`, `"sum_over_batch_size"`, `"mean"`,
-            `"mean_with_sample_weight"` or `None`. Defaults to `"sum_over_batch_size"`.
+            `"mean_with_sample_weight"` or `None`. Defaults to 
+            `"sum_over_batch_size"`.
         name: Optional name for the loss instance.
         dtype: The dtype of the loss's computations. Defaults to `None`.
 
@@ -73,7 +75,8 @@ class ListMLELoss(keras.losses.Loss):
         """Compute the unreduced ListMLE loss.
         
         Args:
-            labels: Ground truth relevance scores of shape [batch_size, list_size].
+            labels: Ground truth relevance scores of 
+                    shape [batch_size,list_size].
             logits: Predicted scores of shape [batch_size, list_size].
             mask: Optional mask of shape [batch_size, list_size].
         
@@ -87,7 +90,8 @@ class ListMLELoss(keras.losses.Loss):
         if mask is not None:
             valid_mask = ops.logical_and(valid_mask, ops.cast(mask, dtype="bool"))
         
-        num_valid_items = ops.sum(ops.cast(valid_mask, dtype=labels.dtype), axis=1, keepdims=True)
+        num_valid_items = ops.sum(ops.cast(valid_mask, dtype=labels.dtype), 
+                                  axis=1, keepdims=True)
         
         batch_has_valid_items = ops.greater(num_valid_items, 0.0)
         
