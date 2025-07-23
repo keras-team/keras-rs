@@ -8,7 +8,7 @@ It generates API and formats user and generated APIs.
 
 import os
 import shutil
-
+import pre_commit
 import namex
 
 PACKAGE = "keras_rs"
