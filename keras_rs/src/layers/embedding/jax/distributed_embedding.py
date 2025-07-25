@@ -221,9 +221,14 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             if jax.__version_info__ >= (0, 6, 3)
             else jax_layout.DeviceLocalLayout  # type: ignore
         )
+        layout = (
+            LayoutClass(major_to_minor=(0, 1), tiling=((8,),))  # type: ignore
+            if jax.__version_info__ >= (0, 7, 1)
+            else LayoutClass(major_to_minor=(0, 1), _tiling=((8,),))  # type: ignore
+        )
         # pylint: disable-next=protected-access
         sparsecore_layout._backend_layout = jax_layout.Format(
-            LayoutClass(major_to_minor=(0, 1), _tiling=((8,),)),  # type: ignore
+            layout,  # type: ignore
             jax.sharding.NamedSharding(
                 device_mesh.backend_mesh,
                 jax.sharding.PartitionSpec(
