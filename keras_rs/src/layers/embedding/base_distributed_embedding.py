@@ -683,7 +683,6 @@ class DistributedEmbedding(keras.layers.Layer):
             # Same for weights if present.
             keras.tree.assert_same_structure(self._feature_configs, weights)
             flat_weights = keras.tree.flatten(weights)
-            # Rearrange to match order of self._placement_to_path_to_feature_config.
             flat_weights = [flat_weights[i] for i in self._input_idx]
             placement_to_path_to_weights = keras.tree.pack_sequence_as(
                 self._placement_to_path_to_feature_config, flat_weights
