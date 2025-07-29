@@ -617,11 +617,11 @@ class DistributedEmbedding(keras.layers.Layer):
 
         super().build(input_shapes)
 
-    def _rearrange_inputs(self, inputs: types.Nested[types.Tensor]) -> types.Nested[types.Tensor]:
+    def _rearrange_inputs(
+        self, inputs: types.Nested[types.Tensor]
+    ) -> types.Nested[types.Tensor]:
         flat_inputs = keras.tree.flatten_with_path(inputs)
-        flat_inputs = {
-            k[-1]: v for (k, v) in flat_inputs
-        }
+        flat_inputs = {k[-1]: v for (k, v) in flat_inputs}
 
         placement_to_path_to_inputs = {}
         for placement in self._placement_to_path_to_feature_config.keys():
@@ -632,7 +632,6 @@ class DistributedEmbedding(keras.layers.Layer):
                 placement_to_path_to_inputs[placement][path] = flat_inputs[path]
 
         return placement_to_path_to_inputs
-        
 
     def preprocess(
         self,
