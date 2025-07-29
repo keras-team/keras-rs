@@ -337,17 +337,32 @@ class DistributedEmbedding(keras.layers.Layer):
     embedding_layer = DistributedEmbedding(feature_configs)
 
     # Add preprocessing to a data input pipeline.
-    def train_dataset_generator():
-        for (inputs, weights), labels in iter(train_dataset):
+    def preprocessed_dataset_generator(dataset):
+        for (inputs, weights), labels in iter(dataset):
             yield embedding_layer.preprocess(
                 inputs, weights, training=True
             ), labels
 
-    preprocessed_train_dataset = train_dataset_generator()
+    preprocessed_train_dataset = preprocessed_dataset_generator(train_dataset)
     ```
     This explicit preprocessing stage combines the input and optional weights,
     so the new data can be passed directly into the `inputs` argument of the
     layer or model.
+
+    **NOTE**: When working in a multi-host setting with data parallelism, the
+    data needs to be sharded properly across hosts.  If the original dataset is
+    of type `tf.data.Dataset`, it will need to be manually sharded _prior_ to
+    applying the preprocess generator:
+    ```python
+    # Manually shard the dataset across hosts.
+    train_dataset = distribution.distribute_dataset(train_dataset)
+    distribution.auto_shard_dataset = False  # Dataset is already sharded.
+
+    # Add a preprocessing stage to the distributed data input pipeline.
+    train_dataset = preprocessed_dataset_generator(train_dataset)
+    ```
+    If the original dataset is _not_ a `tf.data.Dataset`, it must already be
+    pre-sharded across hosts.
 
     #### Usage in a Keras model
 
@@ -602,6 +617,23 @@ class DistributedEmbedding(keras.layers.Layer):
 
         super().build(input_shapes)
 
+    def _rearrange_inputs(self, inputs: types.Nested[types.Tensor]) -> types.Nested[types.Tensor]:
+        flat_inputs = keras.tree.flatten_with_path(inputs)
+        flat_inputs = {
+            k[-1]: v for (k, v) in flat_inputs
+        }
+
+        placement_to_path_to_inputs = {}
+        for placement in self._placement_to_path_to_feature_config.keys():
+            if placement not in placement_to_path_to_inputs:
+                placement_to_path_to_inputs[placement] = {}
+
+            for path in self._placement_to_path_to_feature_config[placement]:
+                placement_to_path_to_inputs[placement][path] = flat_inputs[path]
+
+        return placement_to_path_to_inputs
+        
+
     def preprocess(
         self,
         inputs: types.Nested[types.Tensor],
@@ -639,21 +671,13 @@ class DistributedEmbedding(keras.layers.Layer):
             )
             self.build(input_shapes)
 
-        # Go from deeply nested structure of inputs to flat inputs.
-        flat_inputs = keras.tree.flatten(inputs)
-
         # Go from flat to nested dict placement -> path -> input.
-        placement_to_path_to_inputs = keras.tree.pack_sequence_as(
-            self._placement_to_path_to_feature_config, flat_inputs
-        )
+        placement_to_path_to_inputs = self._rearrange_inputs(inputs)
 
         if weights is not None:
             # Same for weights if present.
             keras.tree.assert_same_structure(self._feature_configs, weights)
-            flat_weights = keras.tree.flatten(weights)
-            placement_to_path_to_weights = keras.tree.pack_sequence_as(
-                self._placement_to_path_to_feature_config, flat_weights
-            )
+            placement_to_path_to_weights = self._rearrange_inputs(weights)
         else:
             # Populate keys for weights.
             placement_to_path_to_weights = {
