@@ -578,6 +578,22 @@ class DistributedEmbedding(keras.layers.Layer):
             )
         )
 
+        self._input_idx: list[int] = []
+        placement_curr_idx = {}
+        prev_placement_idx = 0
+        for placement in self._placement_to_path_to_feature_config.keys():
+            placement_curr_idx[placement] = prev_placement_idx
+            prev_placement_idx += len(
+                self._placement_to_path_to_feature_config[placement]
+            )
+        for placement_and_path in placement_and_paths:
+            placement = placement_and_path.placement
+            self._input_idx.append(placement_curr_idx[placement])
+            placement_curr_idx[placement] += 1
+        self._input_idx = sorted(
+            range(len(self._input_idx)), key=self._input_idx.__getitem__
+        )
+
     def build(self, input_shapes: types.Nested[types.Shape]) -> None:
         if self.built:
             return
@@ -656,7 +672,8 @@ class DistributedEmbedding(keras.layers.Layer):
 
         # Go from deeply nested structure of inputs to flat inputs.
         flat_inputs = keras.tree.flatten(inputs)
-
+        # Rearrange to match order of self._placement_to_path_to_feature_config.
+        flat_inputs = [flat_inputs[i] for i in self._input_idx]
         # Go from flat to nested dict placement -> path -> input.
         placement_to_path_to_inputs = keras.tree.pack_sequence_as(
             self._placement_to_path_to_feature_config, flat_inputs
@@ -666,9 +683,11 @@ class DistributedEmbedding(keras.layers.Layer):
             # Same for weights if present.
             keras.tree.assert_same_structure(self._feature_configs, weights)
             flat_weights = keras.tree.flatten(weights)
+            flat_weights = [flat_weights[i] for i in self._input_idx]
             placement_to_path_to_weights = keras.tree.pack_sequence_as(
                 self._placement_to_path_to_feature_config, flat_weights
             )
+
         else:
             # Populate keys for weights.
             placement_to_path_to_weights = {
