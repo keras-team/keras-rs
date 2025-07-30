@@ -685,6 +685,77 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             res["feature3"].shape, (batch_size, EMBEDDING_OUTPUT_DIM)
         )
 
+    def test_mixed_placement(self):
+        if not self.on_tpu:
+            self.skipTest("Mixed placement test requires a TPU.")
+
+        # Use different embedding dimensions to verify that the correct tables
+        # are used for each feature.
+        embedding_output_dim1 = 16
+        embedding_output_dim2 = 32
+        embedding_output_dim3 = 64
+
+        # Intermix placement to exercise the change of order of inputs.
+        table1 = config.TableConfig(
+            name="table1",
+            vocabulary_size=VOCABULARY_SIZE,
+            embedding_dim=embedding_output_dim1,
+            placement="default_device",
+        )
+        table2 = config.TableConfig(
+            name="table2",
+            vocabulary_size=VOCABULARY_SIZE,
+            embedding_dim=embedding_output_dim2,
+            placement="sparsecore",
+        )
+        table3 = config.TableConfig(
+            name="table3",
+            vocabulary_size=VOCABULARY_SIZE,
+            embedding_dim=embedding_output_dim3,
+            placement="default_device",
+        )
+
+        embedding_config = {
+            "feature1": config.FeatureConfig(
+                name="feature1",
+                table=table1,
+                input_shape=(BATCH_SIZE_PER_CORE, 1),
+                output_shape=(BATCH_SIZE_PER_CORE, embedding_output_dim1),
+            ),
+            "feature2": config.FeatureConfig(
+                name="feature2",
+                table=table2,
+                input_shape=(BATCH_SIZE_PER_CORE, 1),
+                output_shape=(BATCH_SIZE_PER_CORE, embedding_output_dim2),
+            ),
+            "feature3": config.FeatureConfig(
+                name="feature3",
+                table=table3,
+                input_shape=(BATCH_SIZE_PER_CORE, 1),
+                output_shape=(BATCH_SIZE_PER_CORE, embedding_output_dim3),
+            ),
+        }
+
+        batch_size = self._strategy.num_replicas_in_sync * BATCH_SIZE_PER_CORE
+        inputs, _, _ = self.create_inputs_weights_and_labels(
+            batch_size, "dense", embedding_config
+        )
+
+        with self._strategy.scope():
+            layer = distributed_embedding.DistributedEmbedding(embedding_config)
+
+        res = self.run_with_strategy(layer.__call__, inputs)
+
+        self.assertEqual(
+            res["feature1"].shape, (batch_size, embedding_output_dim1)
+        )
+        self.assertEqual(
+            res["feature2"].shape, (batch_size, embedding_output_dim2)
+        )
+        self.assertEqual(
+            res["feature3"].shape, (batch_size, embedding_output_dim3)
+        )
+
     def test_save_load_model(self):
         batch_size = self._strategy.num_replicas_in_sync * BATCH_SIZE_PER_CORE
         feature_configs = self.get_embedding_config("dense", self.placement)
