@@ -146,14 +146,14 @@ class DistributedEmbedding(keras.layers.Layer):
     feature1 = keras_rs.layers.FeatureConfig(
         name="feature1",
         table=table1,
-        input_shape=(PER_REPLICA_BATCH_SIZE,),
-        output_shape=(PER_REPLICA_BATCH_SIZE, TABLE1_EMBEDDING_SIZE),
+        input_shape=(GLOBAL_BATCH_SIZE,),
+        output_shape=(GLOBAL_BATCH_SIZE, TABLE1_EMBEDDING_SIZE),
     )
     feature2 = keras_rs.layers.FeatureConfig(
         name="feature2",
         table=table2,
-        input_shape=(PER_REPLICA_BATCH_SIZE,),
-        output_shape=(PER_REPLICA_BATCH_SIZE, TABLE2_EMBEDDING_SIZE),
+        input_shape=(GLOBAL_BATCH_SIZE,),
+        output_shape=(GLOBAL_BATCH_SIZE, TABLE2_EMBEDDING_SIZE),
     )
 
     feature_configs = {
