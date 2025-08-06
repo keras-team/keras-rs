@@ -107,7 +107,9 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                 )
             self._tpu_feature_configs, self._sparse_core_embedding_config = (
                 config_conversion.translate_keras_rs_configuration(
-                    feature_configs, table_stacking
+                    feature_configs,
+                    table_stacking,
+                    strategy.num_replicas_in_sync,
                 )
             )
             if tpu_embedding_feature == EMBEDDING_FEATURE_V1:
