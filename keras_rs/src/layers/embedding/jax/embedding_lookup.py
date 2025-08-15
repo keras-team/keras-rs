@@ -45,6 +45,7 @@ class EmbeddingLookupConfiguration:
         samples_layout: JaxLayout | None = None,
         table_partition: jax.sharding.PartitionSpec | None = None,
         table_layout: JaxLayout | None = None,
+        sparse_input_partition = jax.sharding.PartitionSpec | None = None,
     ):
         self.mesh = mesh or jax.sharding.Mesh(jax.devices(), sharding_axis)
         self.feature_specs = feature_specs
@@ -66,6 +67,10 @@ class EmbeddingLookupConfiguration:
         self.table_partition = table_partition or jax.sharding.PartitionSpec(
             sharding_axis,
             None,  # type: ignore[no-untyped-call]
+        )
+        self.sparse_input_partition = (
+            sparse_input_partition
+            or embedding.PreprocessedInput.get_partition(sharding_axis)
         )
         self.table_layout = table_layout or jax.sharding.NamedSharding(
             self.mesh, self.table_partition
