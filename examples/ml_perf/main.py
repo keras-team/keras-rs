@@ -8,7 +8,7 @@ import keras
 
 import keras_rs
 
-from .dataloader import create_dummy_dataset
+from .dataloader import DataLoader
 from .model import DLRMDCNV2
 
 SEED = 1337
@@ -20,6 +20,7 @@ def main(
     large_emb_features,
     small_emb_features,
     label,
+    shuffle_buffer,
     embedding_dim,
     allow_id_dropping,
     max_ids_per_partition,
@@ -109,10 +110,18 @@ def main(
 
     # === Load dataset ===
     print("===== Loading dataset =====")
-    train_ds = create_dummy_dataset(
+    train_ds = DataLoader(
+        file_pattern=file_pattern,
         batch_size=per_host_batch_size,
+        dense_features=dense_features,
         large_emb_features=large_emb_features,
         small_emb_features=small_emb_features,
+        label=label,
+        training=True,
+    ).create_dataset(
+        process_id=distribution._process_id,
+        num_processes=num_processes,
+        shuffle_buffer=shuffle_buffer,
     )
     # For the multi-host case, the dataset has to be distributed manually.
     # See note here:
@@ -172,6 +181,8 @@ if __name__ == "__main__":
     ds_cfg = config["dataset"]
     # File path
     file_pattern = ds_cfg["file_pattern"]
+    # Shuffling
+    shuffle_buffer = ds_cfg["shuffle_buffer"]
     # Features
     label = ds_cfg["label"]
     dense_features = ds_cfg["dense"]
@@ -219,6 +230,7 @@ if __name__ == "__main__":
         large_emb_features,
         small_emb_features,
         label,
+        shuffle_buffer,
         embedding_dim,
         allow_id_dropping,
         max_ids_per_partition,

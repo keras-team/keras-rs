@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # ==============================================================================
 # Script Configuration & Argument Handling
@@ -12,7 +13,7 @@
 ACCELERATOR_TYPE=${1:-"v6e-8"}
 ZONE=${2:-"us-east5-a"}
 PROJECT=${3:-"tpu-prod-env-one-vm"}
-USER_CONFIG_NAME=${4} # Capture the fourth argument
+USER_CONFIG_NAME=${4}
 
 # Validate the provided accelerator type
 if [[ "${ACCELERATOR_TYPE}" != "v6e-8" && "${ACCELERATOR_TYPE}" != "v6e-16" ]]; then
