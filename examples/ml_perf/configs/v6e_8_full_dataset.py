@@ -16,5 +16,6 @@ config.dataset.file_pattern = (
 )
 config.model = model_config
 config.training = training_config
+config.training.batch_size = 4224
 
 config.freeze()
