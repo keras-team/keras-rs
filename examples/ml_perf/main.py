@@ -162,11 +162,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print(f"===== Reading config from {args.config_name} ======")
-    config = (
-        importlib.import_module(
-            f".configs.{args.config_name}", package=__package__
-        ).config
-    )
+    config = importlib.import_module(
+        f".configs.{args.config_name}", package=__package__
+    ).config
 
     # === Unpack args from config ===
 

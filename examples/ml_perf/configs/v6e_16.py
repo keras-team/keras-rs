@@ -1,7 +1,8 @@
+from keras.utils import Config
+
 from .datasets.dummy_dataset import dataset_config
 from .models.default_model import model_config
 from .training.default_training import training_config
-from keras.utils import Config
 
 config = Config()
 
