@@ -5,7 +5,7 @@ dataset_config = Config()
 dataset_config.file_pattern = None
 # Features
 dataset_config.label = "clicked"
-dataset_config.dense = [f"int-feature-{i}" for i in range(13)]
+dataset_config.dense = [f"int-feature-{i}" for i in range(1, 14)]
 dataset_config.sparse = [
     {
         "name": "categorical-feature-14",
