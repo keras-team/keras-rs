@@ -37,7 +37,7 @@ def main(
     devices = keras.distribution.list_devices(device_type="tpu")
     distribution = keras.distribution.DataParallel(devices=devices)
     keras.distribution.set_distribution(distribution)
-    num_processes = distribution._num_process()
+    num_processes = distribution._num_process
 
     per_host_batch_size = global_batch_size // num_processes
 
