@@ -22,7 +22,6 @@ fi
 # ==============================================================================
 # Environment Variables
 # ==============================================================================
-# TPU name is generated dynamically. Zone and Project are set from args or defaults.
 export TPU_NAME="abheesht-mlperf-${ACCELERATOR_TYPE}"
 export ZONE
 export PROJECT
@@ -95,7 +94,6 @@ gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} \
 # ==============================================================================
 # Run Training Script
 # ==============================================================================
-# The config path is now also set dynamically.
 echo ">>> Running the main script with config for ${ACCELERATOR_TYPE}..."
 gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} \
   --project ${PROJECT} \
