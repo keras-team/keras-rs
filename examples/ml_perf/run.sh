@@ -5,20 +5,50 @@ set -euo pipefail
 # Script Configuration & Argument Handling
 # ==============================================================================
 # This script accepts up to four optional arguments:
-# 1. Accelerator Type (default: v6e-8, options: v6e-8, v6e-16)
-# 2. Zone (default: us-east5-a)
-# 3. Project (default: tpu-prod-env-one-vm)
-# 4. Config Name (default: derived from accelerator type, e.g., v6e_8)
+# 1. --accelerator-type (default: v6e-8, options: v6e-8, v6e-16)
+# 2. --zone (default: us-east5-a)
+# 3. --project (default: tpu-prod-env-one-vm)
+# 4. --config-name (default: derived from accelerator type, e.g., v6e_8)
 
-ACCELERATOR_TYPE=${1:-"v6e-8"}
-ZONE=${2:-"us-east5-a"}
-PROJECT=${3:-"tpu-prod-env-one-vm"}
-USER_CONFIG_NAME=${4:-""} # Initialize with an empty string if not provided
+# Defaults
+ACCELERATOR_TYPE="v6e-8"
+ZONE="us-east5-a"
+PROJECT="tpu-prod-env-one-vm"
+USER_CONFIG_NAME=""
+
+# ==============================================================================
+# Argument Parsing
+# ==============================================================================
+
+show_help() {
+cat << EOF
+Usage: $0 [--accelerator-type <type>] [--zone <zone>] [--project <project>] [--config-name <name>]
+Options:
+  --accelerator-type  The type of TPU accelerator (default: v6e-8). Options: v6e-8, v6e-16.
+  --zone              The GCP zone for the TPU VM (default: us-east5-a).
+  --project           The GCP project ID (default: tpu-prod-env-one-vm).
+  --config-name       The specific configuration name to use for the training script.
+                      (default: derived from accelerator type, e.g., v6e_8).
+  -h, --help          Show this help message.
+EOF
+}
+
+
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --accelerator-type) ACCELERATOR_TYPE="$2"; shift ;;
+        --zone) ZONE="$2"; shift ;;
+        --project) PROJECT="$2"; shift ;;
+        --config-name) USER_CONFIG_NAME="$2"; shift ;;
+        *) echo "Unknown parameter passed: $1"; show_help; exit 1 ;;
+    esac
+    shift
+done
 
 # Validate the provided accelerator type
 if [[ "${ACCELERATOR_TYPE}" != "v6e-8" && "${ACCELERATOR_TYPE}" != "v6e-16" ]]; then
     echo "Error: Invalid accelerator type '${ACCELERATOR_TYPE}'." >&2
-    echo "Usage: $0 [v6e-8|v6e-16] [gcp_zone] [gcp_project] [config_name]" >&2
+    show_help
     exit 1
 fi
 
