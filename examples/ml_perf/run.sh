@@ -7,10 +7,12 @@
 # 1. Accelerator Type (default: v6e-8, options: v6e-8, v6e-16)
 # 2. Zone (default: us-east5-a)
 # 3. Project (default: tpu-prod-env-one-vm)
+# 4. Config Name (default: derived from accelerator type, e.g., v6e_8)
 
 ACCELERATOR_TYPE=${1:-"v6e-8"}
 ZONE=${2:-"us-east5-a"}
 PROJECT=${3:-"tpu-prod-env-one-vm"}
+USER_CONFIG_NAME=${4} # Capture the fourth argument
 
 # Validate the provided accelerator type
 if [[ "${ACCELERATOR_TYPE}" != "v6e-8" && "${ACCELERATOR_TYPE}" != "v6e-16" ]]; then
@@ -26,11 +28,19 @@ export TPU_NAME="abheesht-mlperf-${ACCELERATOR_TYPE}"
 export ZONE
 export PROJECT
 
+# Use the user-provided config name if it exists, otherwise derive it.
+if [[ -n "${USER_CONFIG_NAME}" ]]; then
+  export CONFIG_NAME=${USER_CONFIG_NAME}
+else
+  export CONFIG_NAME=${ACCELERATOR_TYPE//-/_}
+fi
+
 echo ">>> Using Configuration:"
 echo "    Accelerator: ${ACCELERATOR_TYPE}"
 echo "    TPU Name:    ${TPU_NAME}"
 echo "    Zone:        ${ZONE}"
 echo "    Project:     ${PROJECT}"
+echo "    Config Name: ${CONFIG_NAME}"
 echo "--------------------------------------------------"
 
 
@@ -99,6 +109,6 @@ gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} \
   --project ${PROJECT} \
   --zone ${ZONE} \
   --worker=all \
-  --command="source .keras-env/bin/activate && cd keras-rs && python3 -m examples.ml_perf.main --config_name ${ACCELERATOR_TYPE}"
+  --command="source .keras-env/bin/activate && cd keras-rs && python3 -m examples.ml_perf.main --config_name ${CONFIG_NAME}"
 
 echo ">>> Script finished."
