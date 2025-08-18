@@ -117,7 +117,7 @@ class DataLoader:
 
     def _preprocess(self, example):
         # Read example.
-        feature_spec = self.get_feature_spec()
+        feature_spec = self._get_feature_spec()
         example = tf.io.parse_single_example(example, feature_spec)
 
         # Dense features
