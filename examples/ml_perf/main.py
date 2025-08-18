@@ -182,7 +182,7 @@ if __name__ == "__main__":
     # File path
     file_pattern = ds_cfg["file_pattern"]
     # Shuffling
-    shuffle_buffer = ds_cfg["shuffle_buffer"]
+    shuffle_buffer = ds_cfg.get("shuffle_buffer", None)
     # Features
     label = ds_cfg["label"]
     dense_features = ds_cfg["dense"]
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     num_epochs = training_cfg["num_epochs"]
 
     # For features which have vocabulary_size < embedding_threshold, we can
-    # just do a normal dense lookup for those instead of have distributed
+    # just do a normal dense lookup for those instead of having distributed
     # embeddings. We could ideally pass `placement = default_device` to
     # `keras_rs.layers.TableConfig` directly (and wouldn't have to do this
     # separation of features), but doing it that way will necessarily require
