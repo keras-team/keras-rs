@@ -106,7 +106,7 @@ class DLRMDCNV2(keras.Model):
         # Distributed embeddings for large embedding tables
         self.embedding_layer = keras_rs.layers.DistributedEmbedding(
             feature_configs=large_emb_feature_configs,
-            table_stacking="auto_stacking",
+            table_stacking="auto",
             dtype=dtype,
             name="embedding_layer",
         )
