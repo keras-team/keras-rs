@@ -45,8 +45,6 @@ def main(
     # === Distributed embeddings' configs for sparse features ===
     feature_configs = {}
     for large_emb_feature in large_emb_features:
-        # Rename these features to something shorter; was facing some weird
-        # issues with the longer names.
         feature_name = large_emb_feature["new_name"]
         vocabulary_size = large_emb_feature["vocabulary_size"]
         multi_hot_size = large_emb_feature["multi_hot_size"]
