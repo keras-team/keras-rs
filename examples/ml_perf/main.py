@@ -147,7 +147,7 @@ def main(
         break
 
     # Train the model.
-    model.fit(train_generator, epochs=1)
+    model.fit(train_generator, epochs=num_epochs)
 
 
 if __name__ == "__main__":
