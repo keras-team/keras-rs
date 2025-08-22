@@ -15,7 +15,6 @@ from jax_tpu_embedding.sparsecore.lib.nn import (
     table_stacking as jte_table_stacking,
 )
 from jax_tpu_embedding.sparsecore.utils import utils as jte_utils
-from keras.src import backend
 
 from keras_rs.src import types
 from keras_rs.src.layers.embedding import base_distributed_embedding
@@ -247,23 +246,6 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         )
         return sparsecore_distribution, sparsecore_layout
 
-    def _create_cpu_distribution(
-        self, cpu_axis_name: str = "cpu"
-    ) -> tuple[
-        keras.distribution.ModelParallel, keras.distribution.TensorLayout
-    ]:
-        """Share a variable across all CPU processes."""
-        cpu_devices = jax.devices("cpu")
-        device_mesh = keras.distribution.DeviceMesh(
-            (len(cpu_devices),), [cpu_axis_name], cpu_devices
-        )
-        replicated_layout = keras.distribution.TensorLayout([], device_mesh)
-        layout_map = keras.distribution.LayoutMap(device_mesh=device_mesh)
-        cpu_distribution = keras.distribution.ModelParallel(
-            layout_map=layout_map
-        )
-        return cpu_distribution, replicated_layout
-
     def _add_sparsecore_weight(
         self,
         name: str,
@@ -405,11 +387,6 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         self._sparsecore_layout = sparsecore_layout
         self._sparsecore_distribution = sparsecore_distribution
 
-        # Distribution for CPU operations.
-        cpu_distribution, cpu_layout = self._create_cpu_distribution()
-        self._cpu_distribution = cpu_distribution
-        self._cpu_layout = cpu_layout
-
         mesh = sparsecore_distribution.device_mesh.backend_mesh
         global_device_count = mesh.devices.size
         num_sc_per_device = jte_utils.num_sparsecores_per_device(
@@ -466,10 +443,6 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         # Collect all stacked tables.
         table_specs = embedding_utils.get_table_specs(feature_specs)
         table_stacks = embedding_utils.get_table_stacks(table_specs)
-        stacked_table_specs = {
-            stack_name: stack[0].stacked_table_spec
-            for stack_name, stack in table_stacks.items()
-        }
 
         # Create variables for all stacked tables and slot variables.
         with sparsecore_distribution.scope():
@@ -501,50 +474,6 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                 trainable=True,
             )
             self._iterations.overwrite_with_gradient = True
-
-        with cpu_distribution.scope():
-            # Create variables to track static buffer size and max IDs for each
-            # table during preprocessing.  These variables are shared across all
-            # processes on CPU.  We don't add these via `add_weight` because we
-            # can't have them passed to the training function.
-            replicated_zeros_initializer = ShardedInitializer(
-                "zeros", cpu_layout
-            )
-
-            with backend.name_scope(self.name, caller=self):
-                self._preprocessing_buffer_size = {
-                    table_name: backend.Variable(
-                        initializer=replicated_zeros_initializer,
-                        shape=(),
-                        dtype=backend.standardize_dtype("int32"),
-                        trainable=False,
-                        name=table_name + ":preprocessing:buffer_size",
-                    )
-                    for table_name in stacked_table_specs.keys()
-                }
-                self._preprocessing_max_unique_ids_per_partition = {
-                    table_name: backend.Variable(
-                        shape=(),
-                        name=table_name
-                        + ":preprocessing:max_unique_ids_per_partition",
-                        initializer=replicated_zeros_initializer,
-                        dtype=backend.standardize_dtype("int32"),
-                        trainable=False,
-                    )
-                    for table_name in stacked_table_specs.keys()
-                }
-
-                self._preprocessing_max_ids_per_partition = {
-                    table_name: backend.Variable(
-                        shape=(),
-                        name=table_name
-                        + ":preprocessing:max_ids_per_partition",
-                        initializer=replicated_zeros_initializer,
-                        dtype=backend.standardize_dtype("int32"),
-                        trainable=False,
-                    )
-                    for table_name in stacked_table_specs.keys()
-                }
 
         self._config = jte_embedding_lookup.EmbeddingLookupConfiguration(
             feature_specs,
@@ -660,76 +589,35 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             mesh.devices.item(0)
         )
 
-        # Get current buffer size/max_ids.
-        previous_max_ids_per_partition = keras.tree.map_structure(
-            lambda max_ids_per_partition: max_ids_per_partition.value.item(),
-            self._preprocessing_max_ids_per_partition,
-        )
-        previous_max_unique_ids_per_partition = keras.tree.map_structure(
-            lambda max_unique_ids_per_partition: (
-                max_unique_ids_per_partition.value.item()
-            ),
-            self._preprocessing_max_unique_ids_per_partition,
-        )
-        previous_buffer_size = keras.tree.map_structure(
-            lambda buffer_size: buffer_size.value.item(),
-            self._preprocessing_buffer_size,
-        )
-
         preprocessed, stats = embedding_utils.stack_and_shard_samples(
             self._config.feature_specs,
             samples,
             local_device_count,
             global_device_count,
             num_sc_per_device,
-            static_buffer_size=previous_buffer_size,
         )
 
-        # Extract max unique IDs and buffer sizes.
-        # We need to replicate this value across all local CPU devices.
         if training:
+            # Synchronize input statistics across all devices and update the
+            # underlying stacked tables specs in the feature specs.
+            prev_stats = embedding_utils.get_stacked_table_stats(
+                self._config.feature_specs
+            )
+
+            # Take the maximum with existing stats.
+            stats = keras.tree.map_structure(max, prev_stats, stats)
+
+            # Flatten the stats so we can more efficiently transfer them
+            # between hosts.  We use jax.tree because we will later need to
+            # unflatten.
+            flat_stats, stats_treedef = jax.tree.flatten(stats)
+
+            # In the case of multiple local CPU devices per host, we need to
+            # replicate the stats to placate JAX collectives.
             num_local_cpu_devices = jax.local_device_count("cpu")
-            local_max_ids_per_partition = {
-                table_name: np.repeat(
-                    # Maximum across all partitions and previous max.
-                    np.maximum(
-                        np.max(elems),
-                        previous_max_ids_per_partition[table_name],
-                    ),
-                    num_local_cpu_devices,
-                )
-                for table_name, elems in stats.max_ids_per_partition.items()
-            }
-            local_max_unique_ids_per_partition = {
-                name: np.repeat(
-                    # Maximum across all partitions and previous max.
-                    np.maximum(
-                        np.max(elems),
-                        previous_max_unique_ids_per_partition[name],
-                    ),
-                    num_local_cpu_devices,
-                )
-                for name, elems in stats.max_unique_ids_per_partition.items()
-            }
-            local_buffer_size = {
-                table_name: np.repeat(
-                    np.maximum(
-                        np.max(
-                            # Round values up to the next multiple of 8.
-                            # Currently using this as a proxy for the actual
-                            # required buffer size.
-                            ((elems + 7) // 8) * 8
-                        )
-                        * global_device_count
-                        * num_sc_per_device
-                        * local_device_count
-                        * num_sc_per_device,
-                        previous_buffer_size[table_name],
-                    ),
-                    num_local_cpu_devices,
-                )
-                for table_name, elems in stats.max_ids_per_partition.items()
-            }
+            tiled_stats = np.tile(
+                np.array(flat_stats, dtype=np.int32), (num_local_cpu_devices, 1)
+            )
 
             # Aggregate variables across all processes/devices.
             max_across_cpus = jax.pmap(
@@ -737,48 +625,24 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                     x, "all_cpus"
                 ),
                 axis_name="all_cpus",
-                devices=self._cpu_layout.device_mesh.backend_mesh.devices,
+                backend="cpu",
             )
-            new_max_ids_per_partition = max_across_cpus(
-                local_max_ids_per_partition
-            )
-            new_max_unique_ids_per_partition = max_across_cpus(
-                local_max_unique_ids_per_partition
-            )
-            new_buffer_size = max_across_cpus(local_buffer_size)
+            flat_stats = max_across_cpus(tiled_stats)[0].tolist()
+            stats = jax.tree.unflatten(stats_treedef, flat_stats)
 
-            # Assign new preprocessing parameters.
-            with self._cpu_distribution.scope():
-                # For each process, all max ids/buffer sizes are replicated
-                # across all local devices.  Take the value from the first
-                # device.
-                keras.tree.map_structure(
-                    lambda var, values: var.assign(values[0]),
-                    self._preprocessing_max_ids_per_partition,
-                    new_max_ids_per_partition,
+            # Update configuration and repeat preprocessing if stats changed.
+            if stats != prev_stats:
+                embedding_utils.update_stacked_table_stats(
+                    self._config.feature_specs, stats
                 )
-                keras.tree.map_structure(
-                    lambda var, values: var.assign(values[0]),
-                    self._preprocessing_max_unique_ids_per_partition,
-                    new_max_unique_ids_per_partition,
-                )
-                keras.tree.map_structure(
-                    lambda var, values: var.assign(values[0]),
-                    self._preprocessing_buffer_size,
-                    new_buffer_size,
-                )
-                # Update parameters in the underlying feature specs.
-                int_max_ids_per_partition = keras.tree.map_structure(
-                    lambda varray: varray.item(), new_max_ids_per_partition
-                )
-                int_max_unique_ids_per_partition = keras.tree.map_structure(
-                    lambda varray: varray.item(),
-                    new_max_unique_ids_per_partition,
-                )
-                embedding_utils.update_stacked_table_specs(
+
+                # Re-execute preprocessing with consistent input statistics.
+                preprocessed, _ = embedding_utils.stack_and_shard_samples(
                     self._config.feature_specs,
-                    int_max_ids_per_partition,
-                    int_max_unique_ids_per_partition,
+                    samples,
+                    local_device_count,
+                    global_device_count,
+                    num_sc_per_device,
                 )
 
         return {"inputs": preprocessed}

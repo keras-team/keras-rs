@@ -35,6 +35,12 @@ class ShardedCooMatrix(NamedTuple):
     values: ArrayLike
 
 
+class InputStatsPerTable(NamedTuple):
+    max_ids_per_partition: int
+    max_unique_ids_per_partition: int
+    required_buffer_size_per_device: int
+
+
 def _round_up_to_multiple(value: int, multiple: int) -> int:
     return ((value + multiple - 1) // multiple) * multiple
 
@@ -335,19 +341,47 @@ def get_table_stacks(
     return stacked_table_specs
 
 
-def update_stacked_table_specs(
+def get_stacked_table_stats(
     feature_specs: Nested[FeatureSpec],
-    max_ids_per_partition: Mapping[str, int],
-    max_unique_ids_per_partition: Mapping[str, int],
+) -> dict[str, InputStatsPerTable]:
+    """Extracts the stacked-table input statistics from the feature specs.
+
+    Args:
+        feature_specs: Feature specs from which to extracts the statistics.
+
+    Returns:
+        A mapping of stacked table names to input statistics per table.
+    """
+    stacked_table_specs: dict[str, StackedTableSpec] = {}
+    for feature_spec in jax.tree.flatten(feature_specs)[0]:
+        feature_spec = typing.cast(FeatureSpec, feature_spec)
+        stacked_table_spec = typing.cast(
+            StackedTableSpec, feature_spec.table_spec.stacked_table_spec
+        )
+        stacked_table_specs[stacked_table_spec.stack_name] = stacked_table_spec
+
+    stats: dict[str, InputStatsPerTable] = {}
+    for stacked_table_spec in stacked_table_specs.values():
+        buffer_size = stacked_table_spec.suggested_coo_buffer_size_per_device
+        buffer_size = buffer_size or 0
+        stats[stacked_table_spec.stack_name] = InputStatsPerTable(
+            max_ids_per_partition=stacked_table_spec.max_ids_per_partition,
+            max_unique_ids_per_partition=stacked_table_spec.max_unique_ids_per_partition,
+            required_buffer_size_per_device=buffer_size,
+        )
+
+    return stats
+
+
+def update_stacked_table_stats(
+    feature_specs: Nested[FeatureSpec],
+    stats: Mapping[str, InputStatsPerTable],
 ) -> None:
-    """Updates properties in the supplied feature specs.
+    """Updates stacked-table input properties in the supplied feature specs.
 
     Args:
         feature_specs: Feature specs to update in-place.
-        max_ids_per_partition: Mapping of table stack name to
-            new `max_ids_per_partition` for the stack.
-        max_unique_ids_per_partition: Mapping of table stack name to
-            new `max_unique_ids_per_partition` for the stack.
+        stats: Per-stacked-table input statistics.
     """
     # Collect table specs and stacked table specs.
     table_specs: dict[str, TableSpec] = {}
@@ -363,18 +397,17 @@ def update_stacked_table_specs(
         stacked_table_specs[stacked_table_spec.stack_name] = stacked_table_spec
 
     # Replace fields in the stacked_table_specs.
-    stacked_table_specs = {
-        stack_name: dataclasses.replace(
+    stack_names = stacked_table_specs.keys()
+    for stack_name in stack_names:
+        stack_stats = stats[stack_name]
+        stacked_table_spec = stacked_table_specs[stack_name]
+        buffer_size = stack_stats.required_buffer_size_per_device or None
+        stacked_table_specs[stack_name] = dataclasses.replace(
             stacked_table_spec,
-            max_ids_per_partition=max_ids_per_partition[
-                stacked_table_spec.stack_name
-            ],
-            max_unique_ids_per_partition=max_unique_ids_per_partition[
-                stacked_table_spec.stack_name
-            ],
+            max_ids_per_partition=stack_stats.max_ids_per_partition,
+            max_unique_ids_per_partition=stack_stats.max_unique_ids_per_partition,
+            suggested_coo_buffer_size_per_device=buffer_size,
         )
-        for stack_name, stacked_table_spec in stacked_table_specs.items()
-    }
 
     # Insert new stacked tables into tables.
     for table_spec in table_specs.values():
@@ -534,7 +567,7 @@ def stack_and_shard_samples(
     global_device_count: int,
     num_sc_per_device: int,
     static_buffer_size: int | Mapping[str, int] | None = None,
-) -> tuple[dict[str, ShardedCooMatrix], embedding.SparseDenseMatmulInputStats]:
+) -> tuple[dict[str, ShardedCooMatrix], dict[str, InputStatsPerTable]]:
     """Prepares input samples for use in embedding lookups.
 
     Args:
@@ -544,8 +577,8 @@ def stack_and_shard_samples(
         global_device_count: Number of global JAX devices.
         num_sc_per_device: Number of sparsecores per device.
         static_buffer_size: The static buffer size to use for the samples.
-            Defaults to None, in which case an upper-bound for the buffer size
-            will be automatically determined.
+          Defaults to None, in which case an upper-bound for the buffer size
+          will be automatically determined.
 
     Returns:
         The preprocessed inputs, and statistics useful for updating FeatureSpecs
@@ -579,6 +612,7 @@ def stack_and_shard_samples(
     )
 
     out: dict[str, ShardedCooMatrix] = {}
+    out_stats: dict[str, InputStatsPerTable] = {}
     tables_names = preprocessed_inputs.lhs_row_pointers.keys()
     for table_name in tables_names:
         shard_ends = preprocessed_inputs.lhs_row_pointers[table_name]
@@ -592,5 +626,17 @@ def stack_and_shard_samples(
             row_ids=preprocessed_inputs.lhs_sample_ids[table_name],
             values=preprocessed_inputs.lhs_gains[table_name],
         )
+        out_stats[table_name] = InputStatsPerTable(
+            max_ids_per_partition=np.max(
+                stats.max_ids_per_partition[table_name]
+            ),
+            max_unique_ids_per_partition=np.max(
+                stats.max_unique_ids_per_partition[table_name]
+            ),
+            required_buffer_size_per_device=np.max(
+                stats.required_buffer_size_per_sc[table_name]
+            )
+            * num_sc_per_device,
+        )
 
-    return out, stats
+    return out, out_stats
