@@ -611,7 +611,9 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
 
         self.assertEqual(res.shape, (self.batch_size, EMBEDDING_OUTPUT_DIM))
 
-        tables = layer.get_embedding_tables()
+        with self._strategy.scope():
+            tables = layer.get_embedding_tables()
+
         emb = tables["table"]
 
         if input_type == "dense":
