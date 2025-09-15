@@ -1,13 +1,13 @@
 # Tensorflow.
-tensorflow-cpu~=2.18.0;sys_platform != 'darwin'
-tensorflow~=2.18.0;sys_platform == 'darwin'
+tensorflow-cpu>=2.20.0;sys_platform != 'darwin'
+tensorflow>=2.20.0;sys_platform == 'darwin'
 
 # Torch.
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch>=2.1.0
 
 # Jax.
-jax[cpu]>=0.6.2
+jax[cpu]>=0.7.0
 jax-tpu-embedding;sys_platform == 'linux' and platform_machine == 'x86_64'
 
 # pre-commit checks (formatting, linting, etc.)
