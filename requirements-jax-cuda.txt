@@ -1,5 +1,5 @@
 # Tensorflow cpu-only version.
-tensorflow-cpu
+tensorflow-cpu>=2.20.0
 
 # Torch cpu-only version.
 --extra-index-url https://download.pytorch.org/whl/cpu
@@ -8,7 +8,7 @@ torch>=2.1.0
 # Jax with cuda support.
 # Keep same version as Keras repo.
 --find-links https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-jax[cuda12]==0.6.2
+jax[cuda12]>=0.7.0
 
 # Support for large embeddings.
 jax-tpu-embedding;sys_platform == 'linux' and platform_machine == 'x86_64'
