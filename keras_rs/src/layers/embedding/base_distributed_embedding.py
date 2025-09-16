@@ -822,13 +822,13 @@ class DistributedEmbedding(keras.layers.Layer):
         table_stacking: str | Sequence[Sequence[str]],
     ) -> None:
         del table_stacking
-        table_to_embedding_layer: dict[TableConfig, EmbedReduce] = {}
+        table_config_id_to_embedding_layer: dict[int, EmbedReduce] = {}
         self._default_device_embedding_layers: dict[str, EmbedReduce] = {}
 
         for path, feature_config in feature_configs.items():
-            if feature_config.table in table_to_embedding_layer:
+            if id(feature_config.table) in table_config_id_to_embedding_layer:
                 self._default_device_embedding_layers[path] = (
-                    table_to_embedding_layer[feature_config.table]
+                    table_config_id_to_embedding_layer[id(feature_config.table)]
                 )
             else:
                 embedding_layer = EmbedReduce(
@@ -838,7 +838,9 @@ class DistributedEmbedding(keras.layers.Layer):
                     embeddings_initializer=feature_config.table.initializer,
                     combiner=feature_config.table.combiner,
                 )
-                table_to_embedding_layer[feature_config.table] = embedding_layer
+                table_config_id_to_embedding_layer[id(feature_config.table)] = (
+                    embedding_layer
+                )
                 self._default_device_embedding_layers[path] = embedding_layer
 
     def _default_device_build(
@@ -1013,8 +1015,8 @@ class DistributedEmbedding(keras.layers.Layer):
 
         # The serialized `TableConfig` objects.
         table_config_dicts: list[dict[str, Any]] = []
-        # Mapping from `TableConfig` to index in `table_config_dicts`.
-        table_config_indices: dict[TableConfig, int] = {}
+        # Mapping from `TableConfig` id to index in `table_config_dicts`.
+        table_config_id_to_index: dict[int, int] = {}
 
         def serialize_feature_config(
             feature_config: FeatureConfig,
@@ -1024,17 +1026,17 @@ class DistributedEmbedding(keras.layers.Layer):
             # key.
             feature_config_dict = feature_config.get_config()
 
-            if feature_config.table not in table_config_indices:
+            if id(feature_config.table) not in table_config_id_to_index:
                 # Save the serialized `TableConfig` the first time we see it and
                 # remember its index.
-                table_config_indices[feature_config.table] = len(
+                table_config_id_to_index[id(feature_config.table)] = len(
                     table_config_dicts
                 )
                 table_config_dicts.append(feature_config_dict["table"])
 
             # Replace the serialized `TableConfig` with its index.
-            feature_config_dict["table"] = table_config_indices[
-                feature_config.table
+            feature_config_dict["table"] = table_config_id_to_index[
+                id(feature_config.table)
             ]
             return feature_config_dict
 

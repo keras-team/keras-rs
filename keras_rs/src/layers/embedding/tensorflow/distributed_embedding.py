@@ -106,7 +106,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                     "for the configuration."
                 )
             self._tpu_feature_configs, self._sparse_core_embedding_config = (
-                config_conversion.translate_keras_rs_configuration(
+                config_conversion.keras_to_tf_tpu_configuration(
                     feature_configs,
                     table_stacking,
                     strategy.num_replicas_in_sync,
@@ -135,10 +135,10 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                     "supported with this TPU generation."
                 )
             self._tpu_feature_configs = (
-                config_conversion.clone_tf_feature_configs(feature_configs)
+                config_conversion.clone_tf_tpu_feature_configs(feature_configs)
             )
 
-        self._tpu_optimizer = config_conversion.translate_optimizer(
+        self._tpu_optimizer = config_conversion.to_tf_tpu_optimizer(
             self._optimizer
         )
 
