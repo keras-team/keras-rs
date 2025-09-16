@@ -53,7 +53,7 @@ OPTIMIZER_MAPPINGS = {
 # KerasRS to TensorFlow
 
 
-def translate_keras_rs_configuration(
+def keras_to_tf_tpu_configuration(
     feature_configs: types.Nested[FeatureConfig],
     table_stacking: str | Sequence[str] | Sequence[Sequence[str]],
     num_replicas_in_sync: int,
@@ -66,14 +66,15 @@ def translate_keras_rs_configuration(
     Args:
       feature_configs: The nested Keras RS feature configs.
       table_stacking: The Keras RS table stacking.
+      num_replicas_in_sync: The number of replicas in sync from the strategy.
 
     Returns:
       A tuple containing the TensorFlow TPU feature configs and the TensorFlow
       TPU sparse core embedding config.
     """
-    tables: dict[TableConfig, tf.tpu.experimental.embedding.TableConfig] = {}
+    tables: dict[int, tf.tpu.experimental.embedding.TableConfig] = {}
     feature_configs = keras.tree.map_structure(
-        lambda f: translate_keras_rs_feature_config(
+        lambda f: keras_to_tf_tpu_feature_config(
             f, tables, num_replicas_in_sync
         ),
         feature_configs,
@@ -108,9 +109,9 @@ def translate_keras_rs_configuration(
     return feature_configs, sparse_core_embedding_config
 
 
-def translate_keras_rs_feature_config(
+def keras_to_tf_tpu_feature_config(
     feature_config: FeatureConfig,
-    tables: dict[TableConfig, tf.tpu.experimental.embedding.TableConfig],
+    tables: dict[int, tf.tpu.experimental.embedding.TableConfig],
     num_replicas_in_sync: int,
 ) -> tf.tpu.experimental.embedding.FeatureConfig:
     """Translates a Keras RS feature config to a TensorFlow TPU feature config.
@@ -120,7 +121,8 @@ def translate_keras_rs_feature_config(
 
     Args:
       feature_config: The Keras RS feature config to translate.
-      tables: A mapping of KerasRS table configs to TF TPU table configs.
+      tables: A mapping of KerasRS table config ids to TF TPU table configs.
+      num_replicas_in_sync: The number of replicas in sync from the strategy.
 
     Returns:
       The TensorFlow TPU feature config.
@@ -131,10 +133,10 @@ def translate_keras_rs_feature_config(
             f"but got {num_replicas_in_sync}."
         )
 
-    table = tables.get(feature_config.table, None)
+    table = tables.get(id(feature_config.table), None)
     if table is None:
-        table = translate_keras_rs_table_config(feature_config.table)
-        tables[feature_config.table] = table
+        table = keras_to_tf_tpu_table_config(feature_config.table)
+        tables[id(feature_config.table)] = table
 
     if len(feature_config.output_shape) < 2:
         raise ValueError(
@@ -168,7 +170,7 @@ def translate_keras_rs_feature_config(
     )
 
 
-def translate_keras_rs_table_config(
+def keras_to_tf_tpu_table_config(
     table_config: TableConfig,
 ) -> tf.tpu.experimental.embedding.TableConfig:
     initializer = table_config.initializer
@@ -179,13 +181,13 @@ def translate_keras_rs_table_config(
         vocabulary_size=table_config.vocabulary_size,
         dim=table_config.embedding_dim,
         initializer=initializer,
-        optimizer=translate_optimizer(table_config.optimizer),
+        optimizer=to_tf_tpu_optimizer(table_config.optimizer),
         combiner=table_config.combiner,
         name=table_config.name,
     )
 
 
-def translate_keras_optimizer(
+def keras_to_tf_tpu_optimizer(
     optimizer: keras.optimizers.Optimizer,
 ) -> TfTpuOptimizer:
     """Translates a Keras optimizer to a TensorFlow TPU `_Optimizer`.
@@ -238,7 +240,12 @@ def translate_keras_optimizer(
             "Unsupported optimizer option `Optimizer.loss_scale_factor`."
         )
 
-    optimizer_mapping = OPTIMIZER_MAPPINGS.get(type(optimizer), None)
+    optimizer_mapping = None
+    for optimizer_class, mapping in OPTIMIZER_MAPPINGS.items():
+        # Handle subclasses of the main optimizer class.
+        if isinstance(optimizer, optimizer_class):
+            optimizer_mapping = mapping
+            break
     if optimizer_mapping is None:
         raise ValueError(
             f"Unsupported optimizer type {type(optimizer)}. Optimizer must be "
@@ -258,7 +265,7 @@ def translate_keras_optimizer(
     return optimizer_mapping.tpu_optimizer_class(**tpu_optimizer_kwargs)
 
 
-def translate_optimizer(
+def to_tf_tpu_optimizer(
     optimizer: str | keras.optimizers.Optimizer | TfTpuOptimizer | None,
 ) -> TfTpuOptimizer:
     """Translates a Keras optimizer into a TensorFlow TPU `_Optimizer`.
@@ -299,7 +306,7 @@ def translate_optimizer(
                 "'sgd', 'adagrad', 'adam', or 'ftrl'"
             )
     elif isinstance(optimizer, keras.optimizers.Optimizer):
-        return translate_keras_optimizer(optimizer)
+        return keras_to_tf_tpu_optimizer(optimizer)
     else:
         raise ValueError(
             f"Unknown optimizer type {type(optimizer)}. Please pass an "
@@ -312,7 +319,7 @@ def translate_optimizer(
 # TensorFlow to TensorFlow
 
 
-def clone_tf_feature_configs(
+def clone_tf_tpu_feature_configs(
     feature_configs: types.Nested[tf.tpu.experimental.embedding.FeatureConfig],
 ) -> types.Nested[tf.tpu.experimental.embedding.FeatureConfig]:
     """Clones and resolves TensorFlow TPU feature configs.
@@ -327,7 +334,7 @@ def clone_tf_feature_configs(
     """
     table_configs_dict = {}
 
-    def clone_and_resolve_tf_feature_config(
+    def clone_and_resolve_tf_tpu_feature_config(
         fc: tf.tpu.experimental.embedding.FeatureConfig,
     ) -> tf.tpu.experimental.embedding.FeatureConfig:
         if fc.table not in table_configs_dict:
@@ -336,7 +343,7 @@ def clone_tf_feature_configs(
                     vocabulary_size=fc.table.vocabulary_size,
                     dim=fc.table.dim,
                     initializer=fc.table.initializer,
-                    optimizer=translate_optimizer(fc.table.optimizer),
+                    optimizer=to_tf_tpu_optimizer(fc.table.optimizer),
                     combiner=fc.table.combiner,
                     name=fc.table.name,
                     quantization_config=fc.table.quantization_config,
@@ -352,5 +359,5 @@ def clone_tf_feature_configs(
         )
 
     return keras.tree.map_structure(
-        clone_and_resolve_tf_feature_config, feature_configs
+        clone_and_resolve_tf_tpu_feature_config, feature_configs
     )

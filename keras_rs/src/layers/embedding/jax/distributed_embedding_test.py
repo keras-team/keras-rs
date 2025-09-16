@@ -561,12 +561,18 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         # Setup a model with a zero initializer but otherwise the same
         # feature configs to test restore. Keep the same embedding layer name to
         # ensure the correct weights are restored.
+        table_config_id_to_table_config_with_zero_init = {
+            id(table_config): dataclasses.replace(
+                table_config, initializer="zeros"
+            )
+            for table_config in table_configs
+        }
         feature_configs_with_zero_init = {
             feature_config.name: dataclasses.replace(
                 feature_config,
-                table=dataclasses.replace(
-                    feature_config.table, initializer="zeros"
-                ),
+                table=table_config_id_to_table_config_with_zero_init[
+                    id(feature_config.table)
+                ],
             )
             for feature_config in feature_configs
         }

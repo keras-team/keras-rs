@@ -10,7 +10,7 @@ from keras_rs.src.api_export import keras_rs_export
 
 
 @keras_rs_export("keras_rs.layers.TableConfig")
-@dataclasses.dataclass(eq=True, unsafe_hash=True, order=True)
+@dataclasses.dataclass(order=True)
 class TableConfig:
     """Configuration for one embedding table.
 
@@ -88,7 +88,7 @@ class TableConfig:
 
 
 @keras_rs_export("keras_rs.layers.FeatureConfig")
-@dataclasses.dataclass(eq=True, unsafe_hash=True, order=True)
+@dataclasses.dataclass(order=True)
 class FeatureConfig:
     """Configuration for one embedding feature.
 

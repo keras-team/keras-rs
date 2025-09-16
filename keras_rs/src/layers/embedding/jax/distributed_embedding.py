@@ -690,19 +690,22 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             raise ValueError("Layer must first be built before setting tables.")
 
         if "default_device" in self._placement_to_path_to_feature_config:
-            table_to_embedding_layer = {}
+            table_name_to_embedding_layer = {}
             for (
                 path,
                 feature_config,
             ) in self._placement_to_path_to_feature_config[
                 "default_device"
             ].items():
-                table_to_embedding_layer[feature_config.table] = (
+                table_name_to_embedding_layer[feature_config.table.name] = (
                     self._default_device_embedding_layers[path]
                 )
 
-            for table, embedding_layer in table_to_embedding_layer.items():
-                table_values = tables.get(table.name, None)
+            for (
+                table_name,
+                embedding_layer,
+            ) in table_name_to_embedding_layer.items():
+                table_values = tables.get(table_name, None)
                 if table_values is not None:
                     if embedding_layer.lora_enabled:
                         raise ValueError("Cannot set table if LoRA is enabled.")
