@@ -132,7 +132,7 @@ class STULayer(layers.Layer):
         self, max_seq_len: int, seq_offsets: keras.KerasTensor, k: Optional[keras.KerasTensor], v: Optional[keras.KerasTensor], max_kv_caching_len: int, kv_caching_lengths: Optional[keras.KerasTensor],
     ) -> None:
         # NOTE: Assumes _update_kv_cache is available
-        self.k_cache, self.v_cache, self.max_kv_caching_len, self.kv_caching_offsets = (_update_kv_cache(max_seq_len=max_seq_len, seq_offsets=seq_offsets, k=k, v=v, max_kv_caching_len=max_kv_caching_len, kv_caching_lengths=kv_caching_lengths, orig_k_cache=self.k_cache, orig_v_cache=self.v_cache, orig_max_kv_caching_len=self.max_kv_caching_len, orig_kv_caching_offsets=self.kv_caching_offsets,))
+        self.k_cache, self.v_cache, self.max_kv_caching_len, self.kv_caching_offsets = _update_kv_cache(max_seq_len=max_seq_len, seq_offsets=seq_offsets, k=k, v=v, max_kv_caching_len=max_kv_caching_len, kv_caching_lengths=kv_caching_lengths, orig_k_cache=self.k_cache, orig_v_cache=self.v_cache, orig_max_kv_caching_len=self.max_kv_caching_len, orig_kv_caching_offsets=self.kv_caching_offsets)
 
     def construct_full_kv(self, delta_k: keras.KerasTensor, delta_v: keras.KerasTensor,) -> Tuple[keras.KerasTensor, keras.KerasTensor, int, keras.KerasTensor]:
         # NOTE: Assumes _construct_full_kv is available
