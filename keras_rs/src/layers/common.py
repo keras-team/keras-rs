@@ -17,7 +17,7 @@ def get_valid_attn_mask_keras(
     max_attn_len: int = 0,
     contextual_seq_len: int = 0,
     min_full_attn_seq_len: int = 0,
-):
+) -> keras.KerasTensor:
     """
     Keras implementation of the valid attention mask generation, combining
     causality, sequence lengths, and target awareness.
