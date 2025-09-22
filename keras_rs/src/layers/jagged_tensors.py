@@ -95,7 +95,7 @@ def concat_2D_jagged(
         mask = ops.logical_or(mask < lengths_left_broadcast, ops.logical_and(mask >= max_len_left, mask < max_len_left + lengths_right_broadcast))
         return concatted_dense[ops.reshape(mask, [-1])]
 
-    def pytorch_concat_2D_jagged_resolver(values_left, values_right, max_len_left, max_len_right, offsets_left, offsets_right):
+    def keras_concat_2D_jagged_resolver(values_left, values_right, max_len_left, max_len_right, offsets_left, offsets_right):
         L_total = ops.shape(values_left)[0]
         offsets_left_non_optional = offsets_left
         if offsets_left is None: offsets_left_non_optional = max_len_left * ops.arange(L_total // max_len_left + 1, dtype='int32')
