@@ -193,7 +193,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
 
         # Add pseudo gradients to the inputs.
         embedding_variables = jax.tree.map(
-            lambda table: (table, None),
+            lambda table: embedding.EmbeddingVariables(table=table, slot=()),
             sharded_tables,
         )
 
@@ -288,7 +288,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
 
         # Add pseudo gradients to the inputs.
         embedding_variables = jax.tree.map(
-            lambda table: (table, None),
+            lambda table: embedding.EmbeddingVariables(table=table, slot=()),
             sharded_tables,
         )
 
@@ -479,7 +479,8 @@ class EmbeddingLookupTest(parameterized.TestCase):
             )
         )
         sharded_table_and_slot_variables = typing.cast(
-            dict[str, tuple[jax.Array, ...]], sharded_table_and_slot_variables
+            dict[str, embedding.EmbeddingVariables],
+            sharded_table_and_slot_variables,
         )
 
         # Shard samples for lookup query.
