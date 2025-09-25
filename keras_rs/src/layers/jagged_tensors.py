@@ -70,7 +70,10 @@ def split_2D_jagged(
     def keras_split_2D_jagged_resolver(max_seq_len, values, max_len_left, max_len_right, offsets_left, offsets_right):
         L_total = ops.shape(values)[0]
         offsets_left_non_optional = offsets_left
-        if offsets_left is None: offsets_left_non_optional = max_len_left * ops.arange(L_total // max_len_left + 1, dtype='int32')
+        if offsets_left is None:
+            if max_len_left is None:
+                raise ValueError("Either offsets_left or max_len_left must be provided.")
+            offsets_left_non_optional = max_len_left * ops.arange(L_total // max_len_left + 1, dtype='int32')
         offsets_right_non_optional = offsets_right
         if offsets_right is None: offsets_right_non_optional = max_len_right * ops.arange(L_total // max_len_right + 1, dtype='int32')
         return keras_split_2D_jagged_jagged(max_seq_len=max_seq_len, values=values, offsets_left=offsets_left_non_optional, offsets_right=offsets_right_non_optional)
