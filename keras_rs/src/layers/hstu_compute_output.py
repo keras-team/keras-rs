@@ -31,9 +31,7 @@ def keras_norm_mul_dropout(
         raise NotImplementedError("Group Norm path not suitable for simple Keras ops conversion.")
     else:
         # Functional Layer Normalization (Simulated keras_layer_norm)
-        mean = ops.mean(x, axis=-1, keepdims=True)
-        variance = ops.mean(ops.square(x - mean), axis=-1, keepdims=True)
-        x_norm = (x - mean) / ops.sqrt(variance + eps)
+        x_norm = ops.layer_norm(x, axis=-1, epsilon=eps)
 
         # Apply weight and bias (Gamma * x_norm + Beta)
         y_norm = x_norm * weight + bias
