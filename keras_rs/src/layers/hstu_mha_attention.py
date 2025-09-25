@@ -14,14 +14,16 @@ def keras_pad_qkv(
     Assumes keras_jagged_to_padded_dense is available globally.
     """
     L, H, D = ops.shape(q); V_dim = ops.shape(v)[2]
-    values_q_k = ops.reshape(q, [L, H * D]); values_v = ops.reshape(v, [L, H * V_dim])
+    values_q = ops.reshape(q, [L, H * D]); values_k = ops.reshape(k, [L, H * D]); values_v = ops.reshape(v, [L, H * V_dim])
     
     # Pad Q, K, V
-    padded_q_k = keras_jagged_to_padded_dense(values=values_q_k, offsets=[seq_offsets], max_lengths=[N], padding_value=0.0) 
-    padded_v = keras_jagged_to_padded_dense(values=values_v, offsets=[seq_offsets], max_lengths=[N], padding_value=0.0) 
+    padded_q = keras_jagged_to_padded_dense(values=values_q, offsets=[seq_offsets], max_lengths=[N], padding_value=0.0)
+    padded_k = keras_jagged_to_padded_dense(values=values_k, offsets=[seq_offsets], max_lengths=[N], padding_value=0.0)
+    padded_v = keras_jagged_to_padded_dense(values=values_v, offsets=[seq_offsets], max_lengths=[N], padding_value=0.0)
 
-    B = ops.shape(padded_q_k)[0]; padded_q_k = ops.reshape(padded_q_k, [B, N, H, D]); padded_v = ops.reshape(padded_v, [B, N, H, V_dim])
-    padded_q = ops.transpose(padded_q_k, [0, 2, 1, 3]); padded_k = ops.transpose(padded_q_k, [0, 2, 1, 3])
+    B = ops.shape(padded_q)[0]
+    padded_q = ops.reshape(padded_q, [B, N, H, D]); padded_k = ops.reshape(padded_k, [B, N, H, D]); padded_v = ops.reshape(padded_v, [B, N, H, V_dim])
+    padded_q = ops.transpose(padded_q, [0, 2, 1, 3]); padded_k = ops.transpose(padded_k, [0, 2, 1, 3])
     padded_v = ops.transpose(padded_v, [0, 2, 1, 3])
     return padded_q, padded_k, padded_v
 
