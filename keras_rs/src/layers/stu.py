@@ -45,8 +45,16 @@ def _update_kv_cache(
         delta_offsets = seq_offsets - kv_caching_offsets
         
         # NOTE: split_2D_jagged is available from jagged_tensors.py
-        k_cache, _ = split_2D_jagged(max_seq_len=max_seq_len, values=ops.reshape(fx_unwrap_optional_tensor(k), [-1, ops.shape(k)[-1]]), max_len_left=None, max_len_right=None, offsets_left=kv_caching_offsets, offsets_right=delta_offsets)
-        v_cache, _ = split_2D_jagged(max_seq_len=max_seq_len, values=ops.reshape(fx_unwrap_optional_tensor(v), [-1, ops.shape(v)[-1]]), max_len_left=None, max_len_right=None, offsets_left=kv_caching_offsets, offsets_right=delta_offsets)
+        if k is not None:
+            k_values = ops.reshape(k, [ops.shape(k)[0], -1])
+            k_cache, _ = split_2D_jagged(max_seq_len=max_seq_len, values=k_values, max_len_left=None, max_len_right=None, offsets_left=kv_caching_offsets, offsets_right=delta_offsets)
+        else:
+            k_cache = fx_unwrap_optional_tensor(k)
+        if v is not None:
+            v_values = ops.reshape(v, [ops.shape(v)[0], -1])
+            v_cache, _ = split_2D_jagged(max_seq_len=max_seq_len, values=v_values, max_len_left=None, max_len_right=None, offsets_left=kv_caching_offsets, offsets_right=delta_offsets)
+        else:
+            v_cache = fx_unwrap_optional_tensor(v)
 
         if max_kv_caching_len == 0: 
             max_kv_caching_len = ops.convert_to_numpy(ops.cast(ops.max(kv_caching_lengths), dtype="int32")).item()
