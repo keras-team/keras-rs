@@ -5,7 +5,8 @@ from keras import ops
 from keras import layers
 
 from keras_rs.src.layers.common import fx_unwrap_optional_tensor
-from keras_rs.src.layers.hstu_compute_output import hstu_compute_uqvk, hstu_compute_output
+from keras_rs.src.layers.hstu_compute_output import hstu_compute_output
+from keras_rs.src.layers.hstu_uqvk_output import hstu_compute_uqvk
 from keras_rs.src.layers.hstu_preprocess_attention import keras_hstu_preprocess_and_attention
 from keras_rs.src.layers.hstu_mha_attention import delta_hstu_mha
 from keras_rs.src.layers.jagged_tensors import split_2D_jagged, concat_2D_jagged
