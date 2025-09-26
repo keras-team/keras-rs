@@ -598,8 +598,8 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
                         non_trainable_layouts,
                     ),
                 )(
-                    layer.trainable_variables,
-                    layer.non_trainable_variables,
+                    [v.value for v in layer.trainable_variables],
+                    [v.value for v in layer.non_trainable_variables],
                     preprocessed,
                 )
             else:
