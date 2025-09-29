@@ -265,7 +265,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         table_specs: Sequence[embedding_spec.TableSpec],
         num_shards: int,
         add_slot_variables: bool,
-    ) -> tuple[keras.Variable, tuple[keras.Variable, ...] | None]:
+    ) -> embedding.EmbeddingVariables:
         stacked_table_spec = typing.cast(
             embedding_spec.StackedTableSpec, table_specs[0].stacked_table_spec
         )
@@ -334,7 +334,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                 slot_initializers, slot_variables
             )
 
-        return table_variable, slot_variables
+        return embedding.EmbeddingVariables(table_variable, slot_variables)
 
     @keras_utils.no_automatic_dependency_tracking
     def _sparsecore_init(
@@ -738,8 +738,8 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         # Assign stacked table variables to the device values.
         keras.tree.map_structure_up_to(
             device_tables,
-            lambda table_and_slot_variables,
-            table_value: table_and_slot_variables[0].assign(table_value),
+            lambda embedding_variables,
+            table_value: embedding_variables.table.assign(table_value),
             self._table_and_slot_variables,
             device_tables,
         )
@@ -754,8 +754,10 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
         # Extract only the table variables, not the gradient slot variables.
         table_variables = {
-            name: jax.device_get(table_and_slots[0].value)
-            for name, table_and_slots in self._table_and_slot_variables.items()
+            name: jax.device_get(embedding_variables.table.value)
+            for name, embedding_variables in (
+                self._table_and_slot_variables.items()
+            )
         }
 
         return typing.cast(
