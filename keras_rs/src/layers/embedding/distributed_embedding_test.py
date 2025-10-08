@@ -4,13 +4,9 @@ import math
 import os
 import tempfile
 
-import jax
-import jax.experimental.sparse as jax_sparse
-import jax.numpy as jnp
 import keras
 import numpy as np
 import tensorflow as tf
-from absl import flags
 from absl.testing import absltest
 from absl.testing import parameterized
 
@@ -18,10 +14,6 @@ from keras_rs.src import testing
 from keras_rs.src import types
 from keras_rs.src.layers.embedding import distributed_embedding
 from keras_rs.src.layers.embedding import distributed_embedding_config as config
-
-FLAGS = flags.FLAGS
-_TPU = flags.DEFINE_string("tpu", None, "The TPU to use for TPUStrategy.")
-
 
 FEATURE1_EMBEDDING_OUTPUT_DIM = 7
 FEATURE2_EMBEDDING_OUTPUT_DIM = 11
@@ -50,29 +42,34 @@ class DummyStrategy:
 class JaxDummyStrategy(DummyStrategy):
     @property
     def num_replicas_in_sync(self):
-        return len(jax.devices("tpu"))
+        import jax
+
+        return jax.device_count("tpu")
+
+
+def ragged_bool_true(self):
+    return True
 
 
 class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
         super().setUp()
-        try:
-            self.on_tpu = _TPU.value is not None
-        except flags.UnparsedFlagAccessError:
-            self.on_tpu = False
-
+        self.on_tpu = "TPU_NAME" in os.environ
         self.placement = "sparsecore" if self.on_tpu else "default_device"
 
         if keras.backend.backend() == "tensorflow":
             tf.debugging.disable_traceback_filtering()
 
         if keras.backend.backend() == "tensorflow" and self.on_tpu:
+            # Workaround for a bug preventing weights from being ragged tensors.
+            # The fix in TensorFlow was added after 2.19.1:
+            # https://github.com/tensorflow/tensorflow/commit/185f2f58bafc6410125080264d5d7730e1fa1eb2
+            tf.RaggedTensor.__bool__ = ragged_bool_true
+
             # FLAGS.xla_sparse_core_max_ids_per_partition_per_sample = 16
             # FLAGS.xla_sparse_core_max_unique_ids_per_partition_per_sample = 16
 
-            resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
-                tpu=_TPU.value
-            )
+            resolver = tf.distribute.cluster_resolver.TPUClusterResolver("")
             tf.config.experimental_connect_to_cluster(resolver)
 
             topology = tf.tpu.experimental.initialize_tpu_system(resolver)
@@ -183,11 +180,17 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
         elif input_type == "sparse" and backend == "jax":
 
             def create_tensor(feature_config, op):
+                import jax
+                import jax.experimental.sparse as jax_sparse
+
                 batch_size = feature_config.input_shape[0]
                 sequence_length = feature_config.input_shape[-1]
                 indices = [[i, i % sequence_length] for i in range(batch_size)]
                 return jax_sparse.BCOO(
-                    (jnp.asarray(op((batch_size,))), jnp.asarray(indices)),
+                    (
+                        jax.numpy.asarray(op((batch_size,))),
+                        jax.numpy.asarray(indices),
+                    ),
                     shape=(batch_size, sequence_length),
                     unique_indices=True,
                 )
@@ -532,18 +535,23 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
                     )
                 )
             elif keras.backend.backend() == "jax":
+                import jax
+                from jax.experimental import sparse as jax_sparse
+
                 inputs = jax_sparse.BCOO(
                     (
-                        jnp.asarray([1, 2, 3, 4, 5] * num_repeats),
-                        jnp.asarray(indices),
+                        jax.numpy.asarray([1, 2, 3, 4, 5] * num_repeats),
+                        jax.numpy.asarray(indices),
                     ),
                     shape=(self.batch_size, 4),
                     unique_indices=True,
                 )
                 weights = jax_sparse.BCOO(
                     (
-                        jnp.asarray([1.0, 1.0, 2.0, 3.0, 4.0] * num_repeats),
-                        jnp.asarray(indices),
+                        jax.numpy.asarray(
+                            [1.0, 1.0, 2.0, 3.0, 4.0] * num_repeats
+                        ),
+                        jax.numpy.asarray(indices),
                     ),
                     shape=(self.batch_size, 4),
                     unique_indices=True,
@@ -566,6 +574,8 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
         if keras.backend.backend() == "jax":
             preprocessed = layer.preprocess(inputs, weights)
             if jit_compile:
+                import jax
+
                 # Determine explicit shardings/layouts for jit compilation
                 # (required for sparsecore computations).
                 trainable_layouts = keras.tree.map_structure(

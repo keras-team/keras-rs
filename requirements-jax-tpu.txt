@@ -1,0 +1,10 @@
+# Tensorflow cpu-only version.
+tensorflow-cpu>=2.20.0
+
+# Jax with TPU support.
+jax[tpu]
+
+# Support for TPU embeddings.
+jax-tpu-embedding
+
+-r requirements-common.txt
