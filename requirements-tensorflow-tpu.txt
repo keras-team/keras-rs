@@ -1,0 +1,4 @@
+# Tensorflow with TPU support.
+tensorflow-tpu==2.19.1
+
+-r requirements-common.txt
