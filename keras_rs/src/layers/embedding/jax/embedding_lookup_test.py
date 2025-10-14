@@ -398,7 +398,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
             res=(sharded_samples, sharded_table_and_slot_variables, None),
             gradients=activation_grads,
         )
-        updated_tables_and_slots = embedding_utils.unshard_and_unstack_tables(
+        updated_tables_and_slots = table_stacking.unshard_and_unstack_tables(
             table_specs, updated_stacked_tables, num_table_shards
         )
 
@@ -553,7 +553,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
         lookup_grads = grads["lookup_tables"]
 
         # Recover unstacked and unsharded gradients.
-        updated_tables_and_slots = embedding_utils.unshard_and_unstack_tables(
+        updated_tables_and_slots = table_stacking.unshard_and_unstack_tables(
             table_specs, lookup_grads, num_table_shards
         )
 

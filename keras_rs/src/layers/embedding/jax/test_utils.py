@@ -9,10 +9,10 @@ import numpy as np
 from jax import numpy as jnp
 from jax_tpu_embedding.sparsecore.lib.nn import embedding
 from jax_tpu_embedding.sparsecore.lib.nn import embedding_spec
+from jax_tpu_embedding.sparsecore.lib.nn import table_stacking
 from jax_tpu_embedding.sparsecore.lib.nn.embedding_spec import FeatureSpec
 from jax_tpu_embedding.sparsecore.lib.nn.embedding_spec import TableSpec
 
-from keras_rs.src.layers.embedding.jax import embedding_utils
 from keras_rs.src.layers.embedding.jax.embedding_utils import FeatureSamples
 from keras_rs.src.types import Nested
 
@@ -316,7 +316,7 @@ def stack_shard_and_put_tables(
     num_shards: int,
     sharding: jax.sharding.Sharding,
 ) -> dict[str, embedding.EmbeddingVariables]:
-    sharded_tables = embedding_utils.stack_and_shard_tables(
+    sharded_tables = table_stacking.stack_and_shard_tables(
         table_specs, tables, num_shards
     )
     output: dict[str, embedding.EmbeddingVariables] = jax.device_put(
@@ -336,8 +336,11 @@ def get_unshard_and_unstack_tables(
     num_shards: int,
 ) -> Nested[jax.Array]:
     sharded_tables = jax.device_get(sharded_tables)
-    return embedding_utils.unshard_and_unstack_tables(
-        table_specs, sharded_tables, num_shards
+    return typing.cast(
+        Nested[jax.Array],
+        table_stacking.unshard_and_unstack_tables(
+            table_specs, sharded_tables, num_shards
+        ),
     )
 
 
