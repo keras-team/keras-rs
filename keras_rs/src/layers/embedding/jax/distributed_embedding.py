@@ -265,7 +265,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         table_specs: Sequence[embedding_spec.TableSpec],
         num_shards: int,
         add_slot_variables: bool,
-    ) -> tuple[keras.Variable, tuple[keras.Variable, ...] | None]:
+    ) -> embedding.EmbeddingVariables:
         stacked_table_spec = typing.cast(
             embedding_spec.StackedTableSpec, table_specs[0].stacked_table_spec
         )
@@ -334,7 +334,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                 slot_initializers, slot_variables
             )
 
-        return table_variable, slot_variables
+        return embedding.EmbeddingVariables(table_variable, slot_variables)
 
     @keras_utils.no_automatic_dependency_tracking
     def _sparsecore_init(
@@ -441,7 +441,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         )
 
         # Collect all stacked tables.
-        table_specs = embedding_utils.get_table_specs(feature_specs)
+        table_specs = embedding.get_table_specs(feature_specs)
         table_stacks = embedding_utils.get_table_stacks(table_specs)
 
         # Create variables for all stacked tables and slot variables.
@@ -515,9 +515,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         del inputs, weights, training
 
         # Each stacked-table gets a ShardedCooMatrix.
-        table_specs = embedding_utils.get_table_specs(
-            self._config.feature_specs
-        )
+        table_specs = embedding.get_table_specs(self._config.feature_specs)
         table_stacks = embedding_utils.get_table_stacks(table_specs)
         stacked_table_specs = {
             stack_name: stack[0].stacked_table_spec
@@ -600,40 +598,43 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         if training:
             # Synchronize input statistics across all devices and update the
             # underlying stacked tables specs in the feature specs.
-            prev_stats = embedding_utils.get_stacked_table_stats(
+
+            # Aggregate stats across all processes/devices via pmax.
+            num_local_cpu_devices = jax.local_device_count("cpu")
+
+            def pmax_aggregate(x: Any) -> Any:
+                if not hasattr(x, "ndim"):
+                    x = np.array(x)
+                tiled_x = np.tile(x, (num_local_cpu_devices, *([1] * x.ndim)))
+                return jax.pmap(
+                    lambda y: jax.lax.pmax(y, "all_cpus"),  # type: ignore[no-untyped-call]
+                    axis_name="all_cpus",
+                    backend="cpu",
+                )(tiled_x)[0]
+
+            full_stats = jax.tree.map(pmax_aggregate, stats)
+
+            # Check if stats changed enough to warrant action.
+            stacked_table_specs = embedding.get_stacked_table_specs(
                 self._config.feature_specs
             )
-
-            # Take the maximum with existing stats.
-            stats = keras.tree.map_structure(max, prev_stats, stats)
-
-            # Flatten the stats so we can more efficiently transfer them
-            # between hosts.  We use jax.tree because we will later need to
-            # unflatten.
-            flat_stats, stats_treedef = jax.tree.flatten(stats)
-
-            # In the case of multiple local CPU devices per host, we need to
-            # replicate the stats to placate JAX collectives.
-            num_local_cpu_devices = jax.local_device_count("cpu")
-            tiled_stats = np.tile(
-                np.array(flat_stats, dtype=np.int32), (num_local_cpu_devices, 1)
+            changed = any(
+                np.max(full_stats.max_ids_per_partition[stack_name])
+                > spec.max_ids_per_partition
+                or np.max(full_stats.max_unique_ids_per_partition[stack_name])
+                > spec.max_unique_ids_per_partition
+                or (
+                    np.max(full_stats.required_buffer_size_per_sc[stack_name])
+                    * num_sc_per_device
+                )
+                > (spec.suggested_coo_buffer_size_per_device or 0)
+                for stack_name, spec in stacked_table_specs.items()
             )
-
-            # Aggregate variables across all processes/devices.
-            max_across_cpus = jax.pmap(
-                lambda x: jax.lax.pmax(  # type: ignore[no-untyped-call]
-                    x, "all_cpus"
-                ),
-                axis_name="all_cpus",
-                backend="cpu",
-            )
-            flat_stats = max_across_cpus(tiled_stats)[0].tolist()
-            stats = jax.tree.unflatten(stats_treedef, flat_stats)
 
             # Update configuration and repeat preprocessing if stats changed.
-            if stats != prev_stats:
-                embedding_utils.update_stacked_table_stats(
-                    self._config.feature_specs, stats
+            if changed:
+                embedding.update_preprocessing_parameters(
+                    self._config.feature_specs, full_stats, num_sc_per_device
                 )
 
                 # Re-execute preprocessing with consistent input statistics.
@@ -718,7 +719,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
         config = self._config
         num_table_shards = config.mesh.devices.size * config.num_sc_per_device
-        table_specs = embedding_utils.get_table_specs(config.feature_specs)
+        table_specs = embedding.get_table_specs(config.feature_specs)
         sharded_tables = embedding_utils.stack_and_shard_tables(
             table_specs,
             tables,
@@ -738,8 +739,8 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         # Assign stacked table variables to the device values.
         keras.tree.map_structure_up_to(
             device_tables,
-            lambda table_and_slot_variables,
-            table_value: table_and_slot_variables[0].assign(table_value),
+            lambda embedding_variables,
+            table_value: embedding_variables.table.assign(table_value),
             self._table_and_slot_variables,
             device_tables,
         )
@@ -750,12 +751,14 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
         config = self._config
         num_table_shards = config.mesh.devices.size * config.num_sc_per_device
-        table_specs = embedding_utils.get_table_specs(config.feature_specs)
+        table_specs = embedding.get_table_specs(config.feature_specs)
 
         # Extract only the table variables, not the gradient slot variables.
         table_variables = {
-            name: jax.device_get(table_and_slots[0].value)
-            for name, table_and_slots in self._table_and_slot_variables.items()
+            name: jax.device_get(embedding_variables.table.value)
+            for name, embedding_variables in (
+                self._table_and_slot_variables.items()
+            )
         }
 
         return typing.cast(
