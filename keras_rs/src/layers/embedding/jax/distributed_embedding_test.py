@@ -338,7 +338,7 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
 
         # Trigger layer.build(...) to initialize tables.
         sample_ids, sample_weights = keras_test_utils.create_random_samples(
-            feature_configs, ragged=ragged, seed=0
+            feature_configs, ragged=ragged, seed=0, max_ids_per_sample=10
         )
         inputs = layer.preprocess(sample_ids, sample_weights)
         _ = layer(inputs)
