@@ -19,8 +19,7 @@ try:
     import jax
     import jax.experimental.sparse as jax_sparse
 except ImportError:
-    jax = None
-    jax_sparse = None
+    pass
 
 
 FEATURE1_EMBEDDING_OUTPUT_DIM = 7
