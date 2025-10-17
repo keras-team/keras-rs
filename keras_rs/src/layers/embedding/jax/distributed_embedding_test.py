@@ -24,7 +24,6 @@ from keras_rs.src.layers.embedding.jax import config_conversion
 from keras_rs.src.layers.embedding.jax import (
     distributed_embedding as jax_distributed_embedding,
 )
-from keras_rs.src.layers.embedding.jax import embedding_utils
 from keras_rs.src.layers.embedding.jax import test_utils
 
 keras.config.disable_traceback_filtering()
@@ -177,7 +176,7 @@ class StackedTableInitializerTest(parameterized.TestCase):
         )
         self.assertEqual(actual.shape, expected_shape)
 
-        unsharded_tables = embedding_utils.unshard_and_unstack_tables(
+        unsharded_tables = table_stacking_lib.unshard_and_unstack_tables(
             table_specs,
             {stacked_table_spec.stack_name: actual},
             num_table_shards,
