@@ -3,7 +3,7 @@ tensorflow-cpu
 
 # Torch with cuda support.
 --extra-index-url https://download.pytorch.org/whl/cu121
-torch==2.7.1
+torch==2.9.0
 
 # Jax cpu-only version.
 jax[cpu]
