@@ -55,7 +55,9 @@ class ListMLELoss(keras.losses.Loss):
         ```
     """
 
-    def __init__(self, temperature: float = 1.0, **kwargs: Any) -> None:
+    def __init__(
+        self, temperature: float = 1.0, debug: bool = True, **kwargs: Any
+    ) -> None:
         super().__init__(**kwargs)
 
         if temperature <= 0.0:
@@ -66,6 +68,7 @@ class ListMLELoss(keras.losses.Loss):
 
         self.temperature = temperature
         self._epsilon = 1e-10
+        self.debug = debug
 
     def compute_unreduced_loss(
         self,
@@ -131,12 +134,6 @@ class ListMLELoss(keras.losses.Loss):
         )
         exp_logits = ops.exp(sorted_logits)
 
-        # reversed_exp = ops.flip(exp_logits, axis=1)
-        # reversed_cumsum = ops.cumsum(reversed_exp, axis=1)
-        # cumsum_from_right = ops.flip(reversed_cumsum, axis=1)
-        # cumsum_forward = ops.cumsum(exp_logits, axis=1)
-        # total_sum = ops.sum(exp_logits, axis=1, keepdims=True)
-        # cumsum_from_right = total_sum - cumsum_forward + exp_logits
         reversed_exp = ops.flip(exp_logits, axis=1)
         reversed_cumsum = ops.cumsum(reversed_exp, axis=1)
         cumsum_from_right = ops.flip(reversed_cumsum, axis=1)
@@ -159,6 +156,39 @@ class ListMLELoss(keras.losses.Loss):
         )
 
         weights = ops.ones_like(negative_log_likelihood)
+
+        # Debug print statements for all intermediate values
+        if self.debug:
+            import sys
+
+            def safe_print(label, value):
+                try:
+                    # For TensorFlow, only print numpy if in eager mode
+                    if hasattr(value, "numpy"):
+                        print(label, value.numpy(), file=sys.stderr)
+                    else:
+                        print(
+                            label, ops.convert_to_numpy(value), file=sys.stderr
+                        )
+                except Exception as e:
+                    print(label, f"<error printing: {e}>", file=sys.stderr)
+
+            safe_print("valid_mask", valid_mask)
+            safe_print("num_valid_items", num_valid_items)
+            safe_print("batch_has_valid_items", batch_has_valid_items)
+            safe_print("labels_for_sorting", labels_for_sorting)
+            safe_print("logits_masked", logits_masked)
+            safe_print("sorted_logits", sorted_logits)
+            safe_print("sorted_valid_mask", sorted_valid_mask)
+            safe_print("raw_max", raw_max)
+            safe_print("exp_logits", exp_logits)
+            safe_print("reversed_exp", reversed_exp)
+            safe_print("reversed_cumsum", reversed_cumsum)
+            safe_print("cumsum_from_right", cumsum_from_right)
+            safe_print("log_normalizers", log_normalizers)
+            safe_print("log_probs", log_probs)
+            safe_print("negative_log_likelihood", negative_log_likelihood)
+            safe_print("weights", weights)
 
         return negative_log_likelihood, weights
 
