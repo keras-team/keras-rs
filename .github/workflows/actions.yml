@@ -44,7 +44,7 @@ jobs:
           pip install --no-deps -e "." --progress-bar off
     - name: Test with pytest
       run: |
-        pytest keras_rs/
+        pytest -s . 
 
   run_tests_in_container:
     name: Test the code on TPU
