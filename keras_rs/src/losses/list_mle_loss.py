@@ -55,9 +55,7 @@ class ListMLELoss(keras.losses.Loss):
         ```
     """
 
-    def __init__(
-        self, temperature: float = 1.0, **kwargs: Any
-    ) -> None:
+    def __init__(self, temperature: float = 1.0, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
         if temperature <= 0.0:
@@ -166,8 +164,6 @@ class ListMLELoss(keras.losses.Loss):
         )
 
         weights = ops.ones_like(negative_log_likelihood)
-
-
 
         return negative_log_likelihood, weights
 
