@@ -56,7 +56,7 @@ class ListMLELoss(keras.losses.Loss):
     """
 
     def __init__(
-        self, temperature: float = 1.0, debug: bool = True, **kwargs: Any
+        self, temperature: float = 1.0, **kwargs: Any
     ) -> None:
         super().__init__(**kwargs)
 
@@ -68,7 +68,6 @@ class ListMLELoss(keras.losses.Loss):
 
         self.temperature = temperature
         self._epsilon = 1e-10
-        self.debug = debug
 
     def compute_unreduced_loss(
         self,
@@ -108,8 +107,6 @@ class ListMLELoss(keras.losses.Loss):
         logits_masked = ops.where(
             valid_mask, logits, ops.full_like(logits, -1e9)
         )
-
-        # Here the issue is that pytorch is not stable in sorting, so
         # added stable offset before calling sort_by_scores
         list_size = ops.shape(labels_for_sorting)[1]
         indices = ops.arange(list_size)
@@ -170,38 +167,7 @@ class ListMLELoss(keras.losses.Loss):
 
         weights = ops.ones_like(negative_log_likelihood)
 
-        # Debug print statements for all intermediate values
-        if self.debug:
-            import sys
 
-            def safe_print(label, value):
-                try:
-                    # For TensorFlow, only print numpy if in eager mode
-                    if hasattr(value, "numpy"):
-                        print(label, value.numpy(), file=sys.stderr)
-                    else:
-                        print(
-                            label, ops.convert_to_numpy(value), file=sys.stderr
-                        )
-                except Exception as e:
-                    print(label, f"<error printing: {e}>", file=sys.stderr)
-
-            safe_print("valid_mask", valid_mask)
-            safe_print("num_valid_items", num_valid_items)
-            safe_print("batch_has_valid_items", batch_has_valid_items)
-            safe_print("labels_for_sorting", labels_for_sorting)
-            safe_print("logits_masked", logits_masked)
-            safe_print("sorted_logits", sorted_logits)
-            safe_print("sorted_valid_mask", sorted_valid_mask)
-            safe_print("raw_max", raw_max)
-            safe_print("exp_logits", exp_logits)
-            safe_print("reversed_exp", reversed_exp)
-            safe_print("reversed_cumsum", reversed_cumsum)
-            safe_print("cumsum_from_right", cumsum_from_right)
-            safe_print("log_normalizers", log_normalizers)
-            safe_print("log_probs", log_probs)
-            safe_print("negative_log_likelihood", negative_log_likelihood)
-            safe_print("weights", weights)
 
         return negative_log_likelihood, weights
 
