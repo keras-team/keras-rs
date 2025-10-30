@@ -105,16 +105,6 @@ class ListMLELoss(keras.losses.Loss):
         logits_masked = ops.where(
             valid_mask, logits, ops.full_like(logits, -1e9)
         )
-        # added stable offset before calling sort_by_scores
-        list_size = ops.shape(labels_for_sorting)[1]
-        indices = ops.arange(list_size)
-
-        indices = ops.expand_dims(indices, axis=0)
-        indices = ops.broadcast_to(indices, ops.shape(labels_for_sorting))
-
-        stable_offset = ops.cast(indices, labels_for_sorting.dtype) * 1e-6
-
-        labels_for_sorting = ops.subtract(labels_for_sorting, stable_offset)
 
         sorted_logits, sorted_valid_mask = sort_by_scores(
             tensors_to_sort=[logits_masked, valid_mask],
