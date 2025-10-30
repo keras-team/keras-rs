@@ -92,8 +92,9 @@ def sort_by_scores(
     #   - https://github.com/pytorch/pytorch/issues/27542
     #   - https://github.com/pytorch/pytorch/issues/88227
     #
-    # This small "stable offset" ensures deterministic tie-breaking for equal scores.
-    # We can remove this workaround once PyTorch adds a `stable=True` flag for topk.
+    # This small "stable offset" ensures deterministic tie-breaking for
+    # equal scores. We can remove this workaround once PyTorch adds a
+    # `stable=True` flag for topk.
 
     if K.backend() == "torch" and not shuffle_ties:
         list_size = ops.shape(scores)[1]
