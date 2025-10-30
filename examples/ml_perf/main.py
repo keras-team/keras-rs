@@ -10,6 +10,7 @@ import keras
 
 import keras_rs
 import jax
+from jax.experimental import checkify
 
 from .dataloader import DataLoader
 from .model import DLRMDCNV2
@@ -228,16 +229,17 @@ def main(
     logger.info("Training...")
     t0 = time.perf_counter()
     # jax.profiler.start_trace("/tmp/ml-perf-benchmarking/1000_steps")
-    model.fit(
-        train_generator,
-        # validation_data=eval_generator,
-        epochs=epochs,
-        steps_per_epoch=steps_per_epoch,
-        # callbacks=[MetricLogger()],
-        # validation_steps=training_cfg.num_eval_steps,
-        # validation_freq=1,
-        # verbose=0,
-    )
+    model.predict(train_generator)
+    # model.fit(
+    #     train_generator,
+    #     # validation_data=eval_generator,
+    #     epochs=epochs,
+    #     steps_per_epoch=steps_per_epoch,
+    #     # callbacks=[MetricLogger()],
+    #     # validation_steps=training_cfg.num_eval_steps,
+    #     # validation_freq=1,
+    #     # verbose=0,
+    # )
     # jax.profiler.stop_trace()
     logger.info("Training finished in %s seconds", time.perf_counter() - t0)
 
