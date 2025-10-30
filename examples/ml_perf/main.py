@@ -229,7 +229,7 @@ def main(
     logger.info("Training...")
     t0 = time.perf_counter()
     # jax.profiler.start_trace("/tmp/ml-perf-benchmarking/1000_steps")
-    model.predict(train_generator)
+    model.predict(train_generator, steps=steps_per_epoch)
     # model.fit(
     #     train_generator,
     #     # validation_data=eval_generator,
