@@ -1,7 +1,6 @@
 from typing import Callable
 
 import keras
-from keras import backend as K
 from keras import ops
 
 from keras_rs.src import types
@@ -96,7 +95,7 @@ def sort_by_scores(
     # equal scores. We can remove this workaround once PyTorch adds a
     # `stable=True` flag for topk.
 
-    if K.backend() == "torch" and not shuffle_ties:
+    if keras.backend.backend() == "torch" and not shuffle_ties:
         list_size = ops.shape(scores)[1]
         indices = ops.arange(list_size)
         indices = ops.expand_dims(indices, axis=0)
