@@ -85,6 +85,25 @@ def sort_by_scores(
     else:
         k = ops.minimum(k, max_possible_k)
 
+    # --- Work around for PyTorch instability ---
+    # Torch's `topk` is not stable with `sorted=True`, unlike JAX and TF.
+    # See:
+    #   - https://github.com/pytorch/pytorch/issues/27542
+    #   - https://github.com/pytorch/pytorch/issues/88227
+    #
+    # This small "stable offset" ensures deterministic tie-breaking for
+    # equal scores. We can remove this workaround once PyTorch adds a
+    # `stable=True` flag for topk.
+
+    if keras.backend.backend() == "torch" and not shuffle_ties:
+        list_size = ops.shape(scores)[1]
+        indices = ops.arange(list_size)
+        indices = ops.expand_dims(indices, axis=0)
+        indices = ops.broadcast_to(indices, ops.shape(scores))
+        stable_offset = ops.cast(indices, scores.dtype) * 1e-6
+        scores = ops.subtract(scores, stable_offset)
+    # --- End FIX ---
+
     # Shuffle ties randomly, and push masked values to the beginning.
     shuffled_indices = None
     if shuffle_ties or mask is not None:
