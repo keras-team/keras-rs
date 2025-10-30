@@ -1,6 +1,7 @@
 from typing import Callable
 
 import keras
+from keras import backend as K
 from keras import ops
 
 from keras_rs.src import types
@@ -84,7 +85,7 @@ def sort_by_scores(
         k = min(k, max_possible_k)
     else:
         k = ops.minimum(k, max_possible_k)
-        
+
     # --- Work around for PyTorch instability ---
     # Torch's `topk` is not stable with `sorted=True`, unlike JAX and TF.
     # See:
@@ -93,8 +94,8 @@ def sort_by_scores(
     #
     # This small "stable offset" ensures deterministic tie-breaking for equal scores.
     # We can remove this workaround once PyTorch adds a `stable=True` flag for topk.
-    
-    if backend.backend() == "torch" and not shuffle_ties:
+
+    if K.backend() == "torch" and not shuffle_ties:
         list_size = ops.shape(scores)[1]
         indices = ops.arange(list_size)
         indices = ops.expand_dims(indices, axis=0)
@@ -102,7 +103,7 @@ def sort_by_scores(
         stable_offset = ops.cast(indices, scores.dtype) * 1e-6
         scores = ops.subtract(scores, stable_offset)
     # --- End FIX ---
-    
+
     # Shuffle ties randomly, and push masked values to the beginning.
     shuffled_indices = None
     if shuffle_ties or mask is not None:

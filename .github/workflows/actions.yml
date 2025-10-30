@@ -1,0 +1,123 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_call:
+  release:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  run_tests:
+    name: Test the code
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [tensorflow, jax, torch]
+    runs-on: ubuntu-latest
+    env:
+      KERAS_BACKEND: ${{ matrix.backend }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+    - name: Get pip cache dir
+      id: pip-cache
+      run: |
+        python -m pip install --upgrade pip setuptools
+        echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
+    - name: pip cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.pip-cache.outputs.dir }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    - name: Install dependencies
+      run: |
+          pip install -r requirements.txt --progress-bar off
+          pip install --no-deps -e "." --progress-bar off
+    - name: Test with pytest
+      run: |
+        pytest keras_rs/
+
+  run_tests_in_container:
+    name: Test the code on TPU
+    runs-on: linux-x86-ct6e-44-1tpu
+
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [tensorflow, jax]
+
+    container:
+      image: python:3.11-slim
+      options: --privileged --network host
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Dependencies
+      run: |
+        pip install --no-cache-dir -U pip && \
+        pip install --no-cache-dir -r requirements-${{ matrix.backend }}-tpu.txt
+    
+    - name: Set Keras Backend
+      run: |
+        echo "KERAS_BACKEND=${{ matrix.backend }}" >> $GITHUB_ENV
+        echo "TPU_NAME=local" >> $GITHUB_ENV
+
+    - name: Set TF Specific Environment Variables
+      if: ${{ matrix.backend == 'tensorflow'}}
+      run: |
+        echo "PJRT_DEVICE=TPU" >> $GITHUB_ENV
+        echo "NEXT_PLUGGABLE_DEVICE_USE_C_API=true" >> $GITHUB_ENV
+        echo "TF_XLA_FLAGS=--tf_mlir_enable_mlir_bridge=true" >> $GITHUB_ENV
+        pip show libtpu | grep "^Location: " | sed "s/^Location: \(.*\)$/TF_PLUGGABLE_DEVICE_LIBRARY_PATH=\1\/libtpu\/libtpu.so/1" >> $GITHUB_ENV
+
+    - name: Verify TF Installation
+      if: ${{ matrix.backend == 'tensorflow'}}
+      run: python3 -c "import tensorflow as tf; print('Tensorflow devices:', tf.config.list_logical_devices())"
+
+    - name: Verify JAX Installation
+      if: ${{ matrix.backend == 'jax'}}
+      run: python3 -c "import jax; print('JAX devices:', jax.devices())"
+
+    - name: Test with pytest
+      run: pytest keras_rs/src/layers/embedding/distributed_embedding_test.py
+
+  check_format:
+    name: Check the code format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Get pip cache dir
+        id: pip-cache
+        run: |
+          python -m pip install --upgrade pip setuptools
+          echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
+      - name: pip cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pip-cache.outputs.dir }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt --progress-bar off
+          pip install --no-deps -e "." --progress-bar off
+      - name: Install pre-commit
+        run: pip install pre-commit && pre-commit install
+      - name: Run pre-commit
+        run: pre-commit run --all-files --hook-stage manual
