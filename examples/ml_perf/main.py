@@ -227,7 +227,7 @@ def main(
     # === Training ===
     logger.info("Training...")
     t0 = time.perf_counter()
-    jax.profiler.start_trace("/tmp/ml-perf-benchmarking/1000_steps")
+    # jax.profiler.start_trace("/tmp/ml-perf-benchmarking/1000_steps")
     model.fit(
         train_generator,
         # validation_data=eval_generator,
@@ -238,7 +238,7 @@ def main(
         # validation_freq=1,
         # verbose=0,
     )
-    jax.profiler.stop_trace()
+    # jax.profiler.stop_trace()
     logger.info("Training finished in %s seconds", time.perf_counter() - t0)
 
 
