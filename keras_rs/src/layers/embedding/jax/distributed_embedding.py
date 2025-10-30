@@ -464,17 +464,14 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             )
 
             # Only set the suggested buffer size if set on any individual table.
-            suggested_buffer_sizes = np.asarray(
-                [
-                    s.suggested_coo_buffer_size_per_device
-                    for s in stack
-                    if s.suggested_coo_buffer_size_per_device is not None
-                ],
-                dtype=np.int32,
-            )
-            if len(suggested_buffer_sizes) > 0:
+            valid_buffer_sizes = [
+                s.suggested_coo_buffer_size_per_device
+                for s in stack
+                if s.suggested_coo_buffer_size_per_device is not None
+            ]
+            if valid_buffer_sizes:
                 required_buffer_size_per_device[stack_name] = np.max(
-                    suggested_buffer_sizes
+                    np.asarray(valid_buffer_sizes, dtype=np.int32)
                 )
 
             id_drop_counters[stack_name] = 0
