@@ -250,7 +250,7 @@ def main(
     logger.info("Successfully preprocessed one batch of data")
 
     logger.info("Doing one step of forward pass on the model...")
-    model.predict(dummy_gen, steps=steps_per_epoch)
+    model.predict(dummy_gen, steps=1)
     logger.info("Model summary: %s", model.summary())
 
     # === Load dataset ===
