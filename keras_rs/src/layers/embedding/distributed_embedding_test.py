@@ -86,7 +86,6 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             self._strategy = tf.distribute.TPUStrategy(
                 resolver, experimental_device_assignment=device_assignment
             )
-            print("### num_replicas", self._strategy.num_replicas_in_sync)
             self.addCleanup(tf.tpu.experimental.shutdown_tpu_system, resolver)
         elif keras.backend.backend() == "jax" and self.on_tpu:
             self._strategy = JaxDummyStrategy()
