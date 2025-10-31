@@ -9,10 +9,8 @@ os.environ["KERAS_BACKEND"] = "jax"
 import keras
 
 import keras_rs
-import jax
-jax.config.update("jax_debug_nans", True)
-from jax.experimental import checkify
 
+# jax.config.update("jax_debug_nans", True)
 from .dataloader import DataLoader
 from .model import DLRMDCNV2
 
@@ -28,6 +26,83 @@ keras.config.disable_traceback_filtering()
 class MetricLogger(keras.callbacks.Callback):
     def on_train_batch_end(self, batch, logs=None):
         print("--->", logs["loss"])
+
+
+def _load_dataset(
+    model,
+    distribution,
+    ds_cfg,
+    training_cfg,
+    large_emb_features,
+    small_emb_features,
+    steps_per_epoch,
+    do_eval,
+    num_processes,
+):
+    train_ds = DataLoader(
+        file_pattern=ds_cfg.file_pattern,
+        batch_size=training_cfg.global_batch_size,
+        file_batch_size=ds_cfg.get("file_batch_size", None),
+        dense_features=ds_cfg.dense,
+        large_emb_features=large_emb_features,
+        small_emb_features=small_emb_features,
+        label=ds_cfg.label,
+        num_steps=steps_per_epoch + 20,
+        training=True,
+    ).create_dataset(
+        process_id=distribution._process_id,
+        num_processes=num_processes,
+        shuffle_buffer=ds_cfg.get("shuffle_buffer", None),
+    )
+    if do_eval:
+        eval_ds = DataLoader(
+            file_pattern=ds_cfg.val_file_pattern,
+            batch_size=training_cfg.global_batch_size,
+            file_batch_size=ds_cfg.get("file_batch_size", None),
+            dense_features=ds_cfg.dense,
+            large_emb_features=large_emb_features,
+            small_emb_features=small_emb_features,
+            label=ds_cfg.label,
+            num_steps=training_cfg.num_eval_steps,
+            repeat=True,
+            training=False,
+        ).create_dataset(
+            process_id=distribution._process_id,
+            num_processes=num_processes,
+        )
+    # For the multi-host case, the dataset has to be distributed manually.
+    # See note here:
+    # https://github.com/keras-team/keras-rs/blob/main/keras_rs/src/layers/embedding/base_distributed_embedding.py#L352-L363.
+    if num_processes > 1:
+        train_ds = distribution.distribute_dataset(train_ds)
+        if do_eval:
+            eval_ds = distribution.distribute_dataset(eval_ds)
+        distribution.auto_shard_dataset = False
+
+    def generator(dataset, training=False):
+        """Converts tf.data Dataset to a Python generator and preprocesses
+        large embedding features.
+        """
+        for features, labels in dataset:
+            preprocessed_large_embeddings = model.embedding_layer.preprocess(
+                features["large_emb_inputs"], training=training
+            )
+
+            x = {
+                "dense_input": features["dense_input"],
+                "large_emb_inputs": preprocessed_large_embeddings,
+                "small_emb_inputs": features["small_emb_inputs"],
+            }
+            y = labels
+            yield (x, y)
+
+    logger.info("Preprocessing large embedding tables...")
+    train_gen = generator(train_ds, training=True)
+    if do_eval:
+        eval_gen = generator(eval_ds, training=False)
+        return train_gen, eval_gen
+
+    return train_gen, None
 
 
 def main(
@@ -135,9 +210,6 @@ def main(
     )
     logger.info("Initialised model: %s", model)
 
-    # === Load dataset ===
-    logger.info("Loading dataset...")
-
     # Keras does not have a straightforward way to log at a step-level instead
     # of epoch-level. So, we do a workaround here.
     if ds_cfg.val_file_pattern:
@@ -148,99 +220,66 @@ def main(
         steps_per_epoch = training_cfg.num_steps
         epochs = 1
         do_eval = False
-
     logger.info(f"{steps_per_epoch=}, {epochs=}, {do_eval=}")
 
-    train_ds = DataLoader(
-        file_pattern=ds_cfg.file_pattern,
-        batch_size=training_cfg.global_batch_size,
-        file_batch_size=ds_cfg.get("file_batch_size", None),
-        dense_features=ds_cfg.dense,
-        large_emb_features=large_emb_features,
-        small_emb_features=small_emb_features,
-        label=ds_cfg.label,
-        num_steps=steps_per_epoch + 20,
-        training=True,
-    ).create_dataset(
-        process_id=distribution._process_id,
-        num_processes=num_processes,
-        shuffle_buffer=ds_cfg.get("shuffle_buffer", None),
+    # === Do one dummy forward pass on the model ===
+    logger.info("Loading dummy dataset...")
+    dummy_gen, _ = _load_dataset(
+        model,
+        distribution,
+        ds_cfg,
+        training_cfg,
+        large_emb_features,
+        small_emb_features,
+        steps_per_epoch,
+        do_eval,
+        num_processes,
     )
-    if do_eval:
-        eval_ds = DataLoader(
-            file_pattern=ds_cfg.val_file_pattern,
-            batch_size=training_cfg.global_batch_size,
-            file_batch_size=ds_cfg.get("file_batch_size", None),
-            dense_features=ds_cfg.dense,
-            large_emb_features=large_emb_features,
-            small_emb_features=small_emb_features,
-            label=ds_cfg.label,
-            num_steps=training_cfg.num_eval_steps,
-            repeat=True,
-            training=False,
-        ).create_dataset(
-            process_id=distribution._process_id,
-            num_processes=num_processes,
+
+    logger.debug("Inspecting one batch of data...")
+    for first_batch in dummy_gen:
+        logger.debug("Dense inputs:%s", first_batch[0]["dense_input"])
+        logger.debug(
+            "Small embedding inputs:%s",
+            first_batch[0]["small_emb_inputs"]["25_id"],
         )
-    # For the multi-host case, the dataset has to be distributed manually.
-    # See note here:
-    # https://github.com/keras-team/keras-rs/blob/main/keras_rs/src/layers/embedding/base_distributed_embedding.py#L352-L363.
-    if num_processes > 1:
-        train_ds = distribution.distribute_dataset(train_ds)
-        if do_eval:
-            eval_ds = distribution.distribute_dataset(eval_ds)
-        distribution.auto_shard_dataset = False
-
-    def generator(dataset, training=False):
-        """Converts tf.data Dataset to a Python generator and preprocesses
-        large embedding features.
-        """
-        for features, labels in dataset:
-            preprocessed_large_embeddings = model.embedding_layer.preprocess(
-                features["large_emb_inputs"], training=training
-            )
-
-            x = {
-                "dense_input": features["dense_input"],
-                "large_emb_inputs": preprocessed_large_embeddings,
-                "small_emb_inputs": features["small_emb_inputs"],
-            }
-            y = labels
-            yield (x, y)
-
-    logger.info("Preprocessing large embedding tables...")
-    train_generator = generator(train_ds, training=True)
-    if do_eval:
-        eval_generator = generator(eval_ds, training=False)
-
-    # logger.debug("Inspecting one batch of data...")
-    # for first_batch in train_generator:
-    #     logger.debug("Dense inputs:%s", first_batch[0]["dense_input"])
-    #     logger.debug(
-    #         "Small embedding inputs:%s",
-    #         first_batch[0]["small_emb_inputs"]["25_id"],
-    #     )
-    #     logger.debug(
-    #         "Large embedding inputs:%s", first_batch[0]["large_emb_inputs"]
-    #     )
-    #     break
+        logger.debug(
+            "Large embedding inputs:%s", first_batch[0]["large_emb_inputs"]
+        )
+        break
     logger.info("Successfully preprocessed one batch of data")
+
+    logger.info("Doing one step of forward pass on the model...")
+    model.predict(dummy_gen, steps=steps_per_epoch)
+    logger.info("Model summary: %s", model.summary())
+
+    # === Load dataset ===
+    train_gen, eval_gen = _load_dataset(
+        model,
+        distribution,
+        ds_cfg,
+        training_cfg,
+        large_emb_features,
+        small_emb_features,
+        steps_per_epoch,
+        do_eval,
+        num_processes,
+    )
 
     # === Training ===
     logger.info("Training...")
     t0 = time.perf_counter()
     # jax.profiler.start_trace("/tmp/ml-perf-benchmarking/1000_steps")
-    model.predict(train_generator, steps=steps_per_epoch)
-    # model.fit(
-    #     train_generator,
-    #     # validation_data=eval_generator,
-    #     epochs=epochs,
-    #     steps_per_epoch=steps_per_epoch,
-    #     # callbacks=[MetricLogger()],
-    #     # validation_steps=training_cfg.num_eval_steps,
-    #     # validation_freq=1,
-    #     # verbose=0,
-    # )
+    model.fit(
+        train_gen,
+        validation_data=eval_gen,
+        epochs=epochs,
+        steps_per_epoch=steps_per_epoch,
+        # callbacks=[MetricLogger()],
+        # validation_steps=training_cfg.num_eval_steps,
+        # validation_freq=1,
+        # verbose=0,
+    )
     # jax.profiler.stop_trace()
     logger.info("Training finished in %s seconds", time.perf_counter() - t0)
 

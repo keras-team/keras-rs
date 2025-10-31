@@ -6,7 +6,6 @@ import typing
 from typing import Any, Mapping, Sequence, Union
 
 import jax
-from jax.experimental import multihost_utils
 import keras
 import numpy as np
 from jax import numpy as jnp
