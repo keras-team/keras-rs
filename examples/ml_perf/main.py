@@ -222,32 +222,32 @@ def main(
         do_eval = False
     logger.info(f"{steps_per_epoch=}, {epochs=}, {do_eval=}")
 
-    # === Do one dummy forward pass on the model ===
-    logger.info("Loading dummy dataset...")
-    dummy_gen, _ = _load_dataset(
-        model,
-        distribution,
-        ds_cfg,
-        training_cfg,
-        large_emb_features,
-        small_emb_features,
-        steps_per_epoch,
-        do_eval,
-        num_processes,
-    )
+    # # === Do one dummy forward pass on the model ===
+    # logger.info("Loading dummy dataset...")
+    # dummy_gen, _ = _load_dataset(
+    #     model,
+    #     distribution,
+    #     ds_cfg,
+    #     training_cfg,
+    #     large_emb_features,
+    #     small_emb_features,
+    #     steps_per_epoch,
+    #     do_eval,
+    #     num_processes,
+    # )
 
-    logger.debug("Inspecting one batch of data...")
-    for first_batch in dummy_gen:
-        logger.debug("Dense inputs:%s", first_batch[0]["dense_input"])
-        logger.debug(
-            "Small embedding inputs:%s",
-            first_batch[0]["small_emb_inputs"]["25_id"],
-        )
-        logger.debug(
-            "Large embedding inputs:%s", first_batch[0]["large_emb_inputs"]
-        )
-        break
-    logger.info("Successfully preprocessed one batch of data")
+    # logger.debug("Inspecting one batch of data...")
+    # for first_batch in dummy_gen:
+    #     logger.debug("Dense inputs:%s", first_batch[0]["dense_input"])
+    #     logger.debug(
+    #         "Small embedding inputs:%s",
+    #         first_batch[0]["small_emb_inputs"]["25_id"],
+    #     )
+    #     logger.debug(
+    #         "Large embedding inputs:%s", first_batch[0]["large_emb_inputs"]
+    #     )
+    #     break
+    # logger.info("Successfully preprocessed one batch of data")
 
     # logger.info("Doing one step of forward pass on the model...")
     # # TODO: Use model.predict() directly. For some reason, it is not working,
@@ -275,7 +275,7 @@ def main(
     # jax.profiler.start_trace("/tmp/ml-perf-benchmarking/1000_steps")
     model.fit(
         train_gen,
-        validation_data=eval_gen,
+        # validation_data=eval_gen,
         epochs=epochs,
         steps_per_epoch=steps_per_epoch,
         # callbacks=[MetricLogger()],
