@@ -249,12 +249,12 @@ def main(
         break
     logger.info("Successfully preprocessed one batch of data")
 
-    logger.info("Doing one step of forward pass on the model...")
-    # TODO: Use model.predict() directly. For some reason, it is not working,
-    # currently.
-    for batch in dummy_gen:
-        model.predict_on_batch(batch[0])
-    logger.info("Model summary: %s", model.summary())
+    # logger.info("Doing one step of forward pass on the model...")
+    # # TODO: Use model.predict() directly. For some reason, it is not working,
+    # # currently.
+    # for batch in dummy_gen:
+    #     model.predict_on_batch(batch[0])
+    # logger.info("Model summary: %s", model.summary())
 
     # === Load dataset ===
     train_gen, eval_gen = _load_dataset(
