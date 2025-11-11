@@ -6,6 +6,7 @@ import time
 
 os.environ["KERAS_BACKEND"] = "jax"
 
+import jax
 import keras
 
 import keras_rs
@@ -272,7 +273,8 @@ def main(
     # === Training ===
     logger.info("Training...")
     t0 = time.perf_counter()
-    # jax.profiler.start_trace("/tmp/ml-perf-benchmarking/1000_steps")
+    if training_cfg.do_profile:
+        jax.profiler.start_trace("/tmp/ml-perf-benchmarking/10_steps")
     model.fit(
         train_gen,
         # validation_data=eval_gen,
@@ -283,7 +285,8 @@ def main(
         # validation_freq=1,
         # verbose=0,
     )
-    # jax.profiler.stop_trace()
+    if training_cfg.do_profile:
+        jax.profiler.stop_trace()
     logger.info("Training finished in %s seconds", time.perf_counter() - t0)
 
 
