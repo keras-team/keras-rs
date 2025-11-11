@@ -274,7 +274,8 @@ def main(
     logger.info("Training...")
     t0 = time.perf_counter()
     if training_cfg.do_profile:
-        jax.profiler.start_trace("/tmp/ml-perf-benchmarking/10_steps")
+        options = jax.profiler.ProfilerServer.options(python_tracer_level=1)
+        jax.profiler.start_trace("/tmp/ml-perf-benchmarking/10_steps", options=options)
     model.fit(
         train_gen,
         # validation_data=eval_gen,
