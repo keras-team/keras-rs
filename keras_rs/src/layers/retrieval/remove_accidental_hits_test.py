@@ -1,4 +1,6 @@
 import keras
+import tensorflow as tf
+from absl.testing import absltest
 from absl.testing import parameterized
 from keras import ops
 from keras.layers import deserialize
@@ -6,9 +8,17 @@ from keras.layers import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.layers.retrieval import remove_accidental_hits
+from keras_rs.src.utils import tpu_test_utils
 
 
 class RemoveAccidentalHitsTest(testing.TestCase, parameterized.TestCase):
+    def setUp(self):
+        super().setUp()
+        if keras.backend.backend() == "tensorflow":
+            tf.debugging.disable_traceback_filtering()
+
+        self._strategy = tpu_test_utils.get_tpu_strategy(self)
+
     def create_inputs(self, logits_rank=2, candidate_ids_rank=1):
         shape_3d = (15, 20, 10)
         shape = shape_3d[-logits_rank:]
@@ -68,8 +78,10 @@ class RemoveAccidentalHitsTest(testing.TestCase, parameterized.TestCase):
             logits_rank=logits_rank, candidate_ids_rank=candidate_ids_rank
         )
 
-        out_logits = remove_accidental_hits.RemoveAccidentalHits()(
-            logits, labels, candidate_ids
+        with self._strategy.scope():
+            layer = remove_accidental_hits.RemoveAccidentalHits()
+        out_logits = tpu_test_utils.run_with_strategy(
+            self._strategy, layer, logits, labels, candidate_ids
         )
 
         # Logits of labels are unchanged.
@@ -131,54 +143,78 @@ class RemoveAccidentalHitsTest(testing.TestCase, parameterized.TestCase):
                     )
 
     def test_mismatched_labels_logits_shapes(self):
-        layer = remove_accidental_hits.RemoveAccidentalHits()
+        with self._strategy.scope():
+            layer = remove_accidental_hits.RemoveAccidentalHits()
 
         with self.assertRaisesRegex(
             ValueError, "`labels` and `logits` should have the same shape"
         ):
-            layer(ops.zeros((10, 20)), ops.zeros((10, 30)), ops.zeros((20,)))
+            tpu_test_utils.run_with_strategy(
+                self._strategy,
+                layer,
+                ops.zeros((10, 20)),
+                ops.zeros((10, 30)),
+                ops.zeros((20,)),
+            )
 
     def test_mismatched_labels_candidates_shapes(self):
-        layer = remove_accidental_hits.RemoveAccidentalHits()
+        with self._strategy.scope():
+            layer = remove_accidental_hits.RemoveAccidentalHits()
 
         with self.assertRaisesRegex(
             ValueError,
             "`candidate_ids` should have the same shape as .* `labels`",
         ):
-            layer(ops.zeros((10, 20)), ops.zeros((10, 20)), ops.zeros((30,)))
+            tpu_test_utils.run_with_strategy(
+                self._strategy,
+                layer,
+                ops.zeros((10, 20)),
+                ops.zeros((10, 20)),
+                ops.zeros((30,)),
+            )
 
     def test_predict(self):
         # Note: for predict, we test with probabilities that have a batch dim.
         logits, labels, candidate_ids = self.create_inputs(candidate_ids_rank=2)
 
-        layer = remove_accidental_hits.RemoveAccidentalHits()
-        in_logits = keras.layers.Input(logits.shape[1:])
-        in_labels = keras.layers.Input(labels.shape[1:])
-        in_candidate_ids = keras.layers.Input(labels.shape[1:])
-        out_logits = layer(in_logits, in_labels, in_candidate_ids)
-        model = keras.Model(
-            [in_logits, in_labels, in_candidate_ids], out_logits
-        )
+        with self._strategy.scope():
+            layer = remove_accidental_hits.RemoveAccidentalHits()
+            in_logits = keras.layers.Input(logits.shape[1:])
+            in_labels = keras.layers.Input(labels.shape[1:])
+            in_candidate_ids = keras.layers.Input(labels.shape[1:])
+            out_logits = layer(in_logits, in_labels, in_candidate_ids)
+            model = keras.Model(
+                [in_logits, in_labels, in_candidate_ids], out_logits
+            )
+            model.compile(optimizer="adam", loss="mse")
 
         model.predict([logits, labels, candidate_ids], batch_size=8)
 
     def test_serialization(self):
-        layer = remove_accidental_hits.RemoveAccidentalHits()
+        with self._strategy.scope():
+            layer = remove_accidental_hits.RemoveAccidentalHits()
         restored = deserialize(serialize(layer))
         self.assertDictEqual(layer.get_config(), restored.get_config())
 
     def test_model_saving(self):
         logits, labels, candidate_ids = self.create_inputs()
 
-        layer = remove_accidental_hits.RemoveAccidentalHits()
-        in_logits = keras.layers.Input(logits.shape[1:])
-        in_labels = keras.layers.Input(labels.shape[1:])
-        in_candidate_ids = keras.layers.Input(batch_shape=candidate_ids.shape)
-        out_logits = layer(in_logits, in_labels, in_candidate_ids)
-        model = keras.Model(
-            [in_logits, in_labels, in_candidate_ids], out_logits
-        )
+        with self._strategy.scope():
+            layer = remove_accidental_hits.RemoveAccidentalHits()
+            in_logits = keras.layers.Input(logits.shape[1:])
+            in_labels = keras.layers.Input(labels.shape[1:])
+            in_candidate_ids = keras.layers.Input(
+                batch_shape=candidate_ids.shape
+            )
+            out_logits = layer(in_logits, in_labels, in_candidate_ids)
+            model = keras.Model(
+                [in_logits, in_labels, in_candidate_ids], out_logits
+            )
 
         self.run_model_saving_test(
             model=model, input_data=[logits, labels, candidate_ids]
         )
+
+
+if __name__ == "__main__":
+    absltest.main()

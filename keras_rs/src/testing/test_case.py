@@ -23,6 +23,9 @@ class TestCase(unittest.TestCase):
         desired: types.Tensor,
         atol: float = 1e-6,
         rtol: float = 1e-6,
+        tpu_atol: float = 1e-2,
+        tpu_rtol: float = 1e-2,
+        is_tpu: bool = False,
         msg: str = "",
     ) -> None:
         """Verify that two tensors are close in value element by element.
@@ -38,6 +41,11 @@ class TestCase(unittest.TestCase):
             actual = keras.ops.convert_to_numpy(actual)
         if not isinstance(desired, np.ndarray):
             desired = keras.ops.convert_to_numpy(desired)
+        if tpu_atol is not None and is_tpu:
+            atol = tpu_atol
+        if tpu_rtol is not None and is_tpu:
+            rtol = tpu_rtol
+
         np.testing.assert_allclose(
             actual, desired, atol=atol, rtol=rtol, err_msg=msg
         )

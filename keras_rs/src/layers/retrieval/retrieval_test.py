@@ -1,8 +1,11 @@
 import keras
+import tensorflow as tf
+from absl.testing import absltest
 from absl.testing import parameterized
 
 from keras_rs.src import testing
 from keras_rs.src.layers.retrieval.retrieval import Retrieval
+from keras_rs.src.utils import tpu_test_utils
 
 
 class DummyRetrieval(Retrieval):
@@ -15,7 +18,15 @@ class DummyRetrieval(Retrieval):
 
 class RetrievalTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
-        self.layer = DummyRetrieval(k=5)
+        super().setUp()
+        if keras.backend.backend() == "tensorflow":
+            tf.debugging.disable_traceback_filtering()
+
+        self._strategy = tpu_test_utils.get_tpu_strategy(self)
+        if self._strategy is None:
+            self._strategy = tpu_test_utils.DummyStrategy()
+        with self._strategy.scope():
+            self.layer = DummyRetrieval(k=5)
 
     @parameterized.named_parameters(
         ("embeddings_none", None, None, "`candidate_embeddings` is required."),
@@ -48,19 +59,27 @@ class RetrievalTest(testing.TestCase, parameterized.TestCase):
             )
 
     def test_call_not_overridden(self):
-        class DummyRetrieval(Retrieval):
-            def update_candidates(
-                self, candidate_embeddings, candidate_ids=None
-            ):
-                pass
+        with self._strategy.scope():
+
+            class DummyRetrieval(Retrieval):
+                def update_candidates(
+                    self, candidate_embeddings, candidate_ids=None
+                ):
+                    pass
 
         with self.assertRaises(TypeError):
             DummyRetrieval(k=5)
 
     def test_update_candidates_not_overridden(self):
-        class DummyRetrieval(Retrieval):
-            def call(self, inputs):
-                pass
+        with self._strategy.scope():
+
+            class DummyRetrieval(Retrieval):
+                def call(self, inputs):
+                    pass
 
         with self.assertRaises(TypeError):
             DummyRetrieval(k=5)
+
+
+if __name__ == "__main__":
+    absltest.main()

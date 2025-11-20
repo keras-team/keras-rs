@@ -1,4 +1,6 @@
 import keras
+import tensorflow as tf
+from absl.testing import absltest
 from absl.testing import parameterized
 from keras import ops
 from keras.layers import deserialize
@@ -6,9 +8,17 @@ from keras.layers import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.layers.retrieval import hard_negative_mining
+from keras_rs.src.utils import tpu_test_utils
 
 
 class HardNegativeMiningTest(testing.TestCase, parameterized.TestCase):
+    def setUp(self):
+        super().setUp()
+        if keras.backend.backend() == "tensorflow":
+            tf.debugging.disable_traceback_filtering()
+
+        self._strategy = tpu_test_utils.get_tpu_strategy(self)
+
     def create_inputs(self, rank=2):
         shape_3d = (15, 20, 10)
         shape = shape_3d[-rank:]
@@ -59,9 +69,11 @@ class HardNegativeMiningTest(testing.TestCase, parameterized.TestCase):
         logits, labels = self.create_inputs(rank=rank)
         num_logits = logits.shape[-1]
 
-        out_logits, out_labels = hard_negative_mining.HardNegativeMining(
-            num_hard_negatives
-        )(logits, labels)
+        with self._strategy.scope():
+            layer = hard_negative_mining.HardNegativeMining(num_hard_negatives)
+        out_logits, out_labels = tpu_test_utils.run_with_strategy(
+            self._strategy, layer, logits, labels
+        )
 
         self.assertEqual(
             out_logits.shape[-1], min(num_hard_negatives + 1, num_logits)
@@ -76,9 +88,11 @@ class HardNegativeMiningTest(testing.TestCase, parameterized.TestCase):
         # Set the logits for labels to be highest to ignore effect of labels.
         logits = logits + labels * 1000.0
 
-        out_logits, _ = hard_negative_mining.HardNegativeMining(
-            num_hard_negatives
-        )(logits, labels)
+        with self._strategy.scope():
+            layer = hard_negative_mining.HardNegativeMining(num_hard_negatives)
+        out_logits, _ = tpu_test_utils.run_with_strategy(
+            self._strategy, layer, logits, labels
+        )
 
         # Highest K logits are always returned.
         self.assertAllClose(
@@ -89,28 +103,42 @@ class HardNegativeMiningTest(testing.TestCase, parameterized.TestCase):
     def test_predict(self):
         logits, labels = self.create_inputs()
 
-        in_logits = keras.layers.Input(shape=logits.shape[1:])
-        in_labels = keras.layers.Input(shape=labels.shape[1:])
-        out_logits, out_labels = hard_negative_mining.HardNegativeMining(
-            num_hard_negatives=3
-        )(in_logits, in_labels)
-        model = keras.Model([in_logits, in_labels], [out_logits, out_labels])
+        with self._strategy.scope():
+            in_logits = keras.layers.Input(shape=logits.shape[1:])
+            in_labels = keras.layers.Input(shape=labels.shape[1:])
+            out_logits, out_labels = hard_negative_mining.HardNegativeMining(
+                num_hard_negatives=3
+            )(in_logits, in_labels)
+            model = keras.Model(
+                [in_logits, in_labels], [out_logits, out_labels]
+            )
+            model.compile(optimizer="adam", loss="mse")
 
         model.predict([logits, labels], batch_size=8)
 
     def test_serialization(self):
-        layer = hard_negative_mining.HardNegativeMining(num_hard_negatives=3)
+        with self._strategy.scope():
+            layer = hard_negative_mining.HardNegativeMining(
+                num_hard_negatives=3
+            )
         restored = deserialize(serialize(layer))
         self.assertDictEqual(layer.get_config(), restored.get_config())
 
     def test_model_saving(self):
         logits, labels = self.create_inputs()
 
-        in_logits = keras.layers.Input(shape=logits.shape[1:])
-        in_labels = keras.layers.Input(shape=labels.shape[1:])
-        out_logits, out_labels = hard_negative_mining.HardNegativeMining(
-            num_hard_negatives=3
-        )(in_logits, in_labels)
-        model = keras.Model([in_logits, in_labels], [out_logits, out_labels])
+        with self._strategy.scope():
+            in_logits = keras.layers.Input(shape=logits.shape[1:])
+            in_labels = keras.layers.Input(shape=labels.shape[1:])
+            out_logits, out_labels = hard_negative_mining.HardNegativeMining(
+                num_hard_negatives=3
+            )(in_logits, in_labels)
+            model = keras.Model(
+                [in_logits, in_labels], [out_logits, out_labels]
+            )
 
         self.run_model_saving_test(model=model, input_data=[logits, labels])
+
+
+if __name__ == "__main__":
+    absltest.main()

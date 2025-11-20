@@ -1,4 +1,8 @@
+import os
+
 import keras
+import tensorflow as tf
+from absl.testing import absltest
 from absl.testing import parameterized
 from keras import ops
 from keras.layers import deserialize
@@ -8,10 +12,18 @@ from keras_rs.src import testing
 from keras_rs.src.layers.feature_interaction.dot_interaction import (
     DotInteraction,
 )
+from keras_rs.src.utils import tpu_test_utils
 
 
 class DotInteractionTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
+        super().setUp()
+        if keras.backend.backend() == "tensorflow":
+            tf.debugging.disable_traceback_filtering()
+
+        self.on_tpu = "TPU_NAME" in os.environ
+        self._strategy = tpu_test_utils.get_tpu_strategy(self)
+
         self.input = [
             ops.array([[0.1, -4.3, 0.2, 1.1, 0.3]]),
             ops.array([[2.0, 3.2, -1.0, 0.0, 1.0]]),
@@ -77,25 +89,36 @@ class DotInteractionTest(testing.TestCase, parameterized.TestCase):
         ),
     )
     def test_call(self, self_interaction, skip_gather, exp_output_idx):
-        layer = DotInteraction(
-            self_interaction=self_interaction, skip_gather=skip_gather
+        with self._strategy.scope():
+            layer = DotInteraction(
+                self_interaction=self_interaction, skip_gather=skip_gather
+            )
+        output = tpu_test_utils.run_with_strategy(
+            self._strategy, layer, self.input
         )
-        output = layer(self.input)
-        self.assertAllClose(output, self.exp_outputs[exp_output_idx])
+        self.assertAllClose(
+            output, self.exp_outputs[exp_output_idx], is_tpu=self.on_tpu
+        )
 
     def test_invalid_input_rank(self):
         rank_1_input = [ops.ones((3,)), ops.ones((3,))]
 
-        layer = DotInteraction()
+        with self._strategy.scope():
+            layer = DotInteraction()
         with self.assertRaises(ValueError):
-            layer(rank_1_input)
+            tpu_test_utils.run_with_strategy(
+                self._strategy, layer, rank_1_input
+            )
 
     def test_invalid_input_different_shapes(self):
         unequal_shape_input = [ops.ones((1, 3)), ops.ones((1, 4))]
 
-        layer = DotInteraction()
+        with self._strategy.scope():
+            layer = DotInteraction()
         with self.assertRaises(ValueError):
-            layer(unequal_shape_input)
+            tpu_test_utils.run_with_strategy(
+                self._strategy, layer, unequal_shape_input
+            )
 
     @parameterized.named_parameters(
         (
@@ -120,31 +143,39 @@ class DotInteractionTest(testing.TestCase, parameterized.TestCase):
         ),
     )
     def test_predict(self, self_interaction, skip_gather):
-        feature1 = keras.layers.Input(shape=(5,))
-        feature2 = keras.layers.Input(shape=(5,))
-        feature3 = keras.layers.Input(shape=(5,))
-        x = DotInteraction(
-            self_interaction=self_interaction, skip_gather=skip_gather
-        )([feature1, feature2, feature3])
-        x = keras.layers.Dense(units=1)(x)
-        model = keras.Model([feature1, feature2, feature3], x)
+        with self._strategy.scope():
+            feature1 = keras.layers.Input(shape=(5,))
+            feature2 = keras.layers.Input(shape=(5,))
+            feature3 = keras.layers.Input(shape=(5,))
+            x = DotInteraction(
+                self_interaction=self_interaction, skip_gather=skip_gather
+            )([feature1, feature2, feature3])
+            x = keras.layers.Dense(units=1)(x)
+            model = keras.Model([feature1, feature2, feature3], x)
+            model.compile(optimizer="adam", loss="mse")
 
         model.predict(self.input, batch_size=2)
 
     def test_serialization(self):
-        layer = DotInteraction()
+        with self._strategy.scope():
+            layer = DotInteraction()
         restored = deserialize(serialize(layer))
         self.assertDictEqual(layer.get_config(), restored.get_config())
 
     def test_model_saving(self):
-        feature1 = keras.layers.Input(shape=(5,))
-        feature2 = keras.layers.Input(shape=(5,))
-        feature3 = keras.layers.Input(shape=(5,))
-        x = DotInteraction()([feature1, feature2, feature3])
-        x = keras.layers.Dense(units=1)(x)
-        model = keras.Model([feature1, feature2, feature3], x)
+        with self._strategy.scope():
+            feature1 = keras.layers.Input(shape=(5,))
+            feature2 = keras.layers.Input(shape=(5,))
+            feature3 = keras.layers.Input(shape=(5,))
+            x = DotInteraction()([feature1, feature2, feature3])
+            x = keras.layers.Dense(units=1)(x)
+            model = keras.Model([feature1, feature2, feature3], x)
 
         self.run_model_saving_test(
             model=model,
             input_data=self.input,
         )
+
+
+if __name__ == "__main__":
+    absltest.main()

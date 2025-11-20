@@ -90,7 +90,7 @@ jobs:
       run: python3 -c "import jax; print('JAX devices:', jax.devices())"
 
     - name: Test with pytest
-      run: pytest keras_rs/src/layers/embedding/distributed_embedding_test.py
+      run: pytest keras_rs/src/layers/
 
   check_format:
     name: Check the code format
