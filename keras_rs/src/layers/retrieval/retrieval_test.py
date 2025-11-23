@@ -23,8 +23,6 @@ class RetrievalTest(testing.TestCase, parameterized.TestCase):
             tf.debugging.disable_traceback_filtering()
 
         self._strategy = tpu_test_utils.get_tpu_strategy(self)
-        if self._strategy is None:
-            self._strategy = tpu_test_utils.DummyStrategy()
         with self._strategy.scope():
             self.layer = DummyRetrieval(k=5)
 

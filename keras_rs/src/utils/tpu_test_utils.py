@@ -76,3 +76,4 @@ def run_with_strategy(strategy, fn, *args, jit_compile=False):
         return tf_function_wrapper(*args)
     else:
         assert not jit_compile
+        return fn(*args)
