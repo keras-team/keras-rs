@@ -57,6 +57,7 @@ def get_tpu_strategy(test_case):
             raise ImportError(
                 "JAX backend requires jax to be installed for TPU."
             )
+        print("### num_replicas", jax.device_count("tpu"))
         return JaxDummyStrategy()
     else:
         return DummyStrategy()
