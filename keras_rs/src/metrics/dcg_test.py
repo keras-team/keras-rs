@@ -1,6 +1,7 @@
 import math
 
 import keras
+import tensorflow as tf
 from absl.testing import parameterized
 from keras import ops
 from keras.metrics import deserialize
@@ -9,7 +10,6 @@ from keras.metrics import serialize
 from keras_rs.src import testing
 from keras_rs.src.metrics.dcg import DCG
 from keras_rs.src.utils import tpu_test_utils
-import tensorflow as tf
 
 
 def _compute_dcg(labels, ranks):
@@ -142,9 +142,17 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
             dcg_metric = DCG()
         y_true_t = ops.array(y_true, dtype="float32")
         y_pred_t = ops.array(y_pred, dtype="float32")
-        sw = ops.array(sample_weight, dtype="float32") if sample_weight is not None else None
-        args = (y_true_t, y_pred_t, sw) if sw is not None else (y_true_t, y_pred_t)
-        tpu_test_utils.run_with_strategy(self._strategy, dcg_metric.update_state, *args)
+        sw = (
+            ops.array(sample_weight, dtype="float32")
+            if sample_weight is not None
+            else None
+        )
+        args = (
+            (y_true_t, y_pred_t, sw) if sw is not None else (y_true_t, y_pred_t)
+        )
+        tpu_test_utils.run_with_strategy(
+            self._strategy, dcg_metric.update_state, *args
+        )
         result = dcg_metric.result()
         self.assertAllClose(result, expected_output)
 
@@ -155,7 +163,7 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
             self._strategy,
             dcg_metric.update_state,
             self.y_true_batched,
-            self.y_pred_batched
+            self.y_pred_batched,
         )
         result = dcg_metric.result()
         self.assertAllClose(result, self.expected_output_batched)
@@ -244,7 +252,8 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
             dcg_metric.update_state,
             y_true,
             y_pred,
-            sample_weight=sample_weight)
+            sample_weight=sample_weight,
+        )
         result = dcg_metric.result()
         self.assertAllClose(result, expected_output)
 
@@ -312,7 +321,8 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
             dcg_metric.update_state,
             y_true,
             y_pred,
-            sample_weight=sample_weight)
+            sample_weight=sample_weight,
+        )
         result = dcg_metric.result()
         self.assertAllClose(result, expected_output)
 
@@ -329,7 +339,7 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
             self._strategy,
             dcg_metric.update_state,
             self.y_true_batched,
-            self.y_pred_batched
+            self.y_pred_batched,
         )
         dcg_metric.update_state(self.y_true_batched, self.y_pred_batched)
         result = dcg_metric.result()
@@ -343,13 +353,13 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
             self._strategy,
             dcg_metric.update_state,
             self.y_true_batched[:2],
-            self.y_pred_batched[:2]
+            self.y_pred_batched[:2],
         )
         result = dcg_metric.result()
         self.assertAllClose(
             result,
-            sum([_compute_dcg([1], [1]),
-                 _compute_dcg([3, 2, 1], [1, 3, 4])]) / 2,
+            sum([_compute_dcg([1], [1]), _compute_dcg([3, 2, 1], [1, 3, 4])])
+            / 2,
         )
 
         # Batch 2
@@ -357,7 +367,7 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
             self._strategy,
             dcg_metric.update_state,
             self.y_true_batched[2:],
-            self.y_pred_batched[2:]
+            self.y_pred_batched[2:],
         )
         result = dcg_metric.result()
         self.assertAllClose(result, self.expected_output_batched)
@@ -388,7 +398,8 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
             self._strategy,
             dcg_metric.update_state,
             self.y_true_batched,
-            self.y_pred_batched)
+            self.y_pred_batched,
+        )
         result = dcg_metric.result()
 
         expected_output = (
@@ -412,7 +423,11 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
         y_data = keras.random.randint((2, 5), minval=0, maxval=4)
 
         dataset = tf.data.Dataset.from_tensor_slices((x_data, y_data))
-        dataset = dataset.batch(self._strategy.num_replicas_in_sync if isinstance(self._strategy, tf.distribute.Strategy) else 1)
+        dataset = dataset.batch(
+            self._strategy.num_replicas_in_sync
+            if isinstance(self._strategy, tf.distribute.Strategy)
+            else 1
+        )
 
         if isinstance(self._strategy, tf.distribute.TPUStrategy):
             dataset = self._strategy.experimental_distribute_dataset(dataset)

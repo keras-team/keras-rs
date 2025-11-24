@@ -1,4 +1,5 @@
 import keras
+import tensorflow as tf
 from absl.testing import parameterized
 from keras import ops
 from keras.metrics import deserialize
@@ -7,7 +8,6 @@ from keras.metrics import serialize
 from keras_rs.src import testing
 from keras_rs.src.metrics.mean_reciprocal_rank import MeanReciprocalRank
 from keras_rs.src.utils import tpu_test_utils
-import tensorflow as tf
 
 
 class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
@@ -116,9 +116,9 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
         tpu_test_utils.run_with_strategy(
             self._strategy,
             mrr_metric.update_state,
-            y_true_t,
-            y_pred_t,
-            sample_weight=sample_weight
+            y_true,
+            y_pred,
+            sample_weight=sample_weight,
         )
         result = mrr_metric.result()
         self.assertAllClose(result, expected_output)
@@ -126,7 +126,12 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
     def test_batched_input(self):
         with self._strategy.scope():
             mrr_metric = MeanReciprocalRank()
-        tpu_test_utils.run_with_strategy(mrr_metric.update_state, self.y_true_batched, self.y_pred_batched)
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            mrr_metric.update_state,
+            self.y_true_batched,
+            self.y_pred_batched,
+        )
         result = mrr_metric.result()
         self.assertAllClose(result, 0.625)
 
@@ -138,12 +143,13 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
     def test_batched_inputs_sample_weight(self, sample_weight, expected_output):
         with self._strategy.scope():
             mrr_metric = MeanReciprocalRank()
-         tpu_test_utils.run_with_strategy(
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
             mrr_metric.update_state,
             self.y_true_batched,
             self.y_pred_batched,
             sample_weight=sample_weight,
-         )
+        )
         result = mrr_metric.result()
         self.assertAllClose(result, expected_output)
 
@@ -183,10 +189,11 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
         with self._strategy.scope():
             mrr_metric = MeanReciprocalRank()
         tpu_test_utils.run_with_strategy(
+            self._strategy,
             mrr_metric.update_state,
             y_true,
             y_pred,
-            sample_weight=sample_weight
+            sample_weight=sample_weight,
         )
         result = mrr_metric.result()
         self.assertAllClose(result, expected_output)
@@ -230,7 +237,13 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
     def test_masking(self, y_true, y_pred, sample_weight, expected_output):
         with self._strategy.scope():
             mrr_metric = MeanReciprocalRank()
-        tpu_test_utils.run_with_strategy(mrr_metric.update_state, y_true, y_pred, sample_weight=sample_weight)
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            mrr_metric.update_state,
+            y_true,
+            y_pred,
+            sample_weight=sample_weight,
+        )
         result = mrr_metric.result()
         self.assertAllClose(result, expected_output)
 
@@ -240,7 +253,12 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
     def test_k(self, k, expected_mrr):
         with self._strategy.scope():
             mrr_metric = MeanReciprocalRank(k=k)
-        tpu_test_utils.run_with_strategy(mrr_metric.update_state, self.y_true_batched, self.y_pred_batched)
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            mrr_metric.update_state,
+            self.y_true_batched,
+            self.y_pred_batched,
+        )
         result = mrr_metric.result()
         self.assertAllClose(result, expected_mrr)
 
@@ -248,12 +266,22 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
         with self._strategy.scope():
             mrr_metric = MeanReciprocalRank()
         # Batch 1: First two lists
-        tpu_test_utils.run_with_strategy(mrr_metric.update_state, self.y_true_batched[:2], self.y_pred_batched[:2])
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            mrr_metric.update_state,
+            self.y_true_batched[:2],
+            self.y_pred_batched[:2],
+        )
         result = mrr_metric.result()
         self.assertAllClose(result, 0.75)
 
         # Batch 2: Last two lists
-        tpu_test_utils.run_with_strategy(mrr_metric.update_state, self.y_true_batched[2:], self.y_pred_batched[2:])
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            mrr_metric.update_state,
+            self.y_true_batched[2:],
+            self.y_pred_batched[2:],
+        )
         result = mrr_metric.result()
         self.assertAllClose(result, 0.625)
 
@@ -284,7 +312,11 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
         y_data = keras.random.randint((2, 5), minval=0, maxval=4)
 
         dataset = tf.data.Dataset.from_tensor_slices((x_data, y_data))
-        dataset = dataset.batch(self._strategy.num_replicas_in_sync if isinstance(self._strategy, tf.distribute.Strategy) else 1)
+        dataset = dataset.batch(
+            self._strategy.num_replicas_in_sync
+            if isinstance(self._strategy, tf.distribute.Strategy)
+            else 1
+        )
 
         if isinstance(self._strategy, tf.distribute.TPUStrategy):
             dataset = self._strategy.experimental_distribute_dataset(dataset)

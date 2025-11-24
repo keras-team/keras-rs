@@ -1,4 +1,5 @@
 import keras
+import tensorflow as tf
 from absl.testing import parameterized
 from keras import ops
 from keras.metrics import deserialize
@@ -7,7 +8,6 @@ from keras.metrics import serialize
 from keras_rs.src import testing
 from keras_rs.src.metrics.mean_average_precision import MeanAveragePrecision
 from keras_rs.src.utils import tpu_test_utils
-import tensorflow as tf
 
 
 class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
@@ -115,9 +115,17 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
             map_metric = MeanAveragePrecision()
         y_true_t = ops.array(y_true, dtype="float32")
         y_pred_t = ops.array(y_pred, dtype="float32")
-        sw = ops.array(sample_weight, dtype="float32") if sample_weight is not None else None
-        args = (y_true_t, y_pred_t, sw) if sw is not None else (y_true_t, y_pred_t)
-        tpu_test_utils.run_with_strategy(self._strategy, map_metric.update_state, *args)
+        sw = (
+            ops.array(sample_weight, dtype="float32")
+            if sample_weight is not None
+            else None
+        )
+        args = (
+            (y_true_t, y_pred_t, sw) if sw is not None else (y_true_t, y_pred_t)
+        )
+        tpu_test_utils.run_with_strategy(
+            self._strategy, map_metric.update_state, *args
+        )
         result = map_metric.result()
         self.assertAllClose(result, expected_output)
 
@@ -128,7 +136,7 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
             self._strategy,
             map_metric.update_state,
             self.y_true_batched,
-            self.y_pred_batched
+            self.y_pred_batched,
         )
         result = map_metric.result()
         self.assertAllClose(result, 0.5625)
@@ -192,7 +200,8 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
             map_metric.update_state,
             y_true,
             y_pred,
-            sample_weight=sample_weight)
+            sample_weight=sample_weight,
+        )
         result = map_metric.result()
         self.assertAllClose(result, expected_output)
 
@@ -240,7 +249,8 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
             map_metric.update_state,
             y_true,
             y_pred,
-            sample_weight=sample_weight)
+            sample_weight=sample_weight,
+        )
         result = map_metric.result()
         self.assertAllClose(result, expected_output)
 
@@ -259,12 +269,12 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
     def test_statefulness(self):
         with self._strategy.scope():
             map_metric = MeanAveragePrecision()
-         # Batch 1: First two lists
+        # Batch 1: First two lists
         tpu_test_utils.run_with_strategy(
             self._strategy,
             map_metric.update_state,
             self.y_true_batched[:2],
-            self.y_pred_batched[:2]
+            self.y_pred_batched[:2],
         )
         result = map_metric.result()
         self.assertAllClose(result, 0.75)
@@ -274,7 +284,7 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
             self._strategy,
             map_metric.update_state,
             self.y_true_batched[2:],
-            self.y_pred_batched[2:]
+            self.y_pred_batched[2:],
         )
         result = map_metric.result()
         self.assertAllClose(result, 0.5625)
@@ -336,7 +346,11 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
         y_data = keras.random.randint((2, 5), minval=0, maxval=4)
 
         dataset = tf.data.Dataset.from_tensor_slices((x_data, y_data))
-        dataset = dataset.batch(self._strategy.num_replicas_in_sync if isinstance(self._strategy, tf.distribute.Strategy) else 1)
+        dataset = dataset.batch(
+            self._strategy.num_replicas_in_sync
+            if isinstance(self._strategy, tf.distribute.Strategy)
+            else 1
+        )
 
         if isinstance(self._strategy, tf.distribute.TPUStrategy):
             dataset = self._strategy.experimental_distribute_dataset(dataset)

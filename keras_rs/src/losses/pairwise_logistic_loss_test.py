@@ -1,4 +1,5 @@
 import keras
+import tensorflow as tf
 from absl.testing import parameterized
 from keras import ops
 from keras.losses import deserialize
@@ -7,7 +8,6 @@ from keras.losses import serialize
 from keras_rs.src import testing
 from keras_rs.src.losses.pairwise_logistic_loss import PairwiseLogisticLoss
 from keras_rs.src.utils import tpu_test_utils
-import tensorflow as tf
 
 
 class PairwiseLogisticLossTest(testing.TestCase, parameterized.TestCase):
@@ -127,12 +127,14 @@ class PairwiseLogisticLossTest(testing.TestCase, parameterized.TestCase):
                 model = create_model()
         else:
             model = create_model()
-        
+
         x_data = keras.random.normal((2, 20))
         y_data = keras.random.randint((2, 5), minval=0, maxval=2)
-        dataset = tf.data.Dataset.from_tensor_slices((x_data, y_data)).batch(self._strategy.num_replicas_in_sync if self._strategy else 1)
+        dataset = tf.data.Dataset.from_tensor_slices((x_data, y_data)).batch(
+            self._strategy.num_replicas_in_sync if self._strategy else 1
+        )
         if self._strategy:
-             dataset = self._strategy.experimental_distribute_dataset(dataset)
+            dataset = self._strategy.experimental_distribute_dataset(dataset)
 
         model.fit(dataset, epochs=1, steps_per_epoch=2)
 
