@@ -4,10 +4,12 @@ import os
 import keras
 import tensorflow as tf
 
+jax: Optional[ModuleType] = None
+
 try:
     import jax
 except ImportError:
-    jax = None
+    pass
 
 
 class DummyStrategy:
@@ -33,8 +35,9 @@ class JaxDummyStrategy(DummyStrategy):
             return 0
         return jax.device_count("tpu")
 
+StrategyType = Union[tf.distribute.Strategy, DummyStrategy, JaxDummyStrategy]
 
-def get_tpu_strategy(test_case):
+def get_tpu_strategy(test_case: Any) -> StrategyType:
     """Get TPU strategy if on TPU, otherwise return DummyStrategy."""
     if "TPU_NAME" not in os.environ:
         return DummyStrategy()
@@ -63,15 +66,41 @@ def get_tpu_strategy(test_case):
         return DummyStrategy()
 
 
-def run_with_strategy(strategy, fn, *args, jit_compile=False, **kwargs):
-    """Wrapper for running a function under a strategy."""
+def run_with_strategy(
+    strategy: Any,
+    fn: Callable[..., Any],
+    *args: Any,
+    jit_compile: bool = False,
+    **kwargs: Any
+) -> Any:
+    """
+    Final wrapper fix: Flattens allowed kwargs into positional args before 
+    entering tf.function to guarantee a fixed graph signature.
+    """
     if keras.backend.backend() == "tensorflow":
+        # Extract sample_weight and treat it as an explicit third positional argument.
+        #  If not present, use a placeholder (None).
+        sample_weight_value = kwargs.get('sample_weight', None)
+        all_inputs = args + (sample_weight_value,)
 
         @tf.function(jit_compile=jit_compile)
-        def tf_function_wrapper(*tf_function_args):
-            return strategy.run(fn, args=tf_function_args, kwargs=kwargs)
-
-        return tf_function_wrapper(*args)
+        def tf_function_wrapper(input_tuple: Tuple[Any, ...]) -> Any:
+            num_original_args = len(args)
+            core_args = input_tuple[:num_original_args]
+            sw_value = input_tuple[-1]
+            
+            if sw_value is not None:
+                all_positional_args = core_args + (sw_value,)
+                return strategy.run(
+                    fn, 
+                    args=all_positional_args
+                )
+            else:
+                return strategy.run(
+                    fn, 
+                    args=core_args
+                )
+        return tf_function_wrapper(all_inputs)
     else:
         assert not jit_compile
         return fn(*args, **kwargs)
