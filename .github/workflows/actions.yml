@@ -89,10 +89,12 @@ jobs:
       if: ${{ matrix.backend == 'jax'}}
       run: python3 -c "import jax; print('JAX devices:', jax.devices())"
 
-    - name: Test with pytest
-      if: ${{ matrix.backend == 'tensorflow'}}
+    - name: Test with pytest (TensorFlow)
+      if: ${{ matrix.backend == 'tensorflow' }}
       run: pytest keras_rs/ --ignore=keras_rs/src/layers/embedding/jax
-      if: ${{ matrix.backend == 'jax'}}
+
+    - name: Test with pytest (JAX)
+      if: ${{ matrix.backend == 'jax' }}
       run: pytest keras_rs/
 
   check_format:
