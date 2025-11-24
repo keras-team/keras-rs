@@ -90,7 +90,10 @@ jobs:
       run: python3 -c "import jax; print('JAX devices:', jax.devices())"
 
     - name: Test with pytest
-      run: pytest keras_rs/src/layers/
+      if: ${{ matrix.backend == 'tensorflow'}}
+      run: pytest keras_rs/ --ignore=keras_rs/src/layers/embedding/jax
+      if: ${{ matrix.backend == 'jax'}}
+      run: pytest keras_rs/
 
   check_format:
     name: Check the code format
