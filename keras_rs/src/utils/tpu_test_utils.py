@@ -1,14 +1,10 @@
 import contextlib
 import os
+from types import ModuleType
+from typing import Any, Callable, Optional, Tuple, Union
 
-import Any
-import Callable
 import keras
-import ModuleType
-import Optional
 import tensorflow as tf
-import Tuple
-import Union
 
 jax: Optional[ModuleType] = None
 
