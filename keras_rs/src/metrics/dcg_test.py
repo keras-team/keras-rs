@@ -8,6 +8,8 @@ from keras.metrics import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.metrics.dcg import DCG
+from keras_rs.src.utils import tpu_test_utils
+import tensorflow as tf
 
 
 def _compute_dcg(labels, ranks):
@@ -19,6 +21,10 @@ def _compute_dcg(labels, ranks):
 
 class DCGTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
+        if keras.backend.backend() == "tensorflow":
+            tf.debugging.disable_traceback_filtering()
+        self._strategy = tpu_test_utils.get_tpu_strategy(self)
+
         self.y_true_batched = ops.array(
             [
                 [0, 0, 1, 0],
@@ -50,18 +56,19 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
         )
 
     def test_invalid_k_init(self):
-        with self.assertRaisesRegex(
-            ValueError, "`k` should be a positive integer"
-        ):
-            DCG(k=0)
-        with self.assertRaisesRegex(
-            ValueError, "`k` should be a positive integer"
-        ):
-            DCG(k=-5)
-        with self.assertRaisesRegex(
-            ValueError, "`k` should be a positive integer"
-        ):
-            DCG(k=3.5)
+        with self._strategy.scope():
+            with self.assertRaisesRegex(
+                ValueError, "`k` should be a positive integer"
+            ):
+                DCG(k=0)
+            with self.assertRaisesRegex(
+                ValueError, "`k` should be a positive integer"
+            ):
+                DCG(k=-5)
+            with self.assertRaisesRegex(
+                ValueError, "`k` should be a positive integer"
+            ):
+                DCG(k=3.5)
 
     @parameterized.named_parameters(
         (
@@ -131,14 +138,25 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
     def test_unbatched_inputs(
         self, y_true, y_pred, sample_weight, expected_output
     ):
-        dcg_metric = DCG()
-        dcg_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
+        with self._strategy.scope():
+            dcg_metric = DCG()
+        y_true_t = ops.array(y_true, dtype="float32")
+        y_pred_t = ops.array(y_pred, dtype="float32")
+        sw = ops.array(sample_weight, dtype="float32") if sample_weight is not None else None
+        args = (y_true_t, y_pred_t, sw) if sw is not None else (y_true_t, y_pred_t)
+        tpu_test_utils.run_with_strategy(self._strategy, dcg_metric.update_state, *args)
         result = dcg_metric.result()
         self.assertAllClose(result, expected_output)
 
     def test_batched_input(self):
-        dcg_metric = DCG()
-        dcg_metric.update_state(self.y_true_batched, self.y_pred_batched)
+        with self._strategy.scope():
+            dcg_metric = DCG()
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            dcg_metric.update_state,
+            self.y_true_batched,
+            self.y_pred_batched
+        )
         result = dcg_metric.result()
         self.assertAllClose(result, self.expected_output_batched)
 
@@ -148,11 +166,15 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
         ("1d", [1.0, 0.5, 2.0, 1.0], 2.7288804),
     )
     def test_batched_inputs_sample_weight(self, sample_weight, expected_output):
-        dcg_metric = DCG()
-        dcg_metric.update_state(
+        with self._strategy.scope():
+            dcg_metric = DCG()
+        sw = ops.array(sample_weight, dtype="float32")
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            dcg_metric.update_state,
             self.y_true_batched,
             self.y_pred_batched,
-            sample_weight=sample_weight,
+            sample_weight=sw,
         )
         result = dcg_metric.result()
         self.assertAllClose(result, expected_output)
@@ -215,9 +237,14 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
     def test_2d_sample_weight(
         self, y_true, y_pred, sample_weight, expected_output
     ):
-        dcg_metric = DCG()
-
-        dcg_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
+        with self._strategy.scope():
+            dcg_metric = DCG()
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            dcg_metric.update_state,
+            y_true,
+            y_pred,
+            sample_weight=sample_weight)
         result = dcg_metric.result()
         self.assertAllClose(result, expected_output)
 
@@ -278,9 +305,14 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
         ),
     )
     def test_masking(self, y_true, y_pred, sample_weight, expected_output):
-        dcg_metric = DCG()
-
-        dcg_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
+        with self._strategy.scope():
+            dcg_metric = DCG()
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            dcg_metric.update_state,
+            y_true,
+            y_pred,
+            sample_weight=sample_weight)
         result = dcg_metric.result()
         self.assertAllClose(result, expected_output)
 
@@ -291,27 +323,41 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
         ("4", 4, 3.39040),
     )
     def test_k(self, k, exp_value):
-        dcg_metric = DCG(k=k)
+        with self._strategy.scope():
+            dcg_metric = DCG(k=k)
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            dcg_metric.update_state,
+            self.y_true_batched,
+            self.y_pred_batched
+        )
         dcg_metric.update_state(self.y_true_batched, self.y_pred_batched)
         result = dcg_metric.result()
         self.assertAllClose(result, exp_value, rtol=1e-5)
 
     def test_statefulness(self):
-        dcg_metric = DCG()
+        with self._strategy.scope():
+            dcg_metric = DCG()
         # Batch 1
-        dcg_metric.update_state(
-            self.y_true_batched[:2], self.y_pred_batched[:2]
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            dcg_metric.update_state,
+            self.y_true_batched[:2],
+            self.y_pred_batched[:2]
         )
         result = dcg_metric.result()
         self.assertAllClose(
             result,
-            sum([_compute_dcg([1], [1]), _compute_dcg([3, 2, 1], [1, 3, 4])])
-            / 2,
+            sum([_compute_dcg([1], [1]),
+                 _compute_dcg([3, 2, 1], [1, 3, 4])]) / 2,
         )
 
         # Batch 2
-        dcg_metric.update_state(
-            self.y_true_batched[2:], self.y_pred_batched[2:]
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            dcg_metric.update_state,
+            self.y_true_batched[2:],
+            self.y_pred_batched[2:]
         )
         result = dcg_metric.result()
         self.assertAllClose(result, self.expected_output_batched)
@@ -322,7 +368,8 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
         self.assertAllClose(result, 0.0)
 
     def test_serialization(self):
-        metric = DCG()
+        with self._strategy.scope():
+            metric = DCG()
         restored = deserialize(serialize(metric))
         self.assertDictEqual(metric.get_config(), restored.get_config())
 
@@ -333,10 +380,15 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
         def inverse_discount_fn(rank):
             return ops.divide(1.0, rank)
 
-        dcg_metric = DCG(
-            gain_fn=linear_gain_fn, rank_discount_fn=inverse_discount_fn
-        )
-        dcg_metric.update_state(self.y_true_batched, self.y_pred_batched)
+        with self._strategy.scope():
+            dcg_metric = DCG(
+                gain_fn=linear_gain_fn, rank_discount_fn=inverse_discount_fn
+            )
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            dcg_metric.update_state,
+            self.y_true_batched,
+            self.y_pred_batched)
         result = dcg_metric.result()
 
         expected_output = (
@@ -345,16 +397,24 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
         self.assertAllClose(result, expected_output, rtol=1e-5)
 
     def test_model_evaluate(self):
-        inputs = keras.Input(shape=(20,), dtype="float32")
-        outputs = keras.layers.Dense(5)(inputs)
-        model = keras.Model(inputs=inputs, outputs=outputs)
+        with self._strategy.scope():
+            inputs = keras.Input(shape=(20,), dtype="float32")
+            outputs = keras.layers.Dense(5)(inputs)
+            model = keras.Model(inputs=inputs, outputs=outputs)
 
-        model.compile(
-            loss=keras.losses.MeanSquaredError(),
-            metrics=[DCG()],
-            optimizer="adam",
-        )
-        model.evaluate(
-            x=keras.random.normal((2, 20)),
-            y=keras.random.randint((2, 5), minval=0, maxval=4),
-        )
+            model.compile(
+                loss=keras.losses.MeanSquaredError(),
+                metrics=[DCG()],
+                optimizer="adam",
+            )
+
+        x_data = keras.random.normal((2, 20))
+        y_data = keras.random.randint((2, 5), minval=0, maxval=4)
+
+        dataset = tf.data.Dataset.from_tensor_slices((x_data, y_data))
+        dataset = dataset.batch(self._strategy.num_replicas_in_sync if isinstance(self._strategy, tf.distribute.Strategy) else 1)
+
+        if isinstance(self._strategy, tf.distribute.TPUStrategy):
+            dataset = self._strategy.experimental_distribute_dataset(dataset)
+
+        model.evaluate(dataset, steps=2)

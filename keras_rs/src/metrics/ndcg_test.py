@@ -8,6 +8,8 @@ from keras.metrics import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.metrics.ndcg import NDCG
+from keras_rs.src.utils import tpu_test_utils
+import tensorflow as tf
 
 
 def _compute_dcg(labels, ranks):
@@ -19,6 +21,10 @@ def _compute_dcg(labels, ranks):
 
 class NDCGTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
+        if keras.backend.backend() == "tensorflow":
+            tf.debugging.disable_traceback_filtering()
+        self._strategy = tpu_test_utils.get_tpu_strategy(self)
+
         self.y_true_batched = ops.array(
             [
                 [0, 0, 1, 0],
@@ -57,18 +63,19 @@ class NDCGTest(testing.TestCase, parameterized.TestCase):
         self.expected_output_batched = sum(expected_ndcg) / 4.0
 
     def test_invalid_k_init(self):
-        with self.assertRaisesRegex(
-            ValueError, "`k` should be a positive integer"
-        ):
-            NDCG(k=0)
-        with self.assertRaisesRegex(
-            ValueError, "`k` should be a positive integer"
-        ):
-            NDCG(k=-5)
-        with self.assertRaisesRegex(
-            ValueError, "`k` should be a positive integer"
-        ):
-            NDCG(k=3.5)
+        with self._strategy.scope():
+            with self.assertRaisesRegex(
+                ValueError, "`k` should be a positive integer"
+            ):
+                NDCG(k=0)
+            with self.assertRaisesRegex(
+                ValueError, "`k` should be a positive integer"
+            ):
+                NDCG(k=-5)
+            with self.assertRaisesRegex(
+                ValueError, "`k` should be a positive integer"
+            ):
+                NDCG(k=3.5)
 
     @parameterized.named_parameters(
         (

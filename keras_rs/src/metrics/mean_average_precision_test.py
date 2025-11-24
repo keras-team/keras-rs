@@ -6,10 +6,16 @@ from keras.metrics import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.metrics.mean_average_precision import MeanAveragePrecision
+from keras_rs.src.utils import tpu_test_utils
+import tensorflow as tf
 
 
 class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
+        if keras.backend.backend() == "tensorflow":
+            tf.debugging.disable_traceback_filtering()
+        self._strategy = tpu_test_utils.get_tpu_strategy(self)
+
         self.y_true_batched = ops.array(
             [
                 [0, 0, 1, 0],
@@ -30,18 +36,19 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
         )
 
     def test_invalid_k_init(self):
-        with self.assertRaisesRegex(
-            ValueError, "`k` should be a positive integer"
-        ):
-            MeanAveragePrecision(k=0)
-        with self.assertRaisesRegex(
-            ValueError, "`k` should be a positive integer"
-        ):
-            MeanAveragePrecision(k=-5)
-        with self.assertRaisesRegex(
-            ValueError, "`k` should be a positive integer"
-        ):
-            MeanAveragePrecision(k=3.5)
+        with self._strategy.scope():
+            with self.assertRaisesRegex(
+                ValueError, "`k` should be a positive integer"
+            ):
+                MeanAveragePrecision(k=0)
+            with self.assertRaisesRegex(
+                ValueError, "`k` should be a positive integer"
+            ):
+                MeanAveragePrecision(k=-5)
+            with self.assertRaisesRegex(
+                ValueError, "`k` should be a positive integer"
+            ):
+                MeanAveragePrecision(k=3.5)
 
     @parameterized.named_parameters(
         (
@@ -104,14 +111,25 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
     def test_unbatched_inputs(
         self, y_true, y_pred, sample_weight, expected_output
     ):
-        map_metric = MeanAveragePrecision()
-        map_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
+        with self._strategy.scope():
+            map_metric = MeanAveragePrecision()
+        y_true_t = ops.array(y_true, dtype="float32")
+        y_pred_t = ops.array(y_pred, dtype="float32")
+        sw = ops.array(sample_weight, dtype="float32") if sample_weight is not None else None
+        args = (y_true_t, y_pred_t, sw) if sw is not None else (y_true_t, y_pred_t)
+        tpu_test_utils.run_with_strategy(self._strategy, map_metric.update_state, *args)
         result = map_metric.result()
         self.assertAllClose(result, expected_output)
 
     def test_batched_input(self):
-        map_metric = MeanAveragePrecision()
-        map_metric.update_state(self.y_true_batched, self.y_pred_batched)
+        with self._strategy.scope():
+            map_metric = MeanAveragePrecision()
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            map_metric.update_state,
+            self.y_true_batched,
+            self.y_pred_batched
+        )
         result = map_metric.result()
         self.assertAllClose(result, 0.5625)
 
@@ -121,11 +139,15 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
         ("1d", [1.0, 0.5, 2.0, 1.0], 0.6),
     )
     def test_batched_inputs_sample_weight(self, sample_weight, expected_output):
-        map_metric = MeanAveragePrecision()
-        map_metric.update_state(
+        with self._strategy.scope():
+            map_metric = MeanAveragePrecision()
+        sw = ops.array(sample_weight, dtype="float32")
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            map_metric.update_state,
             self.y_true_batched,
             self.y_pred_batched,
-            sample_weight=sample_weight,
+            sample_weight=sw,
         )
         result = map_metric.result()
         self.assertAllClose(result, expected_output)
@@ -163,9 +185,14 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
     def test_2d_sample_weight(
         self, y_true, y_pred, sample_weight, expected_output
     ):
-        map_metric = MeanAveragePrecision()
-
-        map_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
+        with self._strategy.scope():
+            map_metric = MeanAveragePrecision()
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            map_metric.update_state,
+            y_true,
+            y_pred,
+            sample_weight=sample_weight)
         result = map_metric.result()
         self.assertAllClose(result, expected_output)
 
@@ -206,9 +233,14 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
         ),
     )
     def test_masking(self, y_true, y_pred, sample_weight, expected_output):
-        map_metric = MeanAveragePrecision()
-
-        map_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
+        with self._strategy.scope():
+            map_metric = MeanAveragePrecision()
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            map_metric.update_state,
+            y_true,
+            y_pred,
+            sample_weight=sample_weight)
         result = map_metric.result()
         self.assertAllClose(result, expected_output)
 
@@ -225,17 +257,24 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
         self.assertAllClose(result, expected_map)
 
     def test_statefulness(self):
-        map_metric = MeanAveragePrecision()
-        # Batch 1: First two lists
-        map_metric.update_state(
-            self.y_true_batched[:2], self.y_pred_batched[:2]
+        with self._strategy.scope():
+            map_metric = MeanAveragePrecision()
+         # Batch 1: First two lists
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            map_metric.update_state,
+            self.y_true_batched[:2],
+            self.y_pred_batched[:2]
         )
         result = map_metric.result()
         self.assertAllClose(result, 0.75)
 
         # Batch 2: Last two lists
-        map_metric.update_state(
-            self.y_true_batched[2:], self.y_pred_batched[2:]
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            map_metric.update_state,
+            self.y_true_batched[2:],
+            self.y_pred_batched[2:]
         )
         result = map_metric.result()
         self.assertAllClose(result, 0.5625)
@@ -250,8 +289,11 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
         ("weight_0", 0.0, 0.0),
     )
     def test_scalar_sample_weight(self, sample_weight, expected_output):
-        map_metric = MeanAveragePrecision()
-        map_metric.update_state(
+        with self._strategy.scope():
+            map_metric = MeanAveragePrecision()
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            map_metric.update_state,
             self.y_true_batched,
             self.y_pred_batched,
             sample_weight=sample_weight,
@@ -260,9 +302,12 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
         self.assertAllClose(result, expected_output)
 
     def test_1d_sample_weight(self):
-        map_metric = MeanAveragePrecision()
+        with self._strategy.scope():
+            map_metric = MeanAveragePrecision()
         sample_weight = ops.array([1.0, 0.5, 2.0, 1.0], dtype="float32")
-        map_metric.update_state(
+        tpu_test_utils.run_with_strategy(
+            self._strategy,
+            map_metric.update_state,
             self.y_true_batched,
             self.y_pred_batched,
             sample_weight=sample_weight,
@@ -271,21 +316,29 @@ class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
         self.assertAllClose(result, 0.6)
 
     def test_serialization(self):
-        metric = MeanAveragePrecision()
+        with self._strategy.scope():
+            metric = MeanAveragePrecision()
         restored = deserialize(serialize(metric))
         self.assertDictEqual(metric.get_config(), restored.get_config())
 
     def test_model_evaluate(self):
-        inputs = keras.Input(shape=(20,), dtype="float32")
-        outputs = keras.layers.Dense(5)(inputs)
-        model = keras.Model(inputs=inputs, outputs=outputs)
+        with self._strategy.scope():
+            inputs = keras.Input(shape=(20,), dtype="float32")
+            outputs = keras.layers.Dense(5)(inputs)
+            model = keras.Model(inputs=inputs, outputs=outputs)
 
-        model.compile(
-            loss=keras.losses.MeanSquaredError(),
-            metrics=[MeanAveragePrecision()],
-            optimizer="adam",
-        )
-        model.evaluate(
-            x=keras.random.normal((2, 20)),
-            y=keras.random.randint((2, 5), minval=0, maxval=4),
-        )
+            model.compile(
+                loss=keras.losses.MeanSquaredError(),
+                metrics=[MeanAveragePrecision()],
+                optimizer="adam",
+            )
+        x_data = keras.random.normal((2, 20))
+        y_data = keras.random.randint((2, 5), minval=0, maxval=4)
+
+        dataset = tf.data.Dataset.from_tensor_slices((x_data, y_data))
+        dataset = dataset.batch(self._strategy.num_replicas_in_sync if isinstance(self._strategy, tf.distribute.Strategy) else 1)
+
+        if isinstance(self._strategy, tf.distribute.TPUStrategy):
+            dataset = self._strategy.experimental_distribute_dataset(dataset)
+
+        model.evaluate(dataset, steps=2)

@@ -63,18 +63,13 @@ def get_tpu_strategy(test_case):
         return DummyStrategy()
 
 
-def run_with_strategy(strategy, fn, *args, jit_compile=False):
+def run_with_strategy(strategy, fn, *args, jit_compile=False, **kwargs):
     """Wrapper for running a function under a strategy."""
     if keras.backend.backend() == "tensorflow":
-
         @tf.function(jit_compile=jit_compile)
         def tf_function_wrapper(*tf_function_args):
-            def strategy_fn(*strategy_fn_args):
-                return fn(*strategy_fn_args)
-
-            return strategy.run(strategy_fn, args=tf_function_args)
-
+            return strategy.run(fn, args=tf_function_args, kwargs=kwargs)
         return tf_function_wrapper(*args)
     else:
         assert not jit_compile
-        return fn(*args)
+        return fn(*args, **kwargs)

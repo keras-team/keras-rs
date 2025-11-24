@@ -6,10 +6,16 @@ from keras.losses import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.losses.pairwise_hinge_loss import PairwiseHingeLoss
+from keras_rs.src.utils import tpu_test_utils
+import tensorflow as tf
 
 
 class PairwiseHingeLossTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
+        if keras.backend.backend() == "tensorflow":
+            tf.debugging.disable_traceback_filtering()
+        self._strategy = tpu_test_utils.get_tpu_strategy(self)
+
         self.unbatched_scores = ops.array([1.0, 3.0, 2.0, 4.0, 0.8])
         self.unbatched_labels = ops.array([1.0, 0.0, 1.0, 3.0, 2.0])
 
@@ -110,15 +116,26 @@ class PairwiseHingeLossTest(testing.TestCase, parameterized.TestCase):
         self.assertAllClose(output, expected_output, atol=1e-5)
 
     def test_model_fit(self):
-        inputs = keras.Input(shape=(20,), dtype="float32")
-        outputs = keras.layers.Dense(5)(inputs)
-        model = keras.Model(inputs=inputs, outputs=outputs)
+        def create_model():
+            inputs = keras.Input(shape=(20,), dtype="float32")
+            outputs = keras.layers.Dense(5)(inputs)
+            model = keras.Model(inputs=inputs, outputs=outputs)
+            model.compile(loss=PairwiseHingeLoss(), optimizer="adam")
+            return model
 
-        model.compile(loss=PairwiseHingeLoss(), optimizer="adam")
-        model.fit(
-            x=keras.random.normal((2, 20)),
-            y=keras.random.randint((2, 5), minval=0, maxval=2),
-        )
+        if self._strategy:
+            with self._strategy.scope():
+                model = create_model()
+        else:
+            model = create_model()
+
+        x_data = keras.random.normal((2, 20))
+        y_data = keras.random.randint((2, 5), minval=0, maxval=2)
+        dataset = tf.data.Dataset.from_tensor_slices((x_data, y_data)).batch(self._strategy.num_replicas_in_sync if self._strategy else 1)
+        if self._strategy:
+             dataset = self._strategy.experimental_distribute_dataset(dataset)
+
+        model.fit(dataset, epochs=1, steps_per_epoch=2)
 
     def test_serialization(self):
         loss = PairwiseHingeLoss()
