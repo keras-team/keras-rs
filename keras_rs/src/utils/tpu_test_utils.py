@@ -1,8 +1,14 @@
 import contextlib
 import os
 
+import Any
+import Callable
 import keras
+import ModuleType
+import Optional
 import tensorflow as tf
+import Tuple
+import Union
 
 jax: Optional[ModuleType] = None
 
@@ -35,7 +41,9 @@ class JaxDummyStrategy(DummyStrategy):
             return 0
         return jax.device_count("tpu")
 
+
 StrategyType = Union[tf.distribute.Strategy, DummyStrategy, JaxDummyStrategy]
+
 
 def get_tpu_strategy(test_case: Any) -> StrategyType:
     """Get TPU strategy if on TPU, otherwise return DummyStrategy."""
@@ -71,16 +79,16 @@ def run_with_strategy(
     fn: Callable[..., Any],
     *args: Any,
     jit_compile: bool = False,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> Any:
     """
-    Final wrapper fix: Flattens allowed kwargs into positional args before 
+    Final wrapper fix: Flattens allowed kwargs into positional args before
     entering tf.function to guarantee a fixed graph signature.
     """
     if keras.backend.backend() == "tensorflow":
-        # Extract sample_weight and treat it as an explicit third positional argument.
-        #  If not present, use a placeholder (None).
-        sample_weight_value = kwargs.get('sample_weight', None)
+        # Extract sample_weight and treat it as an explicit third positional
+        # argument. If not present, use a placeholder (None).
+        sample_weight_value = kwargs.get("sample_weight", None)
         all_inputs = args + (sample_weight_value,)
 
         @tf.function(jit_compile=jit_compile)
@@ -88,18 +96,13 @@ def run_with_strategy(
             num_original_args = len(args)
             core_args = input_tuple[:num_original_args]
             sw_value = input_tuple[-1]
-            
+
             if sw_value is not None:
                 all_positional_args = core_args + (sw_value,)
-                return strategy.run(
-                    fn, 
-                    args=all_positional_args
-                )
+                return strategy.run(fn, args=all_positional_args)
             else:
-                return strategy.run(
-                    fn, 
-                    args=core_args
-                )
+                return strategy.run(fn, args=core_args)
+
         return tf_function_wrapper(all_inputs)
     else:
         assert not jit_compile
