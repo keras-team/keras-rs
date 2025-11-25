@@ -34,7 +34,7 @@ class DummyStrategy:
 
 class JaxDummyStrategy(DummyStrategy):
     @property
-    def num_replicas_in_sync(self) -> int:
+    def num_replicas_in_sync(self) -> Any:
         if jax is None:
             return 0
         return jax.device_count("tpu")
