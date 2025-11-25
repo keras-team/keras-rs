@@ -95,7 +95,7 @@ jobs:
 
     - name: Test with pytest (JAX)
       if: ${{ matrix.backend == 'jax' }}
-      run: pytest keras_rs/ --ignore=keras_rs/src/layers/embedding/jax/distributed_embedding_test.py::DistributedEmbeddingLayerTest
+      run: pytest keras_rs/ --ignore=keras_rs/src/layers/embedding/jax/distributed_embedding_test.py
 
   check_format:
     name: Check the code format
