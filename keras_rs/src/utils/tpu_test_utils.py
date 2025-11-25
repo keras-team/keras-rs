@@ -1,7 +1,7 @@
 import contextlib
 import os
 from types import ModuleType
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Any, Callable, ContextManager, Optional, Tuple, Union
 
 import keras
 import tensorflow as tf
@@ -15,24 +15,26 @@ except ImportError:
 
 
 class DummyStrategy:
-    def scope(self):
+    def scope(self) -> ContextManager[None]:
         return contextlib.nullcontext()
 
     @property
-    def num_replicas_in_sync(self):
+    def num_replicas_in_sync(self) -> int:
         return 1
 
-    def run(self, fn, args):
+    def run(self, fn: Callable[..., Any], args: Tuple[Any, ...]) -> Any:
         return fn(*args)
 
-    def experimental_distribute_dataset(self, dataset, options=None):
+    def experimental_distribute_dataset(
+        self, dataset: Any, options: Optional[Any] = None
+    ) -> Any:
         del options
         return dataset
 
 
 class JaxDummyStrategy(DummyStrategy):
     @property
-    def num_replicas_in_sync(self):
+    def num_replicas_in_sync(self) -> int:
         if jax is None:
             return 0
         return jax.device_count("tpu")
@@ -87,7 +89,7 @@ def run_with_strategy(
         sample_weight_value = kwargs.get("sample_weight", None)
         all_inputs = args + (sample_weight_value,)
 
-        @tf.function(jit_compile=jit_compile)
+        @tf.function(jit_compile=jit_compile)  # type: ignore[misc]
         def tf_function_wrapper(input_tuple: Tuple[Any, ...]) -> Any:
             num_original_args = len(args)
             core_args = input_tuple[:num_original_args]

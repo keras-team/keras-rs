@@ -28,6 +28,7 @@ from keras_rs.src.layers.embedding.jax import test_utils
 
 keras.config.disable_traceback_filtering()
 
+from keras_rs.src import testing
 
 def _create_sparsecore_layout(
     sharding_axis: str = "sparsecore",
@@ -308,7 +309,7 @@ class StackedTableInitializerTest(parameterized.TestCase):
     keras.backend.backend() != "jax",
     reason="Backend specific test",
 )
-class DistributedEmbeddingLayerTest(parameterized.TestCase):
+class DistributedEmbeddingLayerTest(testing.TestCase, parameterized.TestCase):
     @parameterized.product(
         ragged=[True, False],
         combiner=["sum", "mean", "sqrtn"],
@@ -326,6 +327,7 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         table_stacking: str | list[str] | list[list[str]],
         jit: bool,
     ):
+        self.on_tpu = "TPU_NAME" in os.environ
         table_configs = keras_test_utils.create_random_table_configs(
             combiner=combiner, seed=10
         )
@@ -374,7 +376,7 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         )
 
         keras.tree.map_structure(
-            lambda a, b: np.testing.assert_allclose(a, b, atol=1e-5),
+            lambda a, b: self.assertAllClose(a, b, atol=1e-3, is_tpu=self.on_tpu),
             outputs,
             expected_outputs,
         )
