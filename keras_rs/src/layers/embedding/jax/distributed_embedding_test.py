@@ -309,7 +309,7 @@ class StackedTableInitializerTest(parameterized.TestCase):
     keras.backend.backend() != "jax",
     reason="Backend specific test",
 )
-class DistributedEmbeddingLayerTest(testing.TestCase, parameterized.TestCase):
+class DistributedEmbeddingLayerTest(parameterized.TestCase):
     @parameterized.product(
         ragged=[True, False],
         combiner=["sum", "mean", "sqrtn"],
@@ -327,7 +327,6 @@ class DistributedEmbeddingLayerTest(testing.TestCase, parameterized.TestCase):
         table_stacking: str | list[str] | list[list[str]],
         jit: bool,
     ):
-        self.on_tpu = "TPU_NAME" in os.environ
         table_configs = keras_test_utils.create_random_table_configs(
             combiner=combiner, seed=10
         )
@@ -376,9 +375,7 @@ class DistributedEmbeddingLayerTest(testing.TestCase, parameterized.TestCase):
         )
 
         keras.tree.map_structure(
-            lambda a, b: self.assertAllClose(
-                a, b, atol=1e-3, is_tpu=self.on_tpu
-            ),
+            lambda a, b: np.testing.assert_allclose(a, b, atol=1e-5),
             outputs,
             expected_outputs,
         )
