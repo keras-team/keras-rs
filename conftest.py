@@ -1,6 +1,7 @@
 from typing import Union
 
 import pytest
+import tensorflow as tf
 
 from keras_rs.src.utils import tpu_test_utils
 
