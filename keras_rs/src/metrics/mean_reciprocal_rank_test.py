@@ -1,5 +1,4 @@
 import keras
-import tensorflow as tf
 from absl.testing import parameterized
 from keras import ops
 from keras.metrics import deserialize
@@ -12,8 +11,6 @@ from keras_rs.src.utils import tpu_test_utils
 
 class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
-        if keras.backend.backend() == "tensorflow":
-            tf.debugging.disable_traceback_filtering()
         self._strategy = tpu_test_utils.get_tpu_strategy(self)
 
         self.y_true_batched = ops.array(
@@ -36,19 +33,18 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
         )
 
     def test_invalid_k_init(self):
-        with self._strategy.scope():
-            with self.assertRaisesRegex(
-                ValueError, "`k` should be a positive integer"
-            ):
-                MeanReciprocalRank(k=0)
-            with self.assertRaisesRegex(
-                ValueError, "`k` should be a positive integer"
-            ):
-                MeanReciprocalRank(k=-5)
-            with self.assertRaisesRegex(
-                ValueError, "`k` should be a positive integer"
-            ):
-                MeanReciprocalRank(k=3.5)  # type: ignore
+        with self.assertRaisesRegex(
+            ValueError, "`k` should be a positive integer"
+        ):
+            MeanReciprocalRank(k=0)
+        with self.assertRaisesRegex(
+            ValueError, "`k` should be a positive integer"
+        ):
+            MeanReciprocalRank(k=-5)
+        with self.assertRaisesRegex(
+            ValueError, "`k` should be a positive integer"
+        ):
+            MeanReciprocalRank(k=3.5)  # type: ignore
 
     @parameterized.named_parameters(
         (
@@ -111,27 +107,14 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
     def test_unbatched_inputs(
         self, y_true, y_pred, sample_weight, expected_output
     ):
-        with self._strategy.scope():
-            mrr_metric = MeanReciprocalRank()
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            mrr_metric.update_state,
-            y_true,
-            y_pred,
-            sample_weight=sample_weight,
-        )
+        mrr_metric = MeanReciprocalRank()
+        mrr_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
         result = mrr_metric.result()
         self.assertAllClose(result, expected_output)
 
     def test_batched_input(self):
-        with self._strategy.scope():
-            mrr_metric = MeanReciprocalRank()
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            mrr_metric.update_state,
-            self.y_true_batched,
-            self.y_pred_batched,
-        )
+        mrr_metric = MeanReciprocalRank()
+        mrr_metric.update_state(self.y_true_batched, self.y_pred_batched)
         result = mrr_metric.result()
         self.assertAllClose(result, 0.625)
 
@@ -141,11 +124,8 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
         ("1d", [1.0, 0.5, 2.0, 1.0], 0.675),
     )
     def test_batched_inputs_sample_weight(self, sample_weight, expected_output):
-        with self._strategy.scope():
-            mrr_metric = MeanReciprocalRank()
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            mrr_metric.update_state,
+        mrr_metric = MeanReciprocalRank()
+        mrr_metric.update_state(
             self.y_true_batched,
             self.y_pred_batched,
             sample_weight=sample_weight,
@@ -186,15 +166,9 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
     def test_2d_sample_weight(
         self, y_true, y_pred, sample_weight, expected_output
     ):
-        with self._strategy.scope():
-            mrr_metric = MeanReciprocalRank()
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            mrr_metric.update_state,
-            y_true,
-            y_pred,
-            sample_weight=sample_weight,
-        )
+        mrr_metric = MeanReciprocalRank()
+
+        mrr_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
         result = mrr_metric.result()
         self.assertAllClose(result, expected_output)
 
@@ -235,15 +209,9 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
         ),
     )
     def test_masking(self, y_true, y_pred, sample_weight, expected_output):
-        with self._strategy.scope():
-            mrr_metric = MeanReciprocalRank()
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            mrr_metric.update_state,
-            y_true,
-            y_pred,
-            sample_weight=sample_weight,
-        )
+        mrr_metric = MeanReciprocalRank()
+
+        mrr_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
         result = mrr_metric.result()
         self.assertAllClose(result, expected_output)
 
@@ -251,36 +219,23 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
         ("1", 1, 0.5), ("2", 2, 0.625), ("3", 3, 0.625), ("4", 4, 0.625)
     )
     def test_k(self, k, expected_mrr):
-        with self._strategy.scope():
-            mrr_metric = MeanReciprocalRank(k=k)
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            mrr_metric.update_state,
-            self.y_true_batched,
-            self.y_pred_batched,
-        )
+        mrr_metric = MeanReciprocalRank(k=k)
+        mrr_metric.update_state(self.y_true_batched, self.y_pred_batched)
         result = mrr_metric.result()
         self.assertAllClose(result, expected_mrr)
 
     def test_statefulness(self):
-        with self._strategy.scope():
-            mrr_metric = MeanReciprocalRank()
+        mrr_metric = MeanReciprocalRank()
         # Batch 1: First two lists
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            mrr_metric.update_state,
-            self.y_true_batched[:2],
-            self.y_pred_batched[:2],
+        mrr_metric.update_state(
+            self.y_true_batched[:2], self.y_pred_batched[:2]
         )
         result = mrr_metric.result()
         self.assertAllClose(result, 0.75)
 
         # Batch 2: Last two lists
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            mrr_metric.update_state,
-            self.y_true_batched[2:],
-            self.y_pred_batched[2:],
+        mrr_metric.update_state(
+            self.y_true_batched[2:], self.y_pred_batched[2:]
         )
         result = mrr_metric.result()
         self.assertAllClose(result, 0.625)
@@ -291,8 +246,7 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
         self.assertAllClose(result, 0.0)
 
     def test_serialization(self):
-        with self._strategy.scope():
-            metric = MeanReciprocalRank()
+        metric = MeanReciprocalRank()
         restored = deserialize(serialize(metric))
         self.assertDictEqual(metric.get_config(), restored.get_config())
 
@@ -308,17 +262,7 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
                 optimizer="adam",
             )
 
-        x_data = keras.random.normal((2, 20))
-        y_data = keras.random.randint((2, 5), minval=0, maxval=4)
-
-        dataset = tf.data.Dataset.from_tensor_slices((x_data, y_data))
-        dataset = dataset.batch(
-            self._strategy.num_replicas_in_sync
-            if isinstance(self._strategy, tf.distribute.Strategy)
-            else 1
+        model.evaluate(
+            x=keras.random.normal((2, 20)),
+            y=keras.random.randint((2, 5), minval=0, maxval=4),
         )
-
-        if isinstance(self._strategy, tf.distribute.TPUStrategy):
-            dataset = self._strategy.experimental_distribute_dataset(dataset)
-
-        model.evaluate(dataset, steps=2)

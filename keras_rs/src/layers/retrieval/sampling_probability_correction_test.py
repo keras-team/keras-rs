@@ -1,5 +1,4 @@
 import keras
-import tensorflow as tf
 from absl.testing import parameterized
 from keras import ops
 from keras.layers import deserialize
@@ -15,10 +14,6 @@ class SamplingProbabilityCorrectionTest(
 ):
     def setUp(self):
         super().setUp()
-        if keras.backend.backend() == "tensorflow":
-            tf.debugging.disable_traceback_filtering()
-
-        self._strategy = tpu_test_utils.get_tpu_strategy(self)
 
     def create_inputs(self, logits_rank=2, probs_rank=1):
         shape_3d = (15, 20, 10)
@@ -96,7 +91,7 @@ class SamplingProbabilityCorrectionTest(
         # Note: for predict, we test with probabilities that have a batch dim.
         logits, probs = self.create_inputs(probs_rank=2)
 
-        with self._strategy.scope():
+        with self.strategy.scope():
             layer = (
                 sampling_probability_correction.SamplingProbabilityCorrection()
             )

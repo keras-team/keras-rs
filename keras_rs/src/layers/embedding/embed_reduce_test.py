@@ -1,8 +1,6 @@
 import math
-import os
 
 import keras
-import tensorflow as tf
 from absl.testing import parameterized
 from keras import ops
 from keras.layers import deserialize
@@ -23,10 +21,6 @@ except ImportError:
 class EmbedReduceTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
         super().setUp()
-        self.on_tpu = "TPU_NAME" in os.environ
-        if keras.backend.backend() == "tensorflow":
-            tf.debugging.disable_traceback_filtering()
-        self._strategy = tpu_test_utils.get_tpu_strategy(self)
 
     @parameterized.named_parameters(
         [
@@ -189,7 +183,7 @@ class EmbedReduceTest(testing.TestCase, parameterized.TestCase):
 
     def test_predict(self):
         input = keras.random.randint((5, 7), minval=0, maxval=10)
-        with self._strategy.scope():
+        with self.strategy.scope():
             model = keras.models.Sequential([EmbedReduce(10, 20)])
             model.compile(optimizer="adam", loss="mse")
         model.predict(input, batch_size=2)

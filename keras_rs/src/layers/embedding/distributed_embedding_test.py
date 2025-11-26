@@ -52,7 +52,6 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             # FLAGS.xla_sparse_core_max_ids_per_partition_per_sample = 16
             # FLAGS.xla_sparse_core_max_unique_ids_per_partition_per_sample = 16
 
-        self._strategy = tpu_test_utils.get_tpu_strategy(self)
         self.batch_size = (
             BATCH_SIZE_PER_CORE * self._strategy.num_replicas_in_sync
         )
@@ -207,7 +206,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             res = layer(preprocessed_inputs)
         else:
             res = tpu_test_utils.run_with_strategy(
-                self._strategy, layer.__call__, inputs, weights
+                self.strategy, layer.__call__, inputs, weights
             )
 
         if placement == "default_device" or not self.on_tpu:
@@ -368,13 +367,13 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
 
             model_inputs, _ = next(iter(test_dataset))
             test_output_before = tpu_test_utils.run_with_strategy(
-                self._strategy, model.__call__, model_inputs
+                self.strategy, model.__call__, model_inputs
             )
 
             model.fit(train_dataset, steps_per_epoch=1, epochs=1)
 
             test_output_after = tpu_test_utils.run_with_strategy(
-                self._strategy, model.__call__, model_inputs
+                self.strategy, model.__call__, model_inputs
             )
 
         # Verify that the embedding has actually trained.
@@ -556,11 +555,11 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
                 )
             else:
                 res = tpu_test_utils.run_with_strategy(
-                    self._strategy, layer.__call__, preprocessed
+                    self.strategy, layer.__call__, preprocessed
                 )
         else:
             res = tpu_test_utils.run_with_strategy(
-                self._strategy,
+                self.strategy,
                 layer.__call__,
                 inputs,
                 weights,

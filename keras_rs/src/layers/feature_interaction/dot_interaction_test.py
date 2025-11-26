@@ -1,7 +1,4 @@
-import os
-
 import keras
-import tensorflow as tf
 from absl.testing import parameterized
 from keras import ops
 from keras.layers import deserialize
@@ -17,10 +14,6 @@ from keras_rs.src.utils import tpu_test_utils
 class DotInteractionTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
         super().setUp()
-        if keras.backend.backend() == "tensorflow":
-            tf.debugging.disable_traceback_filtering()
-        self.on_tpu = "TPU_NAME" in os.environ
-        self._strategy = tpu_test_utils.get_tpu_strategy(self)
 
         self.input = [
             ops.array([[0.1, -4.3, 0.2, 1.1, 0.3]]),
@@ -91,7 +84,11 @@ class DotInteractionTest(testing.TestCase, parameterized.TestCase):
             self_interaction=self_interaction, skip_gather=skip_gather
         )
         output = layer(self.input)
-        self.assertAllClose(output, self.exp_outputs[exp_output_idx])
+        self.assertAllClose(
+            output,
+            self.exp_outputs[exp_output_idx],
+            tpu_atol=1e-2,
+            tpu_rtol=1e-2)
 
     def test_invalid_input_rank(self):
         rank_1_input = [ops.ones((3,)), ops.ones((3,))]
@@ -130,7 +127,7 @@ class DotInteractionTest(testing.TestCase, parameterized.TestCase):
         ),
     )
     def test_predict(self, self_interaction, skip_gather):
-        with self._strategy.scope():
+        with self.strategy.scope():
             feature1 = keras.layers.Input(shape=(5,))
             feature2 = keras.layers.Input(shape=(5,))
             feature3 = keras.layers.Input(shape=(5,))

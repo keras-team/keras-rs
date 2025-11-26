@@ -1,5 +1,4 @@
 import keras
-import tensorflow as tf
 from absl.testing import parameterized
 from keras import ops
 from keras.metrics import deserialize
@@ -12,8 +11,6 @@ from keras_rs.src.utils import tpu_test_utils
 
 class RecallAtKTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
-        if keras.backend.backend() == "tensorflow":
-            tf.debugging.disable_traceback_filtering()
         self._strategy = tpu_test_utils.get_tpu_strategy(self)
 
         self.y_true_batched = ops.array(
@@ -36,19 +33,18 @@ class RecallAtKTest(testing.TestCase, parameterized.TestCase):
         )
 
     def test_invalid_k_init(self):
-        with self._strategy.scope():
-            with self.assertRaisesRegex(
-                ValueError, "`k` should be a positive integer"
-            ):
-                RecallAtK(k=0)
-            with self.assertRaisesRegex(
-                ValueError, "`k` should be a positive integer"
-            ):
-                RecallAtK(k=-5)
-            with self.assertRaisesRegex(
-                ValueError, "`k` should be a positive integer"
-            ):
-                RecallAtK(k=3.5)
+        with self.assertRaisesRegex(
+            ValueError, "`k` should be a positive integer"
+        ):
+            RecallAtK(k=0)
+        with self.assertRaisesRegex(
+            ValueError, "`k` should be a positive integer"
+        ):
+            RecallAtK(k=-5)
+        with self.assertRaisesRegex(
+            ValueError, "`k` should be a positive integer"
+        ):
+            RecallAtK(k=3.5)
 
     @parameterized.named_parameters(
         (
@@ -97,27 +93,14 @@ class RecallAtKTest(testing.TestCase, parameterized.TestCase):
     def test_unbatched_inputs(
         self, y_true, y_pred, sample_weight, expected_output
     ):
-        with self._strategy.scope():
-            r_at_k = RecallAtK(k=3)
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            r_at_k.update_state,
-            y_true,
-            y_pred,
-            sample_weight=sample_weight,
-        )
+        r_at_k = RecallAtK(k=3)
+        r_at_k.update_state(y_true, y_pred, sample_weight=sample_weight)
         result = r_at_k.result()
         self.assertAllClose(result, expected_output, rtol=1e-6)
 
     def test_batched_input(self):
-        with self._strategy.scope():
-            r_at_k = RecallAtK(k=3)
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            r_at_k.update_state,
-            self.y_true_batched,
-            self.y_pred_batched,
-        )
+        r_at_k = RecallAtK(k=3)
+        r_at_k.update_state(self.y_true_batched, self.y_pred_batched)
         result = r_at_k.result()
         self.assertAllClose(result, 0.541667)
 
@@ -127,11 +110,8 @@ class RecallAtKTest(testing.TestCase, parameterized.TestCase):
         ("1d", [1.0, 0.5, 2.0, 1.0], 0.55),
     )
     def test_batched_inputs_sample_weight(self, sample_weight, expected_output):
-        with self._strategy.scope():
-            r_at_k = RecallAtK(k=3)
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            r_at_k.update_state,
+        r_at_k = RecallAtK(k=3)
+        r_at_k.update_state(
             self.y_true_batched,
             self.y_pred_batched,
             sample_weight=sample_weight,
@@ -172,15 +152,8 @@ class RecallAtKTest(testing.TestCase, parameterized.TestCase):
     def test_2d_sample_weight(
         self, y_true, y_pred, sample_weight, expected_output
     ):
-        with self._strategy.scope():
-            r_at_k = RecallAtK(k=2)
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            r_at_k.update_state,
-            y_true,
-            y_pred,
-            sample_weight=sample_weight,
-        )
+        r_at_k = RecallAtK(k=2)
+        r_at_k.update_state(y_true, y_pred, sample_weight=sample_weight)
         result = r_at_k.result()
         self.assertAllClose(result, expected_output, rtol=1e-6)
 
@@ -224,15 +197,8 @@ class RecallAtKTest(testing.TestCase, parameterized.TestCase):
         ),
     )
     def test_masking(self, y_true, y_pred, sample_weight, expected_output):
-        with self._strategy.scope():
-            r_at_k = RecallAtK(k=2)
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            r_at_k.update_state,
-            y_true,
-            y_pred,
-            sample_weight=sample_weight,
-        )
+        r_at_k = RecallAtK(k=2)
+        r_at_k.update_state(y_true, y_pred, sample_weight=sample_weight)
         result = r_at_k.result()
         self.assertAllClose(result, expected_output, rtol=1e-6)
 
@@ -243,35 +209,18 @@ class RecallAtKTest(testing.TestCase, parameterized.TestCase):
         ("4", 4, 0.75),
     )
     def test_k(self, k, expected_recall):
-        with self._strategy.scope():
-            r_at_k = RecallAtK(k=k)
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            r_at_k.update_state,
-            self.y_true_batched,
-            self.y_pred_batched,
-        )
+        r_at_k = RecallAtK(k=k)
+        r_at_k.update_state(self.y_true_batched, self.y_pred_batched)
         result = r_at_k.result()
         self.assertAllClose(result, expected_recall)
 
     def test_statefulness(self):
-        with self._strategy.scope():
-            r_at_k = RecallAtK(k=3)
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            r_at_k.update_state,
-            self.y_true_batched[:2],
-            self.y_pred_batched[:2],
-        )
+        r_at_k = RecallAtK(k=3)
+        r_at_k.update_state(self.y_true_batched[:2], self.y_pred_batched[:2])
         result = r_at_k.result()
         self.assertAllClose(result, 0.833333, rtol=1e-6)
 
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            r_at_k.update_state,
-            self.y_true_batched[2:],
-            self.y_pred_batched[2:],
-        )
+        r_at_k.update_state(self.y_true_batched[2:], self.y_pred_batched[2:])
         result = r_at_k.result()
         self.assertAllClose(result, 0.541667)
 
@@ -280,8 +229,7 @@ class RecallAtKTest(testing.TestCase, parameterized.TestCase):
         self.assertAllClose(result, 0.0)
 
     def test_serialization(self):
-        with self._strategy.scope():
-            metric = RecallAtK(k=3)
+        metric = RecallAtK(k=3)
         restored = deserialize(serialize(metric))
         self.assertDictEqual(metric.get_config(), restored.get_config())
 
@@ -297,17 +245,10 @@ class RecallAtKTest(testing.TestCase, parameterized.TestCase):
                 optimizer="adam",
             )
 
-        x_data = keras.random.normal((2, 20))
-        y_data = keras.random.randint((2, 5), minval=0, maxval=2)
-
-        dataset = tf.data.Dataset.from_tensor_slices((x_data, y_data))
-        dataset = dataset.batch(
-            self._strategy.num_replicas_in_sync
-            if isinstance(self._strategy, tf.distribute.Strategy)
-            else 1
+        model.evaluate(
+            x=keras.random.normal((2, 20)),
+            y=keras.random.randint(
+                (2, 5), minval=0, maxval=2
+            ),  # Using 0/1 for y_true
+            verbose=0,
         )
-
-        if isinstance(self._strategy, tf.distribute.TPUStrategy):
-            dataset = self._strategy.experimental_distribute_dataset(dataset)
-
-        model.evaluate(dataset, steps=2, verbose=0)

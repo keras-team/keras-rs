@@ -1,5 +1,4 @@
 import keras
-import tensorflow as tf
 from absl.testing import parameterized
 from keras import ops
 from keras.layers import deserialize
@@ -13,10 +12,6 @@ from keras_rs.src.utils import tpu_test_utils
 class HardNegativeMiningTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
         super().setUp()
-        if keras.backend.backend() == "tensorflow":
-            tf.debugging.disable_traceback_filtering()
-
-        self._strategy = tpu_test_utils.get_tpu_strategy(self)
 
     def create_inputs(self, rank=2):
         shape_3d = (15, 20, 10)
@@ -98,7 +93,7 @@ class HardNegativeMiningTest(testing.TestCase, parameterized.TestCase):
     def test_predict(self):
         logits, labels = self.create_inputs()
 
-        with self._strategy.scope():
+        with self.strategy.scope():
             in_logits = keras.layers.Input(shape=logits.shape[1:])
             in_labels = keras.layers.Input(shape=labels.shape[1:])
             out_logits, out_labels = hard_negative_mining.HardNegativeMining(

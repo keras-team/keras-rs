@@ -7,7 +7,8 @@ import keras
 import numpy as np
 
 from keras_rs.src import types
-
+import tensorflow as tf
+from keras_rs.src.utils import tpu_test_utils
 
 class TestCase(unittest.TestCase):
     """TestCase class for all Keras Recommenders tests."""
@@ -16,6 +17,16 @@ class TestCase(unittest.TestCase):
         super().setUp()
         keras.utils.clear_session()
         keras.config.disable_traceback_filtering()
+        if keras.backend.backend() == "tensorflow":
+            tf.debugging.disable_traceback_filtering()
+        self.on_tpu = "TPU_NAME" in os.environ
+
+    @property
+    def strategy(self):
+        if hasattr(self, "_strategy"):
+            return self._strategy
+        self._strategy = tpu_test_utils.get_tpu_strategy(self)
+        return self._strategy
 
     def assertAllClose(
         self,
@@ -23,9 +34,8 @@ class TestCase(unittest.TestCase):
         desired: types.Tensor,
         atol: float = 1e-6,
         rtol: float = 1e-6,
-        tpu_atol: float = 1e-2,
-        tpu_rtol: float = 1e-2,
-        is_tpu: bool = False,
+        tpu_atol=None,
+        tpu_rtol=None,
         msg: str = "",
     ) -> None:
         """Verify that two tensors are close in value element by element.
@@ -37,15 +47,15 @@ class TestCase(unittest.TestCase):
           rtol: Relative tolerance.
           msg: Optional error message.
         """
+        if tpu_atol is not None and self.on_tpu:
+            atol = tpu_atol
+        if tpu_rtol is not None and self.on_tpu:
+            rtol = tpu_rtol
+
         if not isinstance(actual, np.ndarray):
             actual = keras.ops.convert_to_numpy(actual)
         if not isinstance(desired, np.ndarray):
             desired = keras.ops.convert_to_numpy(desired)
-        if tpu_atol is not None and is_tpu:
-            atol = tpu_atol
-        if tpu_rtol is not None and is_tpu:
-            rtol = tpu_rtol
-
         np.testing.assert_allclose(
             actual, desired, atol=atol, rtol=rtol, err_msg=msg
         )

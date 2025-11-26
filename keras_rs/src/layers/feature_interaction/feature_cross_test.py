@@ -1,5 +1,4 @@
 import keras
-import tensorflow as tf
 from absl.testing import parameterized
 from keras import ops
 from keras.layers import deserialize
@@ -13,9 +12,6 @@ from keras_rs.src.utils import tpu_test_utils
 class FeatureCrossTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
         super().setUp()
-        if keras.backend.backend() == "tensorflow":
-            tf.debugging.disable_traceback_filtering()
-        self._strategy = tpu_test_utils.get_tpu_strategy(self)
 
         self.x0 = ops.array([[0.1, 0.2, 0.3]], dtype="float32")
         self.x = ops.array([[0.4, 0.5, 0.6]], dtype="float32")
@@ -84,7 +80,7 @@ class FeatureCrossTest(testing.TestCase, parameterized.TestCase):
         self.assertAllClose(self.x, output)
 
     def test_predict(self):
-        with self._strategy.scope():
+        with self.strategy.scope():
             x0 = keras.layers.Input(shape=(3,))
             x1 = FeatureCross(projection_dim=None)(x0, x0)
             x2 = FeatureCross(projection_dim=None)(x0, x1)

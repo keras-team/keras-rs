@@ -10,7 +10,7 @@ from keras_rs.src.layers.embedding.tensorflow import config_conversion
 
 @pytest.mark.skipif(
     keras.backend.backend() != "tensorflow",
-    reason="Backend specific test",
+    reason="Tensorflow specific test",
 )
 class ConfigConversionTest(testing.TestCase, parameterized.TestCase):
     @parameterized.named_parameters(

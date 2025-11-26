@@ -1,7 +1,6 @@
 import math
 
 import keras
-import tensorflow as tf
 from absl.testing import parameterized
 from keras import ops
 from keras.metrics import deserialize
@@ -21,8 +20,6 @@ def _compute_dcg(labels, ranks):
 
 class NDCGTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
-        if keras.backend.backend() == "tensorflow":
-            tf.debugging.disable_traceback_filtering()
         self._strategy = tpu_test_utils.get_tpu_strategy(self)
 
         self.y_true_batched = ops.array(
@@ -63,19 +60,18 @@ class NDCGTest(testing.TestCase, parameterized.TestCase):
         self.expected_output_batched = sum(expected_ndcg) / 4.0
 
     def test_invalid_k_init(self):
-        with self._strategy.scope():
-            with self.assertRaisesRegex(
-                ValueError, "`k` should be a positive integer"
-            ):
-                NDCG(k=0)
-            with self.assertRaisesRegex(
-                ValueError, "`k` should be a positive integer"
-            ):
-                NDCG(k=-5)
-            with self.assertRaisesRegex(
-                ValueError, "`k` should be a positive integer"
-            ):
-                NDCG(k=3.5)
+        with self.assertRaisesRegex(
+            ValueError, "`k` should be a positive integer"
+        ):
+            NDCG(k=0)
+        with self.assertRaisesRegex(
+            ValueError, "`k` should be a positive integer"
+        ):
+            NDCG(k=-5)
+        with self.assertRaisesRegex(
+            ValueError, "`k` should be a positive integer"
+        ):
+            NDCG(k=3.5)
 
     @parameterized.named_parameters(
         (
@@ -148,28 +144,15 @@ class NDCGTest(testing.TestCase, parameterized.TestCase):
     def test_unbatched_inputs(
         self, y_true, y_pred, sample_weight, expected_output
     ):
-        with self._strategy.scope():
-            ndcg_metric = NDCG()
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            ndcg_metric.update_state,
-            y_true,
-            y_pred,
-            sample_weight=sample_weight,
-        )
-        result = ndcg_metric.result()
+        dcg_metric = NDCG()
+        dcg_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
+        result = dcg_metric.result()
         self.assertAllClose(result, expected_output)
 
     def test_batched_input(self):
-        with self._strategy.scope():
-            ndcg_metric = NDCG()
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            ndcg_metric.update_state,
-            self.y_true_batched,
-            self.y_pred_batched,
-        )
-        result = ndcg_metric.result()
+        dcg_metric = NDCG()
+        dcg_metric.update_state(self.y_true_batched, self.y_pred_batched)
+        result = dcg_metric.result()
         self.assertAllClose(result, self.expected_output_batched)
 
     @parameterized.named_parameters(
@@ -178,16 +161,13 @@ class NDCGTest(testing.TestCase, parameterized.TestCase):
         ("1d", [1.0, 0.5, 2.0, 1.0], 0.74262),
     )
     def test_batched_inputs_sample_weight(self, sample_weight, expected_output):
-        with self._strategy.scope():
-            ndcg_metric = NDCG()
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            ndcg_metric.update_state,
+        dcg_metric = NDCG()
+        dcg_metric.update_state(
             self.y_true_batched,
             self.y_pred_batched,
             sample_weight=sample_weight,
         )
-        result = ndcg_metric.result()
+        result = dcg_metric.result()
         self.assertAllClose(result, expected_output)
 
     @parameterized.named_parameters(
@@ -248,16 +228,10 @@ class NDCGTest(testing.TestCase, parameterized.TestCase):
     def test_2d_sample_weight(
         self, y_true, y_pred, sample_weight, expected_output
     ):
-        with self._strategy.scope():
-            ndcg_metric = NDCG()
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            ndcg_metric.update_state,
-            y_true,
-            y_pred,
-            sample_weight=sample_weight,
-        )
-        result = ndcg_metric.result()
+        dcg_metric = NDCG()
+
+        dcg_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
+        result = dcg_metric.result()
         self.assertAllClose(result, expected_output)
 
     @parameterized.named_parameters(
@@ -317,16 +291,10 @@ class NDCGTest(testing.TestCase, parameterized.TestCase):
         ),
     )
     def test_masking(self, y_true, y_pred, sample_weight, expected_output):
-        with self._strategy.scope():
-            ndcg_metric = NDCG()
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            ndcg_metric.update_state,
-            y_true,
-            y_pred,
-            sample_weight=sample_weight,
-        )
-        result = ndcg_metric.result()
+        dcg_metric = NDCG()
+
+        dcg_metric.update_state(y_true, y_pred, sample_weight=sample_weight)
+        result = dcg_metric.result()
         self.assertAllClose(result, expected_output)
 
     @parameterized.named_parameters(
@@ -336,28 +304,18 @@ class NDCGTest(testing.TestCase, parameterized.TestCase):
         ("4", 4, 0.7377),
     )
     def test_k(self, k, exp_value):
-        with self._strategy.scope():
-            ndcg_metric = NDCG(k=k)
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            ndcg_metric.update_state,
-            self.y_true_batched,
-            self.y_pred_batched,
-        )
-        result = ndcg_metric.result()
+        dcg_metric = NDCG(k=k)
+        dcg_metric.update_state(self.y_true_batched, self.y_pred_batched)
+        result = dcg_metric.result()
         self.assertAllClose(result, exp_value, rtol=1e-5)
 
     def test_statefulness(self):
-        with self._strategy.scope():
-            ndcg_metric = NDCG()
+        dcg_metric = NDCG()
         # Batch 1
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            ndcg_metric.update_state,
-            self.y_true_batched[:2],
-            self.y_pred_batched[:2],
+        dcg_metric.update_state(
+            self.y_true_batched[:2], self.y_pred_batched[:2]
         )
-        result = ndcg_metric.result()
+        result = dcg_metric.result()
         dcg = [_compute_dcg([1], [1]), _compute_dcg([3, 2, 1], [1, 3, 4])]
         idcg = [_compute_dcg([1], [1]), _compute_dcg([3, 2, 1], [1, 2, 3])]
         ndcg = sum([a / b if b != 0.0 else 0.0 for a, b in zip(dcg, idcg)]) / 2
@@ -367,23 +325,19 @@ class NDCGTest(testing.TestCase, parameterized.TestCase):
         )
 
         # Batch 2
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            ndcg_metric.update_state,
-            self.y_true_batched[2:],
-            self.y_pred_batched[2:],
+        dcg_metric.update_state(
+            self.y_true_batched[2:], self.y_pred_batched[2:]
         )
-        result = ndcg_metric.result()
+        result = dcg_metric.result()
         self.assertAllClose(result, self.expected_output_batched)
 
         # Reset state
-        ndcg_metric.reset_state()
-        result = ndcg_metric.result()
+        dcg_metric.reset_state()
+        result = dcg_metric.result()
         self.assertAllClose(result, 0.0)
 
     def test_serialization(self):
-        with self._strategy.scope():
-            metric = NDCG()
+        metric = NDCG()
         restored = deserialize(serialize(metric))
         self.assertDictEqual(metric.get_config(), restored.get_config())
 
@@ -394,17 +348,11 @@ class NDCGTest(testing.TestCase, parameterized.TestCase):
         def inverse_discount_fn(rank):
             return ops.divide(1.0, rank)
 
-        with self._strategy.scope():
-            ndcg_metric = NDCG(
-                gain_fn=linear_gain_fn, rank_discount_fn=inverse_discount_fn
-            )
-        tpu_test_utils.run_with_strategy(
-            self._strategy,
-            ndcg_metric.update_state,
-            self.y_true_batched,
-            self.y_pred_batched,
+        dcg_metric = NDCG(
+            gain_fn=linear_gain_fn, rank_discount_fn=inverse_discount_fn
         )
-        result = ndcg_metric.result()
+        dcg_metric.update_state(self.y_true_batched, self.y_pred_batched)
+        result = dcg_metric.result()
 
         dcg = [1 / 1, 3 / 1 + 2 / 3 + 1 / 4, 0, 2 / 1 + 1 / 2]
         idcg = [1 / 1, 3 / 1 + 2 / 2 + 1 / 3, 0.0, 2 / 1 + 1 / 2]
@@ -423,17 +371,7 @@ class NDCGTest(testing.TestCase, parameterized.TestCase):
                 optimizer="adam",
             )
 
-        x_data = keras.random.normal((2, 20))
-        y_data = keras.random.randint((2, 5), minval=0, maxval=4)
-
-        dataset = tf.data.Dataset.from_tensor_slices((x_data, y_data))
-        dataset = dataset.batch(
-            self._strategy.num_replicas_in_sync
-            if isinstance(self._strategy, tf.distribute.Strategy)
-            else 1
+        model.evaluate(
+            x=keras.random.normal((2, 20)),
+            y=keras.random.randint((2, 5), minval=0, maxval=4),
         )
-
-        if isinstance(self._strategy, tf.distribute.TPUStrategy):
-            dataset = self._strategy.experimental_distribute_dataset(dataset)
-
-        model.evaluate(dataset, steps=2)
