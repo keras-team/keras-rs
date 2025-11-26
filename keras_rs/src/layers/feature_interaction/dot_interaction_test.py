@@ -2,7 +2,6 @@ import os
 
 import keras
 import tensorflow as tf
-from absl.testing import absltest
 from absl.testing import parameterized
 from keras import ops
 from keras.layers import deserialize
@@ -20,7 +19,6 @@ class DotInteractionTest(testing.TestCase, parameterized.TestCase):
         super().setUp()
         if keras.backend.backend() == "tensorflow":
             tf.debugging.disable_traceback_filtering()
-
         self.on_tpu = "TPU_NAME" in os.environ
         self._strategy = tpu_test_utils.get_tpu_strategy(self)
 
@@ -89,36 +87,25 @@ class DotInteractionTest(testing.TestCase, parameterized.TestCase):
         ),
     )
     def test_call(self, self_interaction, skip_gather, exp_output_idx):
-        with self._strategy.scope():
-            layer = DotInteraction(
-                self_interaction=self_interaction, skip_gather=skip_gather
-            )
-        output = tpu_test_utils.run_with_strategy(
-            self._strategy, layer, self.input
+        layer = DotInteraction(
+            self_interaction=self_interaction, skip_gather=skip_gather
         )
-        self.assertAllClose(
-            output, self.exp_outputs[exp_output_idx], is_tpu=self.on_tpu
-        )
+        output = layer(self.input)
+        self.assertAllClose(output, self.exp_outputs[exp_output_idx])
 
     def test_invalid_input_rank(self):
         rank_1_input = [ops.ones((3,)), ops.ones((3,))]
 
-        with self._strategy.scope():
-            layer = DotInteraction()
+        layer = DotInteraction()
         with self.assertRaises(ValueError):
-            tpu_test_utils.run_with_strategy(
-                self._strategy, layer, rank_1_input
-            )
+            layer(rank_1_input)
 
     def test_invalid_input_different_shapes(self):
         unequal_shape_input = [ops.ones((1, 3)), ops.ones((1, 4))]
 
-        with self._strategy.scope():
-            layer = DotInteraction()
+        layer = DotInteraction()
         with self.assertRaises(ValueError):
-            tpu_test_utils.run_with_strategy(
-                self._strategy, layer, unequal_shape_input
-            )
+            layer(unequal_shape_input)
 
     @parameterized.named_parameters(
         (
@@ -157,25 +144,19 @@ class DotInteractionTest(testing.TestCase, parameterized.TestCase):
         model.predict(self.input, batch_size=2)
 
     def test_serialization(self):
-        with self._strategy.scope():
-            layer = DotInteraction()
+        layer = DotInteraction()
         restored = deserialize(serialize(layer))
         self.assertDictEqual(layer.get_config(), restored.get_config())
 
     def test_model_saving(self):
-        with self._strategy.scope():
-            feature1 = keras.layers.Input(shape=(5,))
-            feature2 = keras.layers.Input(shape=(5,))
-            feature3 = keras.layers.Input(shape=(5,))
-            x = DotInteraction()([feature1, feature2, feature3])
-            x = keras.layers.Dense(units=1)(x)
-            model = keras.Model([feature1, feature2, feature3], x)
+        feature1 = keras.layers.Input(shape=(5,))
+        feature2 = keras.layers.Input(shape=(5,))
+        feature3 = keras.layers.Input(shape=(5,))
+        x = DotInteraction()([feature1, feature2, feature3])
+        x = keras.layers.Dense(units=1)(x)
+        model = keras.Model([feature1, feature2, feature3], x)
 
         self.run_model_saving_test(
             model=model,
             input_data=self.input,
         )
-
-
-if __name__ == "__main__":
-    absltest.main()

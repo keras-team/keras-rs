@@ -18,7 +18,6 @@ from jax_tpu_embedding.sparsecore.lib.nn import (
 )
 from jax_tpu_embedding.sparsecore.utils import utils as jte_utils
 
-from keras_rs.src import testing
 from keras_rs.src.layers.embedding import test_utils as keras_test_utils
 from keras_rs.src.layers.embedding.jax import checkpoint_utils
 from keras_rs.src.layers.embedding.jax import config_conversion

@@ -1,6 +1,5 @@
 import keras
 import tensorflow as tf
-from absl.testing import absltest
 from absl.testing import parameterized
 from keras import ops
 from keras.layers import deserialize
@@ -71,13 +70,8 @@ class SamplingProbabilityCorrectionTest(
         )
 
         # Verifies logits are always less than corrected logits.
-        with self._strategy.scope():
-            layer = (
-                sampling_probability_correction.SamplingProbabilityCorrection()
-            )
-        corrected_logits = tpu_test_utils.run_with_strategy(
-            self._strategy, layer, logits, probs
-        )
+        layer = sampling_probability_correction.SamplingProbabilityCorrection()
+        corrected_logits = layer(logits, probs)
         self.assertAllClose(
             ops.less(logits, corrected_logits), ops.ones(logits.shape)
         )
@@ -92,9 +86,7 @@ class SamplingProbabilityCorrectionTest(
         )
 
         # Verifies logits are always less than corrected logits.
-        corrected_logits_with_zeros = tpu_test_utils.run_with_strategy(
-            self._strategy, layer, logits, probs_with_zeros
-        )
+        corrected_logits_with_zeros = layer(logits, probs_with_zeros)
         self.assertAllClose(
             ops.less(logits, corrected_logits_with_zeros),
             ops.ones(logits.shape),
@@ -117,27 +109,17 @@ class SamplingProbabilityCorrectionTest(
         model.predict([logits, probs], batch_size=4)
 
     def test_serialization(self):
-        with self._strategy.scope():
-            layer = (
-                sampling_probability_correction.SamplingProbabilityCorrection()
-            )
+        layer = sampling_probability_correction.SamplingProbabilityCorrection()
         restored = deserialize(serialize(layer))
         self.assertDictEqual(layer.get_config(), restored.get_config())
 
     def test_model_saving(self):
         logits, probs = self.create_inputs()
 
-        with self._strategy.scope():
-            layer = (
-                sampling_probability_correction.SamplingProbabilityCorrection()
-            )
-            in_logits = keras.layers.Input(shape=logits.shape[1:])
-            in_probs = keras.layers.Input(batch_shape=probs.shape)
-            out_logits = layer(in_logits, in_probs)
-            model = keras.Model([in_logits, in_probs], out_logits)
+        layer = sampling_probability_correction.SamplingProbabilityCorrection()
+        in_logits = keras.layers.Input(shape=logits.shape[1:])
+        in_probs = keras.layers.Input(batch_shape=probs.shape)
+        out_logits = layer(in_logits, in_probs)
+        model = keras.Model([in_logits, in_probs], out_logits)
 
         self.run_model_saving_test(model=model, input_data=[logits, probs])
-
-
-if __name__ == "__main__":
-    absltest.main()
