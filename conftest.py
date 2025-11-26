@@ -1,10 +1,18 @@
+from typing import Union
+
 import pytest
 
 from keras_rs.src.utils import tpu_test_utils
 
+StrategyType = Union[
+    tf.distribute.Strategy,
+    tpu_test_utils.DummyStrategy,
+    tpu_test_utils.JaxDummyStrategy,
+]
+
 
 @pytest.fixture(scope="session", autouse=True)
-def prime_shared_tpu_strategy(request):
+def prime_shared_tpu_strategy(request) -> StrategyType:
     """
     Eagerly initializes the shared TPU strategy at the beginning of the session
     if running on a TPU. This helps catch initialization errors early.
