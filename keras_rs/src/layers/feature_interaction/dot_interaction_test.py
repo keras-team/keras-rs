@@ -8,7 +8,6 @@ from keras_rs.src import testing
 from keras_rs.src.layers.feature_interaction.dot_interaction import (
     DotInteraction,
 )
-from keras_rs.src.utils import tpu_test_utils
 
 
 class DotInteractionTest(testing.TestCase, parameterized.TestCase):
@@ -88,7 +87,8 @@ class DotInteractionTest(testing.TestCase, parameterized.TestCase):
             output,
             self.exp_outputs[exp_output_idx],
             tpu_atol=1e-2,
-            tpu_rtol=1e-2)
+            tpu_rtol=1e-2,
+        )
 
     def test_invalid_input_rank(self):
         rank_1_input = [ops.ones((3,)), ops.ones((3,))]

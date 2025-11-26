@@ -8,7 +8,6 @@ from keras_rs.src import testing
 from keras_rs.src.losses.pairwise_soft_zero_one_loss import (
     PairwiseSoftZeroOneLoss,
 )
-from keras_rs.src.utils import tpu_test_utils
 
 
 class PairwiseSoftZeroOneLossTest(testing.TestCase, parameterized.TestCase):

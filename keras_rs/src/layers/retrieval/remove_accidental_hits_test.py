@@ -6,7 +6,6 @@ from keras.layers import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.layers.retrieval import remove_accidental_hits
-from keras_rs.src.utils import tpu_test_utils
 
 
 class RemoveAccidentalHitsTest(testing.TestCase, parameterized.TestCase):

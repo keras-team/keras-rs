@@ -5,10 +5,11 @@ from typing import Any
 
 import keras
 import numpy as np
+import tensorflow as tf
 
 from keras_rs.src import types
-import tensorflow as tf
 from keras_rs.src.utils import tpu_test_utils
+
 
 class TestCase(unittest.TestCase):
     """TestCase class for all Keras Recommenders tests."""

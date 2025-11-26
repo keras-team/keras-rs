@@ -6,7 +6,6 @@ from keras.losses import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.losses.list_mle_loss import ListMLELoss
-from keras_rs.src.utils import tpu_test_utils
 
 
 class ListMLELossTest(testing.TestCase, parameterized.TestCase):

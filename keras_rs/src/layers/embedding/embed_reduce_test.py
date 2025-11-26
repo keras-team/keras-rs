@@ -8,7 +8,6 @@ from keras.layers import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.layers.embedding.embed_reduce import EmbedReduce
-from keras_rs.src.utils import tpu_test_utils
 
 try:
     import jax

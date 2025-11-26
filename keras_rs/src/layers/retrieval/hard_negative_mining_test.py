@@ -6,7 +6,6 @@ from keras.layers import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.layers.retrieval import hard_negative_mining
-from keras_rs.src.utils import tpu_test_utils
 
 
 class HardNegativeMiningTest(testing.TestCase, parameterized.TestCase):

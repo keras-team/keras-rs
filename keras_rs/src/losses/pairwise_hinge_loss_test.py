@@ -6,7 +6,6 @@ from keras.losses import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.losses.pairwise_hinge_loss import PairwiseHingeLoss
-from keras_rs.src.utils import tpu_test_utils
 
 
 class PairwiseHingeLossTest(testing.TestCase, parameterized.TestCase):

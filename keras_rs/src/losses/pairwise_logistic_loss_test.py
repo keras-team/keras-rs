@@ -6,7 +6,6 @@ from keras.losses import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.losses.pairwise_logistic_loss import PairwiseLogisticLoss
-from keras_rs.src.utils import tpu_test_utils
 
 
 class PairwiseLogisticLossTest(testing.TestCase, parameterized.TestCase):

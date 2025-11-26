@@ -6,7 +6,6 @@ from keras.layers import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.layers.feature_interaction.feature_cross import FeatureCross
-from keras_rs.src.utils import tpu_test_utils
 
 
 class FeatureCrossTest(testing.TestCase, parameterized.TestCase):

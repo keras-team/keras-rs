@@ -8,7 +8,6 @@ from keras_rs.src import testing
 from keras_rs.src.losses.pairwise_mean_squared_error import (
     PairwiseMeanSquaredError,
 )
-from keras_rs.src.utils import tpu_test_utils
 
 
 class PairwiseMeanSquaredErrorTest(testing.TestCase, parameterized.TestCase):

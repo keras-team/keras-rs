@@ -20,5 +20,3 @@ build/
 .idea/
 
 venv/
-venv_tf/
-venv_jax/
