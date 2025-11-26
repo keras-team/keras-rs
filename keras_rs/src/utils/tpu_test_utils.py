@@ -46,19 +46,24 @@ StrategyType = Union[tf.distribute.Strategy, DummyStrategy, JaxDummyStrategy]
 _shared_strategy: Optional[StrategyType] = None
 _lock = threading.Lock()
 
+
 def create_tpu_strategy() -> Optional[StrategyType]:
     """Initializes the TPU system and returns a TPUStrategy."""
     print("Attempting to create TPUStrategy...")
     try:
-        resolver = tf.distribute.cluster_resolver.TPUClusterResolver(tpu='')
+        resolver = tf.distribute.cluster_resolver.TPUClusterResolver(tpu="")
         tf.config.experimental_connect_to_cluster(resolver)
         tf.tpu.experimental.initialize_tpu_system(resolver)
         strategy = tf.distribute.TPUStrategy(resolver)
-        print(f"TPUStrategy created successfully. Devices: {strategy.extended.num_replicas_in_sync}")
+        print(
+            "TPUStrategy created successfully."
+            "Devices: {strategy.extended.num_replicas_in_sync}"
+        )
         return strategy
     except Exception as e:
         print(f"Error creating TPUStrategy: {e}")
         return None
+
 
 def get_shared_tpu_strategy() -> Optional[StrategyType]:
     """
@@ -97,7 +102,7 @@ def get_shared_tpu_strategy() -> Optional[StrategyType]:
             else:
                 _shared_strategy = DummyStrategy()
             if _shared_strategy is None:
-                 print("Failed to create the shared TPUStrategy.")
+                print("Failed to create the shared TPUStrategy.")
     return _shared_strategy
 
 

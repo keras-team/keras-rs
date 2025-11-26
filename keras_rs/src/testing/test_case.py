@@ -34,7 +34,6 @@ class TestCase(unittest.TestCase):
         strat = tpu_test_utils.get_shared_tpu_strategy()
 
         if strat is None:
-             # This case should ideally be caught by the conftest.py fixture
             self.fail(
                 "TPU environment detected, but the shared TPUStrategy is None. "
                 "Initialization likely failed."
@@ -51,8 +50,8 @@ class TestCase(unittest.TestCase):
         desired: types.Tensor,
         atol: float = 1e-6,
         rtol: float = 1e-6,
-        tpu_atol: float = None,
-        tpu_rtol: float = None,
+        tpu_atol: float | None = None,
+        tpu_rtol: float | None = None,
         msg: str = "",
     ) -> None:
         """Verify that two tensors are close in value element by element.

@@ -1,6 +1,7 @@
 import pytest
-import os
+
 from keras_rs.src.utils import tpu_test_utils
+
 
 @pytest.fixture(scope="session", autouse=True)
 def prime_shared_tpu_strategy(request):
