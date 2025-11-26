@@ -1,7 +1,7 @@
 import os
 import tempfile
 import unittest
-from typing import Any
+from typing import Any, Optional, Union
 
 import keras
 import numpy as np
@@ -9,6 +9,12 @@ import tensorflow as tf
 
 from keras_rs.src import types
 from keras_rs.src.utils import tpu_test_utils
+
+StrategyType = Union[
+    tf.distribute.Strategy,
+    tpu_test_utils.DummyStrategy,
+    tpu_test_utils.JaxDummyStrategy,
+]
 
 
 class TestCase(unittest.TestCase):
@@ -21,13 +27,23 @@ class TestCase(unittest.TestCase):
         if keras.backend.backend() == "tensorflow":
             tf.debugging.disable_traceback_filtering()
         self.on_tpu = "TPU_NAME" in os.environ
+        self._strategy: Optional[StrategyType] = None
 
     @property
-    def strategy(self):
-        if hasattr(self, "_strategy"):
-            return self._strategy
-        self._strategy = tpu_test_utils.get_tpu_strategy(self)
-        return self._strategy
+    def strategy(self) -> StrategyType:
+        strat = tpu_test_utils.get_shared_tpu_strategy()
+
+        if strat is None:
+             # This case should ideally be caught by the conftest.py fixture
+            self.fail(
+                "TPU environment detected, but the shared TPUStrategy is None. "
+                "Initialization likely failed."
+            )
+        return strat
+        # if self._strategy is not None:
+        #     return self._strategy
+        # self._strategy = tpu_test_utils.get_tpu_strategy(self)
+        # return self._strategy
 
     def assertAllClose(
         self,
@@ -35,8 +51,8 @@ class TestCase(unittest.TestCase):
         desired: types.Tensor,
         atol: float = 1e-6,
         rtol: float = 1e-6,
-        tpu_atol=None,
-        tpu_rtol=None,
+        tpu_atol: float = None,
+        tpu_rtol: float = None,
         msg: str = "",
     ) -> None:
         """Verify that two tensors are close in value element by element.

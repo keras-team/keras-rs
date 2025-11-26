@@ -10,6 +10,7 @@ from keras_rs.src.losses.list_mle_loss import ListMLELoss
 
 class ListMLELossTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
+        super().setUp()
         self.unbatched_scores = ops.array(
             [1.0, 3.0, 2.0, 4.0, 0.8], dtype="float32"
         )

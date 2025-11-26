@@ -53,7 +53,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             # FLAGS.xla_sparse_core_max_unique_ids_per_partition_per_sample = 16
 
         self.batch_size = (
-            BATCH_SIZE_PER_CORE * self._strategy.num_replicas_in_sync
+            BATCH_SIZE_PER_CORE * self.strategy.num_replicas_in_sync
         )
 
     def get_embedding_config(self, input_type, placement):
@@ -194,11 +194,11 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
 
         if placement == "sparsecore" and not self.on_tpu:
             with self.assertRaisesRegex(Exception, "sparsecore"):
-                with self._strategy.scope():
+                with self.strategy.scope():
                     distributed_embedding.DistributedEmbedding(feature_configs)
             return
 
-        with self._strategy.scope():
+        with self.strategy.scope():
             layer = distributed_embedding.DistributedEmbedding(feature_configs)
 
         if keras.backend.backend() == "jax":
@@ -276,7 +276,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             (test_model_inputs, test_labels)
         )
 
-        with self._strategy.scope():
+        with self.strategy.scope():
             layer = distributed_embedding.DistributedEmbedding(feature_configs)
 
         def _create_keras_input(
@@ -347,7 +347,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             # New preprocessed data removes the `weights` component.
             dataset_has_weights = False
         else:
-            train_dataset = self._strategy.experimental_distribute_dataset(
+            train_dataset = self.strategy.experimental_distribute_dataset(
                 train_dataset,
                 options=tf.distribute.InputOptions(
                     experimental_fetch_to_device=False
@@ -362,7 +362,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             inputs=keras_model_inputs, outputs=keras_model_outputs
         )
 
-        with self._strategy.scope():
+        with self.strategy.scope():
             model.compile(optimizer="adam", loss="mse")
 
             model_inputs, _ = next(iter(test_dataset))
@@ -511,7 +511,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
         if not use_weights:
             weights = None
 
-        with self._strategy.scope():
+        with self.strategy.scope():
             layer = distributed_embedding.DistributedEmbedding(feature_config)
 
         if keras.backend.backend() == "jax":
@@ -568,7 +568,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
 
         self.assertEqual(res.shape, (self.batch_size, EMBEDDING_OUTPUT_DIM))
 
-        with self._strategy.scope():
+        with self.strategy.scope():
             tables = layer.get_embedding_tables()
 
         emb = tables["table"]
@@ -633,11 +633,11 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             "dense", embedding_config
         )
 
-        with self._strategy.scope():
+        with self.strategy.scope():
             layer = distributed_embedding.DistributedEmbedding(embedding_config)
 
         res = tpu_test_utils.run_with_strategy(
-            self._strategy, layer.__call__, inputs
+            self.strategy, layer.__call__, inputs
         )
 
         if self.placement == "default_device":
@@ -709,11 +709,11 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             "dense", embedding_config
         )
 
-        with self._strategy.scope():
+        with self.strategy.scope():
             layer = distributed_embedding.DistributedEmbedding(embedding_config)
 
         res = tpu_test_utils.run_with_strategy(
-            self._strategy, layer.__call__, inputs
+            self.strategy, layer.__call__, inputs
         )
 
         self.assertEqual(
@@ -740,7 +740,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = os.path.join(temp_dir, "model.keras")
 
-            with self._strategy.scope():
+            with self.strategy.scope():
                 layer = distributed_embedding.DistributedEmbedding(
                     feature_configs
                 )
@@ -748,14 +748,14 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
                 model = keras.Model(inputs=keras_inputs, outputs=keras_outputs)
 
                 output_before = tpu_test_utils.run_with_strategy(
-                    self._strategy, model.__call__, inputs
+                    self.strategy, model.__call__, inputs
                 )
                 model.save(path)
 
-            with self._strategy.scope():
+            with self.strategy.scope():
                 reloaded_model = keras.models.load_model(path)
                 output_after = tpu_test_utils.run_with_strategy(
-                    self._strategy, reloaded_model.__call__, inputs
+                    self.strategy, reloaded_model.__call__, inputs
                 )
 
         if self.placement == "sparsecore":
