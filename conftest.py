@@ -13,7 +13,7 @@ StrategyType = Union[
 
 
 @pytest.fixture(scope="session", autouse=True)
-def prime_shared_tpu_strategy(request) -> StrategyType:
+def prime_shared_tpu_strategy() -> None:
     """
     Eagerly initializes the shared TPU strategy at the beginning of the session
     if running on a TPU. This helps catch initialization errors early.
