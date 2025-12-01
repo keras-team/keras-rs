@@ -127,16 +127,15 @@ class DotInteractionTest(testing.TestCase, parameterized.TestCase):
         ),
     )
     def test_predict(self, self_interaction, skip_gather):
-        with self.strategy.scope():
-            feature1 = keras.layers.Input(shape=(5,))
-            feature2 = keras.layers.Input(shape=(5,))
-            feature3 = keras.layers.Input(shape=(5,))
-            x = DotInteraction(
-                self_interaction=self_interaction, skip_gather=skip_gather
-            )([feature1, feature2, feature3])
-            x = keras.layers.Dense(units=1)(x)
-            model = keras.Model([feature1, feature2, feature3], x)
-            model.compile(optimizer="adam", loss="mse")
+        feature1 = keras.layers.Input(shape=(5,))
+        feature2 = keras.layers.Input(shape=(5,))
+        feature3 = keras.layers.Input(shape=(5,))
+        x = DotInteraction(
+            self_interaction=self_interaction, skip_gather=skip_gather
+        )([feature1, feature2, feature3])
+        x = keras.layers.Dense(units=1)(x)
+        model = keras.Model([feature1, feature2, feature3], x)
+        # model.compile(optimizer="adam", loss="mse")
 
         model.predict(self.input, batch_size=2)
 

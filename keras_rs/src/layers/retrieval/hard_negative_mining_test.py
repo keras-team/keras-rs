@@ -92,16 +92,12 @@ class HardNegativeMiningTest(testing.TestCase, parameterized.TestCase):
     def test_predict(self):
         logits, labels = self.create_inputs()
 
-        with self.strategy.scope():
-            in_logits = keras.layers.Input(shape=logits.shape[1:])
-            in_labels = keras.layers.Input(shape=labels.shape[1:])
-            out_logits, out_labels = hard_negative_mining.HardNegativeMining(
-                num_hard_negatives=3
-            )(in_logits, in_labels)
-            model = keras.Model(
-                [in_logits, in_labels], [out_logits, out_labels]
-            )
-            model.compile(optimizer="adam", loss="mse")
+        in_logits = keras.layers.Input(shape=logits.shape[1:])
+        in_labels = keras.layers.Input(shape=labels.shape[1:])
+        out_logits, out_labels = hard_negative_mining.HardNegativeMining(
+            num_hard_negatives=3
+        )(in_logits, in_labels)
+        model = keras.Model([in_logits, in_labels], [out_logits, out_labels])
 
         model.predict([logits, labels], batch_size=8)
 

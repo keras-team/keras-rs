@@ -154,16 +154,14 @@ class RemoveAccidentalHitsTest(testing.TestCase, parameterized.TestCase):
         # Note: for predict, we test with probabilities that have a batch dim.
         logits, labels, candidate_ids = self.create_inputs(candidate_ids_rank=2)
 
-        with self.strategy.scope():
-            layer = remove_accidental_hits.RemoveAccidentalHits()
-            in_logits = keras.layers.Input(logits.shape[1:])
-            in_labels = keras.layers.Input(labels.shape[1:])
-            in_candidate_ids = keras.layers.Input(labels.shape[1:])
-            out_logits = layer(in_logits, in_labels, in_candidate_ids)
-            model = keras.Model(
-                [in_logits, in_labels, in_candidate_ids], out_logits
-            )
-            model.compile(optimizer="adam", loss="mse")
+        layer = remove_accidental_hits.RemoveAccidentalHits()
+        in_logits = keras.layers.Input(logits.shape[1:])
+        in_labels = keras.layers.Input(labels.shape[1:])
+        in_candidate_ids = keras.layers.Input(labels.shape[1:])
+        out_logits = layer(in_logits, in_labels, in_candidate_ids)
+        model = keras.Model(
+            [in_logits, in_labels, in_candidate_ids], out_logits
+        )
 
         model.predict([logits, labels, candidate_ids], batch_size=8)
 

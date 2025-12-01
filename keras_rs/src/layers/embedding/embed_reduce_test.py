@@ -9,18 +9,8 @@ from keras.layers import serialize
 from keras_rs.src import testing
 from keras_rs.src.layers.embedding.embed_reduce import EmbedReduce
 
-try:
-    import jax
-    from jax.experimental import sparse as jax_sparse
-except ImportError:
-    jax = None
-    jax_sparse = None
-
 
 class EmbedReduceTest(testing.TestCase, parameterized.TestCase):
-    def setUp(self):
-        super().setUp()
-
     @parameterized.named_parameters(
         [
             (
@@ -182,9 +172,7 @@ class EmbedReduceTest(testing.TestCase, parameterized.TestCase):
 
     def test_predict(self):
         input = keras.random.randint((5, 7), minval=0, maxval=10)
-        with self.strategy.scope():
-            model = keras.models.Sequential([EmbedReduce(10, 20)])
-            model.compile(optimizer="adam", loss="mse")
+        model = keras.models.Sequential([EmbedReduce(10, 20)])
         model.predict(input, batch_size=2)
 
     def test_serialization(self):

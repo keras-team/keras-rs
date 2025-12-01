@@ -8,7 +8,6 @@ from keras.metrics import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.metrics.dcg import DCG
-from keras_rs.src.utils import tpu_test_utils
 
 
 def _compute_dcg(labels, ranks):
@@ -20,7 +19,7 @@ def _compute_dcg(labels, ranks):
 
 class DCGTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
-        self._strategy = tpu_test_utils.get_tpu_strategy(self)
+        super().setUp()
 
         self.y_true_batched = ops.array(
             [
@@ -348,17 +347,15 @@ class DCGTest(testing.TestCase, parameterized.TestCase):
         self.assertAllClose(result, expected_output, rtol=1e-5)
 
     def test_model_evaluate(self):
-        with self._strategy.scope():
-            inputs = keras.Input(shape=(20,), dtype="float32")
-            outputs = keras.layers.Dense(5)(inputs)
-            model = keras.Model(inputs=inputs, outputs=outputs)
+        inputs = keras.Input(shape=(20,), dtype="float32")
+        outputs = keras.layers.Dense(5)(inputs)
+        model = keras.Model(inputs=inputs, outputs=outputs)
 
-            model.compile(
-                loss=keras.losses.MeanSquaredError(),
-                metrics=[DCG()],
-                optimizer="adam",
-            )
-
+        model.compile(
+            loss=keras.losses.MeanSquaredError(),
+            metrics=[DCG()],
+            optimizer="adam",
+        )
         model.evaluate(
             x=keras.random.normal((2, 20)),
             y=keras.random.randint((2, 5), minval=0, maxval=4),

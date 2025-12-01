@@ -90,15 +90,11 @@ class SamplingProbabilityCorrectionTest(
         # Note: for predict, we test with probabilities that have a batch dim.
         logits, probs = self.create_inputs(probs_rank=2)
 
-        with self.strategy.scope():
-            layer = (
-                sampling_probability_correction.SamplingProbabilityCorrection()
-            )
-            in_logits = keras.layers.Input(logits.shape[1:])
-            in_probs = keras.layers.Input(probs.shape[1:])
-            out_logits = layer(in_logits, in_probs)
-            model = keras.Model([in_logits, in_probs], out_logits)
-            model.compile(optimizer="adam", loss="mse")
+        layer = sampling_probability_correction.SamplingProbabilityCorrection()
+        in_logits = keras.layers.Input(logits.shape[1:])
+        in_probs = keras.layers.Input(probs.shape[1:])
+        out_logits = layer(in_logits, in_probs)
+        model = keras.Model([in_logits, in_probs], out_logits)
 
         model.predict([logits, probs], batch_size=4)
 

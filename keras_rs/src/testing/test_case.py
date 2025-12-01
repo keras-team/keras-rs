@@ -24,10 +24,14 @@ class TestCase(unittest.TestCase):
         super().setUp()
         keras.utils.clear_session()
         keras.config.disable_traceback_filtering()
-        if keras.backend.backend() == "tensorflow":
-            tf.debugging.disable_traceback_filtering()
         self.on_tpu = "TPU_NAME" in os.environ
         self._strategy: Optional[StrategyType] = None
+        if keras.backend.backend() == "tensorflow":
+            tf.debugging.disable_traceback_filtering()
+            if self.on_tpu:
+                scope = tpu_test_utils.get_shared_tpu_strategy().scope()
+                scope.__enter__()
+                self.addCleanup(lambda: scope.__exit__(None, None, None))
 
     @property
     def strategy(self) -> StrategyType:

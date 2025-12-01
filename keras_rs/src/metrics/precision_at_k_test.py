@@ -6,12 +6,11 @@ from keras.metrics import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.metrics.precision_at_k import PrecisionAtK
-from keras_rs.src.utils import tpu_test_utils
 
 
 class PrecisionAtKTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
-        self._strategy = tpu_test_utils.get_tpu_strategy(self)
+        super().setUp()
 
         self.y_true_batched = ops.array(
             [
@@ -231,17 +230,15 @@ class PrecisionAtKTest(testing.TestCase, parameterized.TestCase):
         self.assertDictEqual(metric.get_config(), restored.get_config())
 
     def test_model_evaluate(self):
-        with self._strategy.scope():
-            inputs = keras.Input(shape=(20,), dtype="float32")
-            outputs = keras.layers.Dense(5)(inputs)
-            model = keras.Model(inputs=inputs, outputs=outputs)
+        inputs = keras.Input(shape=(20,), dtype="float32")
+        outputs = keras.layers.Dense(5)(inputs)
+        model = keras.Model(inputs=inputs, outputs=outputs)
 
-            model.compile(
-                loss=keras.losses.MeanSquaredError(),
-                metrics=[PrecisionAtK(k=3)],
-                optimizer="adam",
-            )
-
+        model.compile(
+            loss=keras.losses.MeanSquaredError(),
+            metrics=[PrecisionAtK(k=3)],
+            optimizer="adam",
+        )
         model.evaluate(
             x=keras.random.normal((2, 20)),
             y=keras.random.randint(

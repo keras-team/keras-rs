@@ -111,19 +111,11 @@ class PairwiseLogisticLossTest(testing.TestCase, parameterized.TestCase):
         self.assertAllClose(output, expected_output, atol=1e-5)
 
     def test_model_fit(self):
-        def create_model():
-            inputs = keras.Input(shape=(20,), dtype="float32")
-            outputs = keras.layers.Dense(5)(inputs)
-            model = keras.Model(inputs=inputs, outputs=outputs)
-            model.compile(loss=PairwiseLogisticLoss(), optimizer="adam")
-            return model
+        inputs = keras.Input(shape=(20,), dtype="float32")
+        outputs = keras.layers.Dense(5)(inputs)
+        model = keras.Model(inputs=inputs, outputs=outputs)
 
-        if self.strategy:
-            with self.strategy.scope():
-                model = create_model()
-        else:
-            model = create_model()
-
+        model.compile(loss=PairwiseLogisticLoss(), optimizer="adam")
         model.fit(
             x=keras.random.normal((2, 20)),
             y=keras.random.randint((2, 5), minval=0, maxval=2),
