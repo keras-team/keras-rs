@@ -19,5 +19,4 @@ build/
 # Pycharm files
 .idea/
 
-venv/]
-venv_tf/
+venv/
