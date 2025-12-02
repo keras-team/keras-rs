@@ -33,7 +33,7 @@ class JaxDummyStrategy(DummyStrategy):
         return jax.device_count("tpu")
 
 
-StrategyType = Union[tf.distribute.Strategy, DummyStrategy, JaxDummyStrategy]
+StrategyType = Union[tf.distribute.Strategy, DummyStrategy]
 
 _shared_strategy: Optional[StrategyType] = None
 _lock = threading.Lock()
@@ -104,20 +104,13 @@ def run_with_strategy(
     entering tf.function to guarantee a fixed graph signature.
     """
     if keras.backend.backend() == "tensorflow":
-        # Extract sample_weight and treat it as an explicit third positional
-        # argument. If not present, use a placeholder (None).
-        sample_weight_value = kwargs.get("sample_weight", None)
-        all_inputs = args + (sample_weight_value,)
+        all_inputs = (args, kwargs)
 
         @tf.function(jit_compile=jit_compile)  # type: ignore[untyped-decorator]
-        def tf_function_wrapper(input_tuple: Tuple[Any, ...]) -> Any:
-            num_original_args = len(args)
-            core_args = input_tuple[:num_original_args]
-            sw_value = input_tuple[-1]
-
-            if sw_value is not None:
-                all_positional_args = core_args + (sw_value,)
-                return strategy.run(fn, args=all_positional_args)
+        def tf_function_wrapper(input_tuple: Tuple[Any, Any]) -> Any:
+            core_args, core_kwargs = input_tuple
+            if core_kwargs:
+                return strategy.run(fn, args=core_args, kwargs=core_kwargs)
             else:
                 return strategy.run(fn, args=core_args)
 

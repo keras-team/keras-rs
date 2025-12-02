@@ -1,7 +1,7 @@
 import os
 import tempfile
 import unittest
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 import keras
 import numpy as np
@@ -9,12 +9,6 @@ import tensorflow as tf
 
 from keras_rs.src import types
 from keras_rs.src.utils import tpu_test_utils
-
-StrategyType = Union[
-    tf.distribute.Strategy,
-    tpu_test_utils.DummyStrategy,
-    tpu_test_utils.JaxDummyStrategy,
-]
 
 
 class TestCase(unittest.TestCase):
@@ -25,7 +19,7 @@ class TestCase(unittest.TestCase):
         keras.utils.clear_session()
         keras.config.disable_traceback_filtering()
         self.on_tpu = "TPU_NAME" in os.environ
-        self._strategy: Optional[StrategyType] = None
+        self._strategy: Optional[tpu_test_utils.StrategyType] = None
         if keras.backend.backend() == "tensorflow":
             tf.debugging.disable_traceback_filtering()
             if self.on_tpu:
@@ -36,7 +30,7 @@ class TestCase(unittest.TestCase):
                     self.addCleanup(lambda: scope.__exit__(None, None, None))
 
     @property
-    def strategy(self) -> StrategyType:
+    def strategy(self) -> tpu_test_utils.StrategyType:
         strat = tpu_test_utils.get_shared_tpu_strategy()
 
         if strat is None:
