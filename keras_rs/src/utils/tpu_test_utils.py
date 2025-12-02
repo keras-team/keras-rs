@@ -152,7 +152,7 @@ def run_with_strategy(
         sample_weight_value = kwargs.get("sample_weight", None)
         all_inputs = args + (sample_weight_value,)
 
-        @tf.function(jit_compile=jit_compile)  # type: ignore[misc]
+        @tf.function(jit_compile=jit_compile)  # type: ignore[untyped-decorator]
         def tf_function_wrapper(input_tuple: Tuple[Any, ...]) -> Any:
             num_original_args = len(args)
             core_args = input_tuple[:num_original_args]
