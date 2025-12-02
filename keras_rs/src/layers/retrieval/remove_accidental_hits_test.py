@@ -9,9 +9,6 @@ from keras_rs.src.layers.retrieval import remove_accidental_hits
 
 
 class RemoveAccidentalHitsTest(testing.TestCase, parameterized.TestCase):
-    def setUp(self):
-        super().setUp()
-
     def create_inputs(self, logits_rank=2, candidate_ids_rank=1):
         shape_3d = (15, 20, 10)
         shape = shape_3d[-logits_rank:]

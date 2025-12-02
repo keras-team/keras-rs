@@ -9,9 +9,6 @@ from keras_rs.src.layers.retrieval import hard_negative_mining
 
 
 class HardNegativeMiningTest(testing.TestCase, parameterized.TestCase):
-    def setUp(self):
-        super().setUp()
-
     def create_inputs(self, rank=2):
         shape_3d = (15, 20, 10)
         shape = shape_3d[-rank:]

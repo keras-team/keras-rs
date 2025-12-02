@@ -1,18 +1,10 @@
 import contextlib
 import os
 import threading
-from types import ModuleType
 from typing import Any, Callable, ContextManager, Optional, Tuple, Union
 
 import keras
 import tensorflow as tf
-
-jax: Optional[ModuleType] = None
-
-try:
-    import jax
-except ImportError:
-    pass
 
 
 class DummyStrategy:
@@ -36,8 +28,8 @@ class DummyStrategy:
 class JaxDummyStrategy(DummyStrategy):
     @property
     def num_replicas_in_sync(self) -> Any:
-        if jax is None:
-            return 0
+        import jax
+
         return jax.device_count("tpu")
 
 
@@ -93,46 +85,11 @@ def get_shared_tpu_strategy() -> Optional[StrategyType]:
                 )
                 print("### num_replicas", _shared_strategy.num_replicas_in_sync)
             elif keras.backend.backend() == "jax":
-                if jax is None:
-                    raise ImportError(
-                        "JAX backend requires jax to be installed for TPU."
-                    )
-                print("### num_replicas", jax.device_count("tpu"))
                 _shared_strategy = JaxDummyStrategy()
+                print("### num_replicas", _shared_strategy.num_replicas_in_sync)
             else:
                 _shared_strategy = DummyStrategy()
-            if _shared_strategy is None:
-                print("Failed to create the shared TPUStrategy.")
     return _shared_strategy
-
-
-def get_tpu_strategy(test_case: Any) -> StrategyType:
-    """Get TPU strategy if on TPU, otherwise return DummyStrategy."""
-    if "TPU_NAME" not in os.environ:
-        return DummyStrategy()
-    if keras.backend.backend() == "tensorflow":
-        resolver = tf.distribute.cluster_resolver.TPUClusterResolver()
-        tf.config.experimental_connect_to_cluster(resolver)
-        topology = tf.tpu.experimental.initialize_tpu_system(resolver)
-        tpu_metadata = resolver.get_tpu_system_metadata()
-        device_assignment = tf.tpu.experimental.DeviceAssignment.build(
-            topology, num_replicas=tpu_metadata.num_hosts
-        )
-        strategy = tf.distribute.TPUStrategy(
-            resolver, experimental_device_assignment=device_assignment
-        )
-        print("### num_replicas", strategy.num_replicas_in_sync)
-        test_case.addCleanup(tf.tpu.experimental.shutdown_tpu_system, resolver)
-        return strategy
-    elif keras.backend.backend() == "jax":
-        if jax is None:
-            raise ImportError(
-                "JAX backend requires jax to be installed for TPU."
-            )
-        print("### num_replicas", jax.device_count("tpu"))
-        return JaxDummyStrategy()
-    else:
-        return DummyStrategy()
 
 
 def run_with_strategy(

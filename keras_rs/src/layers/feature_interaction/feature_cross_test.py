@@ -79,13 +79,11 @@ class FeatureCrossTest(testing.TestCase, parameterized.TestCase):
         self.assertAllClose(self.x, output)
 
     def test_predict(self):
-        with self.strategy.scope():
-            x0 = keras.layers.Input(shape=(3,))
-            x1 = FeatureCross(projection_dim=None)(x0, x0)
-            x2 = FeatureCross(projection_dim=None)(x0, x1)
-            logits = keras.layers.Dense(units=1)(x2)
-            model = keras.Model(x0, logits)
-            model.compile(optimizer="adam", loss="mse")
+        x0 = keras.layers.Input(shape=(3,))
+        x1 = FeatureCross(projection_dim=None)(x0, x0)
+        x2 = FeatureCross(projection_dim=None)(x0, x1)
+        logits = keras.layers.Dense(units=1)(x2)
+        model = keras.Model(x0, logits)
 
         model.predict(self.x0, batch_size=2)
 

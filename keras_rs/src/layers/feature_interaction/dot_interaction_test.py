@@ -135,7 +135,6 @@ class DotInteractionTest(testing.TestCase, parameterized.TestCase):
         )([feature1, feature2, feature3])
         x = keras.layers.Dense(units=1)(x)
         model = keras.Model([feature1, feature2, feature3], x)
-        # model.compile(optimizer="adam", loss="mse")
 
         model.predict(self.input, batch_size=2)
 
