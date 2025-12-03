@@ -1,4 +1,3 @@
-import contextlib
 import functools
 import math
 import os
@@ -14,6 +13,7 @@ from keras_rs.src import testing
 from keras_rs.src import types
 from keras_rs.src.layers.embedding import distributed_embedding
 from keras_rs.src.layers.embedding import distributed_embedding_config as config
+from keras_rs.src.utils import tpu_test_utils
 
 try:
     import jax
@@ -28,28 +28,6 @@ EMBEDDING_OUTPUT_DIM = 7
 VOCABULARY_SIZE = 23
 BATCH_SIZE_PER_CORE = 16
 SEQUENCE_LENGTH = 13
-
-
-class DummyStrategy:
-    def scope(self):
-        return contextlib.nullcontext()
-
-    @property
-    def num_replicas_in_sync(self):
-        return 1
-
-    def run(self, fn, args):
-        return fn(*args)
-
-    def experimental_distribute_dataset(self, dataset, options=None):
-        del options
-        return dataset
-
-
-class JaxDummyStrategy(DummyStrategy):
-    @property
-    def num_replicas_in_sync(self):
-        return jax.device_count("tpu")
 
 
 def ragged_bool_true(self):
@@ -74,45 +52,9 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             # FLAGS.xla_sparse_core_max_ids_per_partition_per_sample = 16
             # FLAGS.xla_sparse_core_max_unique_ids_per_partition_per_sample = 16
 
-            resolver = tf.distribute.cluster_resolver.TPUClusterResolver()
-            tf.config.experimental_connect_to_cluster(resolver)
-
-            topology = tf.tpu.experimental.initialize_tpu_system(resolver)
-            tpu_metadata = resolver.get_tpu_system_metadata()
-
-            device_assignment = tf.tpu.experimental.DeviceAssignment.build(
-                topology, num_replicas=tpu_metadata.num_hosts
-            )
-            self._strategy = tf.distribute.TPUStrategy(
-                resolver, experimental_device_assignment=device_assignment
-            )
-            print("### num_replicas", self._strategy.num_replicas_in_sync)
-            self.addCleanup(tf.tpu.experimental.shutdown_tpu_system, resolver)
-        elif keras.backend.backend() == "jax" and self.on_tpu:
-            self._strategy = JaxDummyStrategy()
-        else:
-            self._strategy = DummyStrategy()
-
         self.batch_size = (
-            BATCH_SIZE_PER_CORE * self._strategy.num_replicas_in_sync
+            BATCH_SIZE_PER_CORE * self.strategy.num_replicas_in_sync
         )
-
-    def run_with_strategy(self, fn, *args, jit_compile=False):
-        """Wrapper for running a function under a strategy."""
-
-        if keras.backend.backend() == "tensorflow":
-
-            @tf.function(jit_compile=jit_compile)
-            def tf_function_wrapper(*tf_function_args):
-                def strategy_fn(*strategy_fn_args):
-                    return fn(*strategy_fn_args)
-
-                return self._strategy.run(strategy_fn, args=tf_function_args)
-
-            return tf_function_wrapper(*args)
-        else:
-            self.assertFalse(jit_compile)
-            return fn(*args)
 
     def get_embedding_config(self, input_type, placement):
         sequence_length = 1 if input_type == "dense" else SEQUENCE_LENGTH
@@ -252,18 +194,18 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
 
         if placement == "sparsecore" and not self.on_tpu:
             with self.assertRaisesRegex(Exception, "sparsecore"):
-                with self._strategy.scope():
-                    distributed_embedding.DistributedEmbedding(feature_configs)
+                distributed_embedding.DistributedEmbedding(feature_configs)
             return
 
-        with self._strategy.scope():
-            layer = distributed_embedding.DistributedEmbedding(feature_configs)
+        layer = distributed_embedding.DistributedEmbedding(feature_configs)
 
         if keras.backend.backend() == "jax":
             preprocessed_inputs = layer.preprocess(inputs, weights)
             res = layer(preprocessed_inputs)
         else:
-            res = self.run_with_strategy(layer.__call__, inputs, weights)
+            res = tpu_test_utils.run_with_strategy(
+                self.strategy, layer.__call__, inputs, weights
+            )
 
         if placement == "default_device" or not self.on_tpu:
             # verify sublayers and variables are tracked
@@ -332,8 +274,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             (test_model_inputs, test_labels)
         )
 
-        with self._strategy.scope():
-            layer = distributed_embedding.DistributedEmbedding(feature_configs)
+        layer = distributed_embedding.DistributedEmbedding(feature_configs)
 
         def _create_keras_input(
             feature_config: config.FeatureConfig, dtype: types.DType
@@ -403,7 +344,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             # New preprocessed data removes the `weights` component.
             dataset_has_weights = False
         else:
-            train_dataset = self._strategy.experimental_distribute_dataset(
+            train_dataset = self.strategy.experimental_distribute_dataset(
                 train_dataset,
                 options=tf.distribute.InputOptions(
                     experimental_fetch_to_device=False
@@ -418,19 +359,18 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             inputs=keras_model_inputs, outputs=keras_model_outputs
         )
 
-        with self._strategy.scope():
-            model.compile(optimizer="adam", loss="mse")
+        model.compile(optimizer="adam", loss="mse")
 
-            model_inputs, _ = next(iter(test_dataset))
-            test_output_before = self.run_with_strategy(
-                model.__call__, model_inputs
-            )
+        model_inputs, _ = next(iter(test_dataset))
+        test_output_before = tpu_test_utils.run_with_strategy(
+            self.strategy, model.__call__, model_inputs
+        )
 
-            model.fit(train_dataset, steps_per_epoch=1, epochs=1)
+        model.fit(train_dataset, steps_per_epoch=1, epochs=1)
 
-            test_output_after = self.run_with_strategy(
-                model.__call__, model_inputs
-            )
+        test_output_after = tpu_test_utils.run_with_strategy(
+            self.strategy, model.__call__, model_inputs
+        )
 
         # Verify that the embedding has actually trained.
         for before, after in zip(
@@ -567,8 +507,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
         if not use_weights:
             weights = None
 
-        with self._strategy.scope():
-            layer = distributed_embedding.DistributedEmbedding(feature_config)
+        layer = distributed_embedding.DistributedEmbedding(feature_config)
 
         if keras.backend.backend() == "jax":
             preprocessed = layer.preprocess(inputs, weights)
@@ -610,16 +549,21 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
                     preprocessed,
                 )
             else:
-                res = self.run_with_strategy(layer.__call__, preprocessed)
+                res = tpu_test_utils.run_with_strategy(
+                    self.strategy, layer.__call__, preprocessed
+                )
         else:
-            res = self.run_with_strategy(
-                layer.__call__, inputs, weights, jit_compile=jit_compile
+            res = tpu_test_utils.run_with_strategy(
+                self.strategy,
+                layer.__call__,
+                inputs,
+                weights,
+                jit_compile=jit_compile,
             )
 
         self.assertEqual(res.shape, (self.batch_size, EMBEDDING_OUTPUT_DIM))
 
-        with self._strategy.scope():
-            tables = layer.get_embedding_tables()
+        tables = layer.get_embedding_tables()
 
         emb = tables["table"]
 
@@ -683,10 +627,11 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             "dense", embedding_config
         )
 
-        with self._strategy.scope():
-            layer = distributed_embedding.DistributedEmbedding(embedding_config)
+        layer = distributed_embedding.DistributedEmbedding(embedding_config)
 
-        res = self.run_with_strategy(layer.__call__, inputs)
+        res = tpu_test_utils.run_with_strategy(
+            self.strategy, layer.__call__, inputs
+        )
 
         if self.placement == "default_device":
             self.assertLen(layer._flatten_layers(include_self=False), 1)
@@ -757,10 +702,11 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             "dense", embedding_config
         )
 
-        with self._strategy.scope():
-            layer = distributed_embedding.DistributedEmbedding(embedding_config)
+        layer = distributed_embedding.DistributedEmbedding(embedding_config)
 
-        res = self.run_with_strategy(layer.__call__, inputs)
+        res = tpu_test_utils.run_with_strategy(
+            self.strategy, layer.__call__, inputs
+        )
 
         self.assertEqual(
             res["feature1"].shape, (self.batch_size, embedding_output_dim1)
@@ -786,21 +732,19 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = os.path.join(temp_dir, "model.keras")
 
-            with self._strategy.scope():
-                layer = distributed_embedding.DistributedEmbedding(
-                    feature_configs
-                )
-                keras_outputs = layer(keras_inputs)
-                model = keras.Model(inputs=keras_inputs, outputs=keras_outputs)
+            layer = distributed_embedding.DistributedEmbedding(feature_configs)
+            keras_outputs = layer(keras_inputs)
+            model = keras.Model(inputs=keras_inputs, outputs=keras_outputs)
 
-                output_before = self.run_with_strategy(model.__call__, inputs)
-                model.save(path)
+            output_before = tpu_test_utils.run_with_strategy(
+                self.strategy, model.__call__, inputs
+            )
+            model.save(path)
 
-            with self._strategy.scope():
-                reloaded_model = keras.models.load_model(path)
-                output_after = self.run_with_strategy(
-                    reloaded_model.__call__, inputs
-                )
+            reloaded_model = keras.models.load_model(path)
+            output_after = tpu_test_utils.run_with_strategy(
+                self.strategy, reloaded_model.__call__, inputs
+            )
 
         if self.placement == "sparsecore":
             self.skipTest("TODO table reloading.")

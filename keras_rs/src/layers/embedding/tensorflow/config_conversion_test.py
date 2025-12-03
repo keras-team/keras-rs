@@ -1,4 +1,5 @@
 import keras
+import pytest
 import tensorflow as tf
 from absl.testing import parameterized
 
@@ -7,6 +8,10 @@ from keras_rs.src.layers.embedding import distributed_embedding_config as config
 from keras_rs.src.layers.embedding.tensorflow import config_conversion
 
 
+@pytest.mark.skipif(
+    keras.backend.backend() != "tensorflow",
+    reason="Tensorflow specific test",
+)
 class ConfigConversionTest(testing.TestCase, parameterized.TestCase):
     @parameterized.named_parameters(
         (

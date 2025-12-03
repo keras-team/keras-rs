@@ -10,6 +10,8 @@ from keras_rs.src.metrics.mean_average_precision import MeanAveragePrecision
 
 class MeanAveragePrecisionTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
+        super().setUp()
+
         self.y_true_batched = ops.array(
             [
                 [0, 0, 1, 0],

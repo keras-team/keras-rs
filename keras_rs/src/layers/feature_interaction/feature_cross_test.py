@@ -10,6 +10,8 @@ from keras_rs.src.layers.feature_interaction.feature_cross import FeatureCross
 
 class FeatureCrossTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
+        super().setUp()
+
         self.x0 = ops.array([[0.1, 0.2, 0.3]], dtype="float32")
         self.x = ops.array([[0.4, 0.5, 0.6]], dtype="float32")
         self.exp_output = ops.array([[0.55, 0.8, 1.05]])
