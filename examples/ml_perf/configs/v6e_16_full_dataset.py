@@ -202,11 +202,11 @@ training_config.learning_rate = 0.0034
 training_config.global_batch_size = 16384
 # Set `num_steps` instead of `num_epochs`, because we are using a Python
 # generator.
-training_config.num_steps = 10  # 28000
+training_config.num_steps = 28000  # 28000
 training_config.eval_freq = 5
 training_config.num_eval_steps = 10
 
-training_config.do_profile = True
+training_config.do_profile = False
 training_config.profile_log_path = "/tmp/ml_perf/10_steps"
 
 # === Assign all configs to the root config ===
