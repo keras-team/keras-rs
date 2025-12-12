@@ -272,8 +272,14 @@ def main(
 
     # === Training ===
     logger.info("Training...")
-    t0 = time.perf_counter()
+
     if training_cfg.do_profile:
+        # Compile the model first.
+        model.fit(
+            train_gen,
+            epochs=1,
+            steps_per_epoch=1,
+        )
         options = jax.profiler.ProfileOptions()
         options.python_tracer_level = 1
         options.host_tracer_level = os.getenv("HOST_TRACER_LEVEL", 1)
@@ -281,6 +287,8 @@ def main(
             training_cfg.profile_log_path,
             profiler_options=options
         )
+
+    t0 = time.perf_counter()
     model.fit(
         train_gen,
         # validation_data=eval_gen,
