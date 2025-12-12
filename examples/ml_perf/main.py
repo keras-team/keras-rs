@@ -282,7 +282,7 @@ def main(
         )
         options = jax.profiler.ProfileOptions()
         options.python_tracer_level = 1
-        options.host_tracer_level = os.getenv("HOST_TRACER_LEVEL", 1)
+        options.host_tracer_level = 2
         jax.profiler.start_trace(
             training_cfg.profile_log_path,
             profiler_options=options
