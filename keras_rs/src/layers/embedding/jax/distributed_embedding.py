@@ -28,9 +28,14 @@ from keras_rs.src.layers.embedding.jax import embedding_utils
 from keras_rs.src.types import Nested
 from keras_rs.src.utils import keras_utils
 
+if jax.__version_info__ >= (0, 8, 0):
+    from jax import shard_map
+else:
+    from jax.experimental.shard_map import shard_map  # type: ignore[assignment]
+
+
 ArrayLike = Union[np.ndarray[Any, Any], jax.Array]
 FeatureConfig = config.FeatureConfig
-shard_map = jax.experimental.shard_map.shard_map  # type: ignore[attr-defined]
 
 
 def _get_partition_spec(
