@@ -206,8 +206,8 @@ training_config.num_steps = 28000  # 28000
 training_config.eval_freq = 5
 training_config.num_eval_steps = 10
 
-training_config.do_profile = False
-training_config.profile_log_path = "/tmp/ml_perf/10_steps"
+training_config.do_profile = True
+training_config.profile_log_path = "/tmp/ml_perf/2_steps"
 
 # === Assign all configs to the root config ===
 config.dataset = dataset_config

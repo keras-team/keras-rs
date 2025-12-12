@@ -274,11 +274,12 @@ def main(
     logger.info("Training...")
     t0 = time.perf_counter()
     if training_cfg.do_profile:
-        # options = jax.profiler.ProfileOptions()
-        # options.python_tracer_level = 1
+        options = jax.profiler.ProfileOptions()
+        options.python_tracer_level = 1
+        options.host_tracer_level = os.getenv("HOST_TRACER_LEVEL", 1)
         jax.profiler.start_trace(
             "/tmp/ml-perf-benchmarking/10_steps",
-            # profiler_options=options
+            profiler_options=options
         )
     model.fit(
         train_gen,
