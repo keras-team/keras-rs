@@ -352,7 +352,12 @@ def _compute_expected_lookup(
     batch_size = len(samples.tokens)
     out = jnp.zeros(shape=(batch_size, table.shape[1]), dtype=table.dtype)
     for i in range(len(samples.tokens)):
-        out = out.at[i, :].add(samples.weights[i] @ table[samples.tokens[i], :])
+        weights = (
+            samples.weights[i]
+            if samples.weights is not None
+            else jnp.ones(samples.tokens[i].shape[0], dtype=jnp.float32)
+        )
+        out = out.at[i, :].add(weights @ table[samples.tokens[i], :])
 
     return out
 
@@ -405,8 +410,11 @@ def _compute_expected_lookup_grad(
     embedding_dim = activation_gradients.shape[1]
     sample_lengths = jnp.array([len(sample) for sample in samples.tokens])
     rows = jnp.repeat(jnp.arange(batch_size), sample_lengths)
-    cols = jnp.concatenate(np.unstack(samples.tokens))  # type: ignore[attr-defined]
-    vals = jnp.concatenate(np.unstack(samples.weights)).reshape(-1, 1)  # type: ignore[attr-defined]
+    cols = jnp.concatenate(list(samples.tokens))
+    if samples.weights is None:
+        vals = jnp.ones((rows.shape[0], 1), dtype=jnp.float32)
+    else:
+        vals = jnp.concatenate(list(samples.weights)).reshape(-1, 1)
 
     # Compute: grad = samples^T * activation_gradients.
     grad = jnp.zeros(shape=(vocabulary_size, embedding_dim))
