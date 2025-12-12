@@ -19,8 +19,6 @@ from keras_rs.src.layers.embedding.jax import embedding_utils
 from keras_rs.src.layers.embedding.jax import test_utils
 from keras_rs.src.types import Nested
 
-shard_map = jax.experimental.shard_map.shard_map
-
 Shape: TypeAlias = tuple[int, ...]
 
 

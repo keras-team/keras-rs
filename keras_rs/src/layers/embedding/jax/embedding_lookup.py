@@ -16,9 +16,30 @@ from jax_tpu_embedding.sparsecore.utils import utils as jte_utils
 from keras_rs.src.layers.embedding.jax import embedding_utils
 from keras_rs.src.types import Nested
 
-ShardedCooMatrix = embedding_utils.ShardedCooMatrix
-shard_map = jax.experimental.shard_map.shard_map  # type: ignore[attr-defined]
+if jax.__version_info__ >= (0, 8, 0):
+    from jax import shard_map
+else:
+    from jax.experimental.shard_map import shard_map as exp_shard_map
 
+    def shard_map(  # type: ignore[misc]
+        f: Any = None,
+        /,
+        *,
+        out_specs: Any,
+        in_specs: Any,
+        mesh: Any = None,
+        check_vma: bool = True,
+    ) -> Any:
+        return exp_shard_map(
+            f,
+            mesh=mesh,
+            in_specs=in_specs,
+            out_specs=out_specs,
+            check_rep=check_vma,
+        )  # type: ignore[no-untyped-call]
+
+
+ShardedCooMatrix = embedding_utils.ShardedCooMatrix
 ArrayLike: TypeAlias = jax.Array | np.ndarray[Any, Any]
 JaxLayout: TypeAlias = jax.sharding.NamedSharding | jax_layout.Format
 
@@ -121,7 +142,7 @@ def embedding_lookup(
             mesh=config.mesh,
             in_specs=(pd, pt),
             out_specs=pd,
-            check_rep=False,
+            check_vma=False,
         ),
     )
 
@@ -220,7 +241,7 @@ def embedding_lookup_bwd(
             mesh=config.mesh,
             in_specs=(pd, pd, pt, preplicate),
             out_specs=pt,
-            check_rep=False,
+            check_vma=False,
         ),
         #   in_shardings=(
         #       activation_layout,
