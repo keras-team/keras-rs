@@ -278,7 +278,7 @@ def main(
         options.python_tracer_level = 1
         options.host_tracer_level = os.getenv("HOST_TRACER_LEVEL", 1)
         jax.profiler.start_trace(
-            "/tmp/ml-perf-benchmarking/10_steps",
+            training_config.profile_log_path,
             profiler_options=options
         )
     model.fit(
