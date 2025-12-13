@@ -1,7 +1,9 @@
 import argparse
+import collections
 import importlib
 import logging
 import os
+import threading
 import time
 
 os.environ["KERAS_BACKEND"] = "jax"
@@ -29,81 +31,104 @@ class MetricLogger(keras.callbacks.Callback):
         print("--->", logs["loss"])
 
 
-def _load_dataset(
-    model,
-    distribution,
-    ds_cfg,
-    training_cfg,
-    large_emb_features,
-    small_emb_features,
-    steps_per_epoch,
-    do_eval,
-    num_processes,
-):
-    train_ds = DataLoader(
-        file_pattern=ds_cfg.file_pattern,
-        batch_size=training_cfg.global_batch_size,
-        file_batch_size=ds_cfg.get("file_batch_size", None),
-        dense_features=ds_cfg.dense,
-        large_emb_features=large_emb_features,
-        small_emb_features=small_emb_features,
-        label=ds_cfg.label,
-        num_steps=steps_per_epoch + 20,
-        training=True,
-    ).create_dataset(
-        process_id=distribution._process_id,
-        num_processes=num_processes,
-        shuffle_buffer=ds_cfg.get("shuffle_buffer", None),
-    )
-    if do_eval:
-        eval_ds = DataLoader(
-            file_pattern=ds_cfg.val_file_pattern,
+class ThreadedDataLoader:
+    def __init__(
+        self,
+        process_fn,
+        distribution,
+        ds_cfg,
+        training_cfg,
+        large_emb_features,
+        small_emb_features,
+        steps,
+        num_processes,
+        num_workers=2,
+        training=False,
+    ):
+        # Load TF dataset.
+        dataset = DataLoader(
+            file_pattern=ds_cfg.file_pattern,
             batch_size=training_cfg.global_batch_size,
             file_batch_size=ds_cfg.get("file_batch_size", None),
             dense_features=ds_cfg.dense,
             large_emb_features=large_emb_features,
             small_emb_features=small_emb_features,
             label=ds_cfg.label,
-            num_steps=training_cfg.num_eval_steps,
-            repeat=True,
-            training=False,
+            num_steps=steps + 20 if training else steps,
+            repeat=not training,
+            training=training,
         ).create_dataset(
             process_id=distribution._process_id,
             num_processes=num_processes,
+            shuffle_buffer=ds_cfg.get("shuffle_buffer", None)
+            if training
+            else None,
         )
-    # For the multi-host case, the dataset has to be distributed manually.
-    # See note here:
-    # https://github.com/keras-team/keras-rs/blob/main/keras_rs/src/layers/embedding/base_distributed_embedding.py#L352-L363.
-    if num_processes > 1:
-        train_ds = distribution.distribute_dataset(train_ds)
-        if do_eval:
-            eval_ds = distribution.distribute_dataset(eval_ds)
-        distribution.auto_shard_dataset = False
 
-    def generator(dataset, training=False):
-        """Converts tf.data Dataset to a Python generator and preprocesses
-        large embedding features.
-        """
-        for features, labels in dataset:
-            preprocessed_large_embeddings = model.embedding_layer.preprocess(
-                features["large_emb_inputs"], training=training
-            )
+        # For the multi-host case, the dataset has to be distributed manually.
+        # See note here:
+        # https://github.com/keras-team/keras-rs/blob/main/keras_rs/src/layers/embedding/base_distributed_embedding.py#L352-L363.
+        if num_processes > 1:
+            dataset = distribution.distribute_dataset(dataset)
+        self.dataset = dataset
 
-            x = {
-                "dense_input": features["dense_input"],
-                "large_emb_inputs": preprocessed_large_embeddings,
-                "small_emb_inputs": features["small_emb_inputs"],
-            }
-            y = labels
-            yield (x, y)
+        # Attributes.
+        self.process_fn = process_fn
+        self.num_workers = num_workers
+        self.training = training
 
-    logger.info("Preprocessing large embedding tables...")
-    train_gen = generator(train_ds, training=True)
-    if do_eval:
-        eval_gen = generator(eval_ds, training=False)
-        return train_gen, eval_gen
+        # Queue for pushing samples.
+        self._buffer = collections.deque(maxlen=2)
+        self._sync = threading.Condition()
+        self._workers = []
 
-    return train_gen, None
+        for _ in range(num_workers):
+            worker = threading.Thread(target=self._worker_loop, daemon=True)
+            worker.start()
+            self._workers.append(worker)
+
+    def _preprocess(self, features, labels):
+        """Preprocesses large embedding features."""
+        preprocessed_large_embeddings = self.process_fn(
+            features["large_emb_inputs"], training=self.training
+        )
+
+        x = {
+            "dense_input": features["dense_input"],
+            "large_emb_inputs": preprocessed_large_embeddings,
+            "small_emb_inputs": features["small_emb_inputs"],
+        }
+        y = labels
+        return (x, y)
+
+    def _worker_loop(self):
+        while True:
+            x, y = next(self.dataset)
+            x, y = self._preprocess(x, y)
+            with self._sync:
+                self._sync.wait_for(
+                    lambda: len(self.buffer) < self.buffer.maxlen
+                )
+                self._buffer.append((x, y))
+                self._sync.notify_all()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        with self._sync:
+            self._sync.wait_for(lambda: self.buffer)
+            item = self.buffer.popleft()
+            self._sync.notify_all()
+            return item
+
+    def stop(self):
+        for worker in self._workers:
+            worker.join(timeout=5)
+
+        with self._sync:
+            self.buffer.clear()
+            self._sync.notify_all()
 
 
 def main(
@@ -258,17 +283,33 @@ def main(
     # logger.info("Model summary: %s", model.summary())
 
     # === Load dataset ===
-    train_gen, eval_gen = _load_dataset(
-        model,
-        distribution,
-        ds_cfg,
-        training_cfg,
-        large_emb_features,
-        small_emb_features,
-        steps_per_epoch,
-        do_eval,
-        num_processes,
+    logger.info("Loading dataset...")
+    train_gen = ThreadedDataLoader(
+        process_fn=model.embedding_layer.preprocess,
+        distribution=distribution,
+        ds_cfg=ds_cfg,
+        training_cfg=training_cfg,
+        large_emb_features=large_emb_features,
+        small_emb_features=small_emb_features,
+        steps=steps_per_epoch,
+        num_processes=num_processes,
+        num_workers=2,
+        training=True,
     )
+    eval_gen = None
+    if do_eval:
+        eval_gen = ThreadedDataLoader(
+            process_fn=model.embedding_layer.preprocess,
+            distribution=distribution,
+            ds_cfg=ds_cfg,
+            training_cfg=training_cfg,
+            large_emb_features=large_emb_feature,
+            small_emb_features=small_emb_features,
+            steps=training_cfg.num_eval_steps,
+            num_processes=num_processes,
+            num_workers=2,
+            training=False,
+        )
 
     # === Training ===
     logger.info("Training...")
@@ -284,8 +325,7 @@ def main(
         options.python_tracer_level = 1
         options.host_tracer_level = 2
         jax.profiler.start_trace(
-            training_cfg.profile_log_path,
-            profiler_options=options
+            training_cfg.profile_log_path, profiler_options=options
         )
 
     t0 = time.perf_counter()
@@ -302,6 +342,10 @@ def main(
     if training_cfg.do_profile:
         jax.profiler.stop_trace()
     logger.info("Training finished in %s seconds", time.perf_counter() - t0)
+
+    train_gen.stop()
+    if eval_gen:
+        eval_gen.stop()
 
 
 if __name__ == "__main__":
