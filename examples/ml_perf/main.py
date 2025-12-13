@@ -70,6 +70,7 @@ class ThreadedDataLoader:
         # https://github.com/keras-team/keras-rs/blob/main/keras_rs/src/layers/embedding/base_distributed_embedding.py#L352-L363.
         if num_processes > 1:
             dataset = distribution.distribute_dataset(dataset)
+            distribution.auto_shard_dataset = False
         self.dataset = dataset
 
         # Attributes.
