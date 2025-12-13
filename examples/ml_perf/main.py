@@ -71,7 +71,7 @@ class ThreadedDataLoader:
         if num_processes > 1:
             dataset = distribution.distribute_dataset(dataset)
             distribution.auto_shard_dataset = False
-        self.dataset = dataset
+        self.dataset = iter(dataset)
 
         # Attributes.
         self.process_fn = process_fn

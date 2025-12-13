@@ -224,5 +224,5 @@ class DataLoader:
         if self.repeat:
             dataset = dataset.repeat()
 
-        dataset = dataset.prefetch(tf.data.AUTOTUNE)
+        # dataset = dataset.prefetch(tf.data.AUTOTUNE)
         return dataset
