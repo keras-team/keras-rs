@@ -20,7 +20,7 @@ Shape: TypeAlias = tuple[int, ...]
 
 class FeatureSamples(NamedTuple):
     tokens: ArrayLike
-    weights: ArrayLike
+    weights: ArrayLike | None
 
 
 class ShardedCooMatrix(NamedTuple):
@@ -84,36 +84,6 @@ def convert_to_numpy(
         )
 
 
-def ones_like(
-    ragged_or_dense: np.ndarray[Any, Any], dtype: Any = None
-) -> np.ndarray[Any, Any]:
-    """Creates an array of ones the same as as the input.
-
-    This differs from traditional numpy in that a ragged input will lead to
-    a resulting ragged array of ones, whereas np.ones_like(...) will instead
-    only consider the outer array and return a 1D dense array of ones.
-
-    Args:
-        ragged_or_dense: The ragged or dense input whose shape and data-type
-            define these same attributes of the returned array.
-        dtype: The data-type of the returned array.
-
-    Returns:
-        An array of ones with the same shape as the input, and specified data
-        type.
-    """
-    dtype = dtype or ragged_or_dense.dtype
-    if ragged_or_dense.dtype == np.ndarray:
-        # Ragged.
-        return np.array(
-            [np.ones_like(row, dtype=dtype) for row in ragged_or_dense],
-            dtype=np.ndarray,
-        )
-    else:
-        # Dense.
-        return np.ones_like(ragged_or_dense, dtype=dtype)
-
-
 def create_feature_samples(
     feature_structure: Nested[T],
     feature_ids: Nested[ArrayLike | Sequence[int] | Sequence[Sequence[int]]],
@@ -141,18 +111,17 @@ def create_feature_samples(
     )
 
     if feature_weights is None:
-        # Make ragged or dense ones_like.
-        feature_weights = jax.tree.map(
-            lambda _, ids: ones_like(ids, np.float32),
+        return jax.tree.map(  # type: ignore[no-any-return]
+            lambda _, ids: FeatureSamples(ids, None),
             feature_structure,
             feature_ids,
         )
-    else:
-        feature_weights = jax.tree.map(
-            lambda _, wgts: convert_to_numpy(wgts, np.float32),
-            feature_structure,
-            feature_weights,
-        )
+
+    feature_weights = jax.tree.map(
+        lambda _, wgts: convert_to_numpy(wgts, np.float32),
+        feature_structure,
+        feature_weights,
+    )
 
     # Assemble.
     def _create_feature_samples(
@@ -200,16 +169,20 @@ def stack_and_shard_samples(
     flat_feature_specs, _ = jax.tree.flatten(feature_specs)
 
     feature_tokens = []
-    feature_weights = []
+    collected_weights = []
 
     def collect_tokens_and_weights(
         feature_spec: FeatureSpec, samples: FeatureSamples
     ) -> None:
         del feature_spec
         feature_tokens.append(samples.tokens)
-        feature_weights.append(samples.weights)
+        collected_weights.append(samples.weights)
 
     jax.tree.map(collect_tokens_and_weights, feature_specs, feature_samples)
+
+    feature_weights = (
+        None if all(w is None for w in collected_weights) else collected_weights
+    )
 
     preprocessed_inputs, stats = embedding.preprocess_sparse_dense_matmul_input(
         feature_tokens,
