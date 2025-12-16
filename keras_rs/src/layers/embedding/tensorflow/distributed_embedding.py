@@ -35,10 +35,11 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         table_stacking: (
             str | Sequence[str] | Sequence[Sequence[str]]
         ) = "auto",
+        update_stats: bool = False,
         **kwargs: Any,
     ) -> None:
         # `'update_stats'` is supported only on JAX.
-        if kwargs.pop("update_stats"):
+        if update_stats:
             raise ValueError(
                 "`'update_stats'` cannot be True for the TensorFlow backend."
             )
