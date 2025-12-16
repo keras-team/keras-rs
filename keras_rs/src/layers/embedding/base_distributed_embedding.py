@@ -459,8 +459,8 @@ class DistributedEmbedding(keras.layers.Layer):
             will be interpreted as no table stacking.
         update_stats: If True, `'max_ids_per_partition'`,
             `'max_unique_ids_per_partition'` and
-            `'suggested_coo_buffer_size_per_device'` are updated. This argument
-            can be set to True only for the JAX backend.
+            `'suggested_coo_buffer_size_per_device'` are updated during
+            training. This argument can be set to True only for the JAX backend.
         **kwargs: Additional arguments to pass to the layer base class.
     """
 
