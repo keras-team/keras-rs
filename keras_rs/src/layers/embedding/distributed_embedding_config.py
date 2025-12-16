@@ -10,7 +10,7 @@ from keras_rs.src.api_export import keras_rs_export
 
 
 @keras_rs_export("keras_rs.layers.TableConfig")
-@dataclasses.dataclass(eq=True, unsafe_hash=True, order=True)
+@dataclasses.dataclass(order=True)
 class TableConfig:
     """Configuration for one embedding table.
 
@@ -88,7 +88,7 @@ class TableConfig:
 
 
 @keras_rs_export("keras_rs.layers.FeatureConfig")
-@dataclasses.dataclass(eq=True, unsafe_hash=True, order=True)
+@dataclasses.dataclass(order=True)
 class FeatureConfig:
     """Configuration for one embedding feature.
 
@@ -102,7 +102,10 @@ class FeatureConfig:
         input_shape: The input shape of the feature. The feature fed into the
             layer has to match the shape. Note that for ragged dimensions in the
             input, the dimension provided here presents the maximum value;
-            anything larger will be truncated.
+            anything larger will be truncated. Also note that the first
+            dimension represents the global batch size. For example, on TPU,
+            this represents the total number of samples that are dispatched to
+            all the TPUs connected to the current host.
         output_shape: The output shape of the feature activation. What is
             returned by the embedding layer has to match this shape.
     """

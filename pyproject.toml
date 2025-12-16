@@ -9,14 +9,15 @@ authors = [
 ]
 description = "Multi-backend recommender systems with Keras 3."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = {text = "Apache License 2.0"}
 dynamic = ["version"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3 :: Only",
     "Operating System :: Unix",
     "Operating System :: Microsoft :: Windows",
@@ -63,7 +64,7 @@ known-first-party = ["keras_rs"]
 [tool.mypy]
 python_version = "3.10"
 strict = "True"
-exclude = ["_test\\.py$", "^examples/"]
+exclude = ["_test\\.py$", "^examples/", "venv/"]
 untyped_calls_exclude = ["ml_dtypes"]
 disable_error_code = ["import-untyped", "unused-ignore"]
 disallow_subclassing_any = "False"

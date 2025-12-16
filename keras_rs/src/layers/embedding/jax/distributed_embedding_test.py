@@ -24,7 +24,6 @@ from keras_rs.src.layers.embedding.jax import config_conversion
 from keras_rs.src.layers.embedding.jax import (
     distributed_embedding as jax_distributed_embedding,
 )
-from keras_rs.src.layers.embedding.jax import embedding_utils
 from keras_rs.src.layers.embedding.jax import test_utils
 
 keras.config.disable_traceback_filtering()
@@ -177,7 +176,7 @@ class StackedTableInitializerTest(parameterized.TestCase):
         )
         self.assertEqual(actual.shape, expected_shape)
 
-        unsharded_tables = embedding_utils.unshard_and_unstack_tables(
+        unsharded_tables = table_stacking_lib.unshard_and_unstack_tables(
             table_specs,
             {stacked_table_spec.stack_name: actual},
             num_table_shards,
@@ -561,12 +560,18 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         # Setup a model with a zero initializer but otherwise the same
         # feature configs to test restore. Keep the same embedding layer name to
         # ensure the correct weights are restored.
+        table_config_id_to_table_config_with_zero_init = {
+            id(table_config): dataclasses.replace(
+                table_config, initializer="zeros"
+            )
+            for table_config in table_configs
+        }
         feature_configs_with_zero_init = {
             feature_config.name: dataclasses.replace(
                 feature_config,
-                table=dataclasses.replace(
-                    feature_config.table, initializer="zeros"
-                ),
+                table=table_config_id_to_table_config_with_zero_init[
+                    id(feature_config.table)
+                ],
             )
             for feature_config in feature_configs
         }

@@ -10,6 +10,8 @@ from keras_rs.src.metrics.recall_at_k import RecallAtK
 
 class RecallAtKTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
+        super().setUp()
+
         self.y_true_batched = ops.array(
             [
                 [0, 0, 1, 0],

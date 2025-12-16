@@ -19,8 +19,6 @@ from keras_rs.src.layers.embedding.jax import embedding_utils
 from keras_rs.src.layers.embedding.jax import test_utils
 from keras_rs.src.types import Nested
 
-shard_map = jax.experimental.shard_map.shard_map
-
 Shape: TypeAlias = tuple[int, ...]
 
 
@@ -193,7 +191,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
 
         # Add pseudo gradients to the inputs.
         embedding_variables = jax.tree.map(
-            lambda table: (table, None),
+            lambda table: embedding.EmbeddingVariables(table=table, slot=()),
             sharded_tables,
         )
 
@@ -288,7 +286,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
 
         # Add pseudo gradients to the inputs.
         embedding_variables = jax.tree.map(
-            lambda table: (table, None),
+            lambda table: embedding.EmbeddingVariables(table=table, slot=()),
             sharded_tables,
         )
 
@@ -398,7 +396,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
             res=(sharded_samples, sharded_table_and_slot_variables, None),
             gradients=activation_grads,
         )
-        updated_tables_and_slots = embedding_utils.unshard_and_unstack_tables(
+        updated_tables_and_slots = table_stacking.unshard_and_unstack_tables(
             table_specs, updated_stacked_tables, num_table_shards
         )
 
@@ -479,7 +477,8 @@ class EmbeddingLookupTest(parameterized.TestCase):
             )
         )
         sharded_table_and_slot_variables = typing.cast(
-            dict[str, tuple[jax.Array, ...]], sharded_table_and_slot_variables
+            dict[str, embedding.EmbeddingVariables],
+            sharded_table_and_slot_variables,
         )
 
         # Shard samples for lookup query.
@@ -552,7 +551,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
         lookup_grads = grads["lookup_tables"]
 
         # Recover unstacked and unsharded gradients.
-        updated_tables_and_slots = embedding_utils.unshard_and_unstack_tables(
+        updated_tables_and_slots = table_stacking.unshard_and_unstack_tables(
             table_specs, lookup_grads, num_table_shards
         )
 

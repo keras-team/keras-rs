@@ -12,6 +12,7 @@ from keras_rs.src.losses.pairwise_soft_zero_one_loss import (
 
 class PairwiseSoftZeroOneLossTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
+        super().setUp()
         self.unbatched_scores = ops.array([1.0, 3.0, 2.0, 4.0, 0.8])
         self.unbatched_labels = ops.array([1.0, 0.0, 1.0, 3.0, 2.0])
 

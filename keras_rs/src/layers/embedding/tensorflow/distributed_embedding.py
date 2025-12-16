@@ -35,8 +35,15 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         table_stacking: (
             str | Sequence[str] | Sequence[Sequence[str]]
         ) = "auto",
+        update_stats: bool = False,
         **kwargs: Any,
     ) -> None:
+        # `update_stats` is supported only on JAX.
+        if update_stats:
+            raise ValueError(
+                "`update_stats` cannot be True for the TensorFlow backend."
+            )
+
         # Intercept arguments that are supported only on TensorFlow.
         self._optimizer = kwargs.pop("optimizer", None)
         self._pipeline_execution_with_tensor_core = kwargs.pop(
@@ -106,8 +113,10 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                     "for the configuration."
                 )
             self._tpu_feature_configs, self._sparse_core_embedding_config = (
-                config_conversion.translate_keras_rs_configuration(
-                    feature_configs, table_stacking
+                config_conversion.keras_to_tf_tpu_configuration(
+                    feature_configs,
+                    table_stacking,
+                    strategy.num_replicas_in_sync,
                 )
             )
             if tpu_embedding_feature == EMBEDDING_FEATURE_V1:
@@ -133,10 +142,10 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                     "supported with this TPU generation."
                 )
             self._tpu_feature_configs = (
-                config_conversion.clone_tf_feature_configs(feature_configs)
+                config_conversion.clone_tf_tpu_feature_configs(feature_configs)
             )
 
-        self._tpu_optimizer = config_conversion.translate_optimizer(
+        self._tpu_optimizer = config_conversion.to_tf_tpu_optimizer(
             self._optimizer
         )
 
@@ -279,8 +288,18 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
     def _sparsecore_get_embedding_tables(self) -> dict[str, types.Tensor]:
         tables: dict[str, types.Tensor] = {}
         strategy = tf.distribute.get_strategy()
-        # 4 is the number of sparsecores per chip
-        num_shards = strategy.num_replicas_in_sync * 4
+        if not self._is_tpu_strategy(strategy):
+            raise RuntimeError(
+                "`DistributedEmbedding.get_embedding_tables` needs to be "
+                "called under the TPUStrategy that DistributedEmbedding was "
+                f"created with, but is being called under strategy {strategy}. "
+                "Please use `with strategy.scope()` when calling "
+                "`get_embedding_tables`."
+            )
+
+        tpu_hardware = strategy.extended.tpu_hardware_feature
+        num_sc_per_device = tpu_hardware.num_embedding_devices_per_chip
+        num_shards = strategy.num_replicas_in_sync * num_sc_per_device
 
         def populate_table(
             feature_config: tf.tpu.experimental.embedding.FeatureConfig,

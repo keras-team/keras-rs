@@ -1,4 +1,5 @@
 import collections
+import dataclasses
 import importlib.util
 import typing
 from typing import Any, Sequence
@@ -20,9 +21,10 @@ EmbedReduce = embed_reduce.EmbedReduce
 SUPPORTED_PLACEMENTS = ("auto", "default_device", "sparsecore")
 
 
-PlacementAndPath = collections.namedtuple(
-    "PlacementAndPath", ["placement", "path"]
-)
+@dataclasses.dataclass(eq=True, unsafe_hash=True, order=True)
+class PlacementAndPath:
+    placement: str
+    path: str
 
 
 def _ragged_to_dense_inputs(
@@ -146,14 +148,14 @@ class DistributedEmbedding(keras.layers.Layer):
     feature1 = keras_rs.layers.FeatureConfig(
         name="feature1",
         table=table1,
-        input_shape=(PER_REPLICA_BATCH_SIZE,),
-        output_shape=(PER_REPLICA_BATCH_SIZE, TABLE1_EMBEDDING_SIZE),
+        input_shape=(GLOBAL_BATCH_SIZE,),
+        output_shape=(GLOBAL_BATCH_SIZE, TABLE1_EMBEDDING_SIZE),
     )
     feature2 = keras_rs.layers.FeatureConfig(
         name="feature2",
         table=table2,
-        input_shape=(PER_REPLICA_BATCH_SIZE,),
-        output_shape=(PER_REPLICA_BATCH_SIZE, TABLE2_EMBEDDING_SIZE),
+        input_shape=(GLOBAL_BATCH_SIZE,),
+        output_shape=(GLOBAL_BATCH_SIZE, TABLE2_EMBEDDING_SIZE),
     )
 
     feature_configs = {
@@ -455,6 +457,10 @@ class DistributedEmbedding(keras.layers.Layer):
             tables in the inner lists together. Note that table stacking is not
             supported on older TPUs, in which case the default value of `"auto"`
             will be interpreted as no table stacking.
+        update_stats: If True, `'max_ids_per_partition'`,
+            `'max_unique_ids_per_partition'` and
+            `'suggested_coo_buffer_size_per_device'` are updated during
+            training. This argument can be set to True only for the JAX backend.
         **kwargs: Additional arguments to pass to the layer base class.
     """
 
@@ -465,6 +471,7 @@ class DistributedEmbedding(keras.layers.Layer):
         table_stacking: (
             str | Sequence[str] | Sequence[Sequence[str]]
         ) = "auto",
+        update_stats: bool = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -483,6 +490,8 @@ class DistributedEmbedding(keras.layers.Layer):
                 self._placement_to_path_to_feature_config["default_device"],
                 table_stacking,
             )
+
+        self.update_stats = update_stats
 
     @keras_utils.no_automatic_dependency_tracking
     def _init_feature_configs_structures(
@@ -518,12 +527,12 @@ class DistributedEmbedding(keras.layers.Layer):
         With these structures in place, the steps to:
         - go from the deeply nested structure to the two-level structure are:
           - `assert_same_struct` as `self._feature_configs`
-          - `flatten`
-          - `pack_sequence_as` `self._placement_to_path_to_feature_config`
+          - use `self._feature_deeply_nested_placement_and_paths` to map from
+            deeply nested to two-level
         - go from the two-level structure to the deeply nested structure:
-         - `assert_same_struct` as `self._placement_to_path_to_feature_config`
-         - `flatten`
-         - `pack_sequence_as` `self._feature_configs`
+          - `assert_same_struct` as `self._placement_to_path_to_feature_config`
+          - use `self._feature_deeply_nested_placement_and_paths` to locate each
+            output in the two-level dicts
 
         Args:
             feature_configs: The deeply nested structure of `FeatureConfig` or
@@ -590,14 +599,14 @@ class DistributedEmbedding(keras.layers.Layer):
         ] = collections.defaultdict(dict)
 
         def populate_placement_to_path_to_input_shape(
-            placement_and_path: PlacementAndPath, input_shape: types.Shape
+            pp: PlacementAndPath, input_shape: types.Shape
         ) -> None:
-            placement_to_path_to_input_shape[placement_and_path.placement][
-                placement_and_path.path
-            ] = input_shape
+            placement_to_path_to_input_shape[pp.placement][pp.path] = (
+                input_shape
+            )
 
         keras.tree.map_structure_up_to(
-            self._feature_configs,
+            self._feature_deeply_nested_placement_and_paths,
             populate_placement_to_path_to_input_shape,
             self._feature_deeply_nested_placement_and_paths,
             input_shapes,
@@ -645,35 +654,40 @@ class DistributedEmbedding(keras.layers.Layer):
         """
         # Verify input structure.
         keras.tree.assert_same_structure(self._feature_configs, inputs)
+        if weights is not None:
+            keras.tree.assert_same_structure(self._feature_configs, weights)
 
         if not self.built:
-            input_shapes = keras.tree.map_structure_up_to(
-                self._feature_configs,
+            input_shapes = keras.tree.map_structure(
                 lambda array: backend.standardize_shape(array.shape),
                 inputs,
             )
             self.build(input_shapes)
 
-        # Go from deeply nested structure of inputs to flat inputs.
-        flat_inputs = keras.tree.flatten(inputs)
-
-        # Go from flat to nested dict placement -> path -> input.
-        placement_to_path_to_inputs = keras.tree.pack_sequence_as(
-            self._placement_to_path_to_feature_config, flat_inputs
-        )
-
-        if weights is not None:
-            # Same for weights if present.
-            keras.tree.assert_same_structure(self._feature_configs, weights)
-            flat_weights = keras.tree.flatten(weights)
-            placement_to_path_to_weights = keras.tree.pack_sequence_as(
-                self._placement_to_path_to_feature_config, flat_weights
-            )
-        else:
-            # Populate keys for weights.
-            placement_to_path_to_weights = {
-                k: None for k in placement_to_path_to_inputs
+        # Go from deeply nested to nested dict placement -> path -> input.
+        def to_placement_to_path(
+            tensors: types.Nested[types.Tensor],
+        ) -> dict[str, dict[str, types.Tensor]]:
+            result: dict[str, dict[str, types.Tensor]] = {
+                p: dict() for p in self._placement_to_path_to_feature_config
             }
+
+            def populate(pp: PlacementAndPath, x: types.Tensor) -> None:
+                result[pp.placement][pp.path] = x
+
+            keras.tree.map_structure(
+                populate,
+                self._feature_deeply_nested_placement_and_paths,
+                tensors,
+            )
+            return result
+
+        placement_to_path_to_inputs = to_placement_to_path(inputs)
+
+        # Same for weights if present.
+        placement_to_path_to_weights = (
+            to_placement_to_path(weights) if weights is not None else None
+        )
 
         placement_to_path_to_preprocessed: dict[
             str, dict[str, dict[str, types.Nested[types.Tensor]]]
@@ -684,7 +698,9 @@ class DistributedEmbedding(keras.layers.Layer):
             placement_to_path_to_preprocessed["sparsecore"] = (
                 self._sparsecore_preprocess(
                     placement_to_path_to_inputs["sparsecore"],
-                    placement_to_path_to_weights["sparsecore"],
+                    placement_to_path_to_weights["sparsecore"]
+                    if placement_to_path_to_weights is not None
+                    else None,
                     training,
                 )
             )
@@ -694,7 +710,9 @@ class DistributedEmbedding(keras.layers.Layer):
             placement_to_path_to_preprocessed["default_device"] = (
                 self._default_device_preprocess(
                     placement_to_path_to_inputs["default_device"],
-                    placement_to_path_to_weights["default_device"],
+                    placement_to_path_to_weights["default_device"]
+                    if placement_to_path_to_weights is not None
+                    else None,
                     training,
                 )
             )
@@ -780,11 +798,13 @@ class DistributedEmbedding(keras.layers.Layer):
             placement_to_path_to_outputs,
         )
 
-        # Go from placement -> path -> output to flat outputs.
-        flat_outputs = keras.tree.flatten(placement_to_path_to_outputs)
+        # Go from placement -> path -> output to deeply nested structure.
+        def populate_output(pp: PlacementAndPath) -> types.Tensor:
+            return placement_to_path_to_outputs[pp.placement][pp.path]
 
-        # Go from flat outputs to deeply nested structure.
-        return keras.tree.pack_sequence_as(self._feature_configs, flat_outputs)
+        return keras.tree.map_structure(
+            populate_output, self._feature_deeply_nested_placement_and_paths
+        )
 
     def get_embedding_tables(self) -> dict[str, types.Tensor]:
         """Return the content of the embedding tables by table name.
@@ -809,13 +829,13 @@ class DistributedEmbedding(keras.layers.Layer):
         table_stacking: str | Sequence[Sequence[str]],
     ) -> None:
         del table_stacking
-        table_to_embedding_layer: dict[TableConfig, EmbedReduce] = {}
+        table_config_id_to_embedding_layer: dict[int, EmbedReduce] = {}
         self._default_device_embedding_layers: dict[str, EmbedReduce] = {}
 
         for path, feature_config in feature_configs.items():
-            if feature_config.table in table_to_embedding_layer:
+            if id(feature_config.table) in table_config_id_to_embedding_layer:
                 self._default_device_embedding_layers[path] = (
-                    table_to_embedding_layer[feature_config.table]
+                    table_config_id_to_embedding_layer[id(feature_config.table)]
                 )
             else:
                 embedding_layer = EmbedReduce(
@@ -825,7 +845,9 @@ class DistributedEmbedding(keras.layers.Layer):
                     embeddings_initializer=feature_config.table.initializer,
                     combiner=feature_config.table.combiner,
                 )
-                table_to_embedding_layer[feature_config.table] = embedding_layer
+                table_config_id_to_embedding_layer[id(feature_config.table)] = (
+                    embedding_layer
+                )
                 self._default_device_embedding_layers[path] = embedding_layer
 
     def _default_device_build(
@@ -1000,8 +1022,8 @@ class DistributedEmbedding(keras.layers.Layer):
 
         # The serialized `TableConfig` objects.
         table_config_dicts: list[dict[str, Any]] = []
-        # Mapping from `TableConfig` to index in `table_config_dicts`.
-        table_config_indices: dict[TableConfig, int] = {}
+        # Mapping from `TableConfig` id to index in `table_config_dicts`.
+        table_config_id_to_index: dict[int, int] = {}
 
         def serialize_feature_config(
             feature_config: FeatureConfig,
@@ -1011,17 +1033,17 @@ class DistributedEmbedding(keras.layers.Layer):
             # key.
             feature_config_dict = feature_config.get_config()
 
-            if feature_config.table not in table_config_indices:
+            if id(feature_config.table) not in table_config_id_to_index:
                 # Save the serialized `TableConfig` the first time we see it and
                 # remember its index.
-                table_config_indices[feature_config.table] = len(
+                table_config_id_to_index[id(feature_config.table)] = len(
                     table_config_dicts
                 )
                 table_config_dicts.append(feature_config_dict["table"])
 
             # Replace the serialized `TableConfig` with its index.
-            feature_config_dict["table"] = table_config_indices[
-                feature_config.table
+            feature_config_dict["table"] = table_config_id_to_index[
+                id(feature_config.table)
             ]
             return feature_config_dict
 

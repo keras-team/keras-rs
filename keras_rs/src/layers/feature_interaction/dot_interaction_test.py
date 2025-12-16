@@ -12,6 +12,8 @@ from keras_rs.src.layers.feature_interaction.dot_interaction import (
 
 class DotInteractionTest(testing.TestCase, parameterized.TestCase):
     def setUp(self):
+        super().setUp()
+
         self.input = [
             ops.array([[0.1, -4.3, 0.2, 1.1, 0.3]]),
             ops.array([[2.0, 3.2, -1.0, 0.0, 1.0]]),
@@ -81,7 +83,12 @@ class DotInteractionTest(testing.TestCase, parameterized.TestCase):
             self_interaction=self_interaction, skip_gather=skip_gather
         )
         output = layer(self.input)
-        self.assertAllClose(output, self.exp_outputs[exp_output_idx])
+        self.assertAllClose(
+            output,
+            self.exp_outputs[exp_output_idx],
+            tpu_atol=1e-2,
+            tpu_rtol=1e-2,
+        )
 
     def test_invalid_input_rank(self):
         rank_1_input = [ops.ones((3,)), ops.ones((3,))]

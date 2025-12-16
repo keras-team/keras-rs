@@ -1,12 +1,14 @@
 import os
 import tempfile
 import unittest
-from typing import Any
+from typing import Any, Optional
 
 import keras
 import numpy as np
+import tensorflow as tf
 
 from keras_rs.src import types
+from keras_rs.src.utils import tpu_test_utils
 
 
 class TestCase(unittest.TestCase):
@@ -16,6 +18,31 @@ class TestCase(unittest.TestCase):
         super().setUp()
         keras.utils.clear_session()
         keras.config.disable_traceback_filtering()
+        self.on_tpu = "TPU_NAME" in os.environ
+        self._strategy: Optional[tpu_test_utils.StrategyType] = None
+        if keras.backend.backend() == "tensorflow":
+            tf.debugging.disable_traceback_filtering()
+            if self.on_tpu:
+                strategy = tpu_test_utils.get_shared_tpu_strategy()
+                if strategy is not None:
+                    scope = strategy.scope()
+                    scope.__enter__()
+                    self.addCleanup(lambda: scope.__exit__(None, None, None))
+
+    @property
+    def strategy(self) -> tpu_test_utils.StrategyType:
+        strat = tpu_test_utils.get_shared_tpu_strategy()
+
+        if strat is None:
+            self.fail(
+                "TPU environment detected, but the shared TPUStrategy is None. "
+                "Initialization likely failed."
+            )
+        return strat
+        # if self._strategy is not None:
+        #     return self._strategy
+        # self._strategy = tpu_test_utils.get_tpu_strategy(self)
+        # return self._strategy
 
     def assertAllClose(
         self,
@@ -23,6 +50,8 @@ class TestCase(unittest.TestCase):
         desired: types.Tensor,
         atol: float = 1e-6,
         rtol: float = 1e-6,
+        tpu_atol: float | None = None,
+        tpu_rtol: float | None = None,
         msg: str = "",
     ) -> None:
         """Verify that two tensors are close in value element by element.
@@ -34,6 +63,11 @@ class TestCase(unittest.TestCase):
           rtol: Relative tolerance.
           msg: Optional error message.
         """
+        if tpu_atol is not None and self.on_tpu:
+            atol = tpu_atol
+        if tpu_rtol is not None and self.on_tpu:
+            rtol = tpu_rtol
+
         if not isinstance(actual, np.ndarray):
             actual = keras.ops.convert_to_numpy(actual)
         if not isinstance(desired, np.ndarray):

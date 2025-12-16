@@ -1,11 +1,15 @@
+import logging
 from typing import Any, TypeAlias
 
 import keras
 from keras import ops
 
 import keras_rs
+import jax
 
 Tensor: TypeAlias = Any
+
+logger = logging.getLogger(__name__)
 
 
 def _clone_initializer(
@@ -56,7 +60,7 @@ class DLRMDCNV2(keras.Model):
         The model processes two types of input features:
         1. Dense Features: Continuous-valued features that are processed by
            a multi-layer perceptron (the "bottom MLP").
-        2. Sparse Features: High-cardinality categorical features that are
+        2. Lookup Features: High-cardinality categorical features that are
            first mapped into low-dimensional embedding vectors using the
            `keras_rs.layers.DistributedEmbedding` layer. This layer is highly
            optimized for large-scale recommendation models, especially on TPUs
@@ -90,6 +94,10 @@ class DLRMDCNV2(keras.Model):
             name: The name of the layer.
         """
         super().__init__(dtype=dtype, name=name, **kwargs)
+
+        passed_args = locals()
+        logger.debug("Initialising `DLRMDCNV2` with: %s", passed_args)
+
         self.seed = seed
 
         # === Layers ====
@@ -103,6 +111,7 @@ class DLRMDCNV2(keras.Model):
             ),
             name="bottom_mlp",
         )
+        logging.debug("Initialised Bottom MLP: %s", self.bottom_mlp)
         # Distributed embeddings for large embedding tables
         self.embedding_layer = keras_rs.layers.DistributedEmbedding(
             feature_configs=large_emb_feature_configs,
@@ -110,20 +119,31 @@ class DLRMDCNV2(keras.Model):
             dtype=dtype,
             name="embedding_layer",
         )
+        logging.debug(
+            "Initialised `DistributedEmbedding` layer: %s", self.embedding_layer
+        )
         # Embedding layers for small embedding tables
         self.small_embedding_layers = None
         if small_emb_features:
-            self.small_embedding_layers = [
-                keras.layers.Embedding(
-                    input_dim=small_emb_feature["vocabulary_size"],
-                    output_dim=embedding_dim,
-                    embeddings_initializer=keras.initializers.LecunNormal(
-                        seed=self.seed,
-                    ),
-                    name=f"small_embedding_layer_{i}",
+            self.small_embedding_layers = {}
+            for small_emb_feature in small_emb_features:
+                name = small_emb_feature["name"]
+                new_name = small_emb_feature["new_name"]
+                vocabulary_size = small_emb_feature["vocabulary_size"]
+                self.small_embedding_layers[f"{new_name}_id"] = (
+                    keras.layers.Embedding(
+                        input_dim=vocabulary_size,
+                        output_dim=embedding_dim,
+                        embeddings_initializer=keras.initializers.LecunNormal(
+                            seed=self.seed,
+                        ),
+                        name=f"small_embedding_layer_{new_name}",
+                    )
                 )
-                for i, small_emb_feature in enumerate(small_emb_features)
-            ]
+            logging.debug(
+                "Initialised small embedding layers: %s",
+                self.small_embedding_layers,
+            )
         # DCN for "interactions"
         self.dcn_block = DCNBlock(
             num_layers=num_dcn_layers,
@@ -132,6 +152,7 @@ class DLRMDCNV2(keras.Model):
             dtype=dtype,
             name="dcn_block",
         )
+        logging.debug("Initialised DCN block: %s", self.dcn_block)
         # Top MLP for predictions
         self.top_mlp = keras.Sequential(
             self._get_mlp_layers(
@@ -141,6 +162,7 @@ class DLRMDCNV2(keras.Model):
             ),
             name="top_mlp",
         )
+        logging.debug("Initialised Top MLP: %s", self.top_mlp)
 
         # === Passed attributes ===
         self.large_emb_feature_configs = large_emb_feature_configs
@@ -164,15 +186,15 @@ class DLRMDCNV2(keras.Model):
 
         # Embed features.
         dense_output = self.bottom_mlp(dense_input)
-        # jax.debug.print("dense_ouput {}", dense_output.shape)
         large_embeddings = self.embedding_layer(large_emb_inputs)
         small_embeddings = None
         if self.small_emb_features:
             small_embeddings = []
             small_emb_inputs = inputs["small_emb_inputs"]
-            for small_emb_input, embedding_layer in zip(
-                small_emb_inputs.values(), self.small_embedding_layers
-            ):
+            for small_emb_feature in small_emb_inputs.keys():
+                small_emb_input = small_emb_inputs[small_emb_feature]
+                embedding_layer = self.small_embedding_layers[small_emb_feature]
+
                 embedding = embedding_layer(small_emb_input)
                 embedding = ops.sum(embedding, axis=-2)
                 small_embeddings.append(embedding)
@@ -288,6 +310,9 @@ class DCNBlock(keras.layers.Layer):
             name: The name of the layer.
         """
         super().__init__(dtype=dtype, name=name, **kwargs)
+
+        passed_args = locals()
+        logger.debug("Initialising `DCNBlock` with: %s", passed_args)
 
         # Layers
         self.layers = [

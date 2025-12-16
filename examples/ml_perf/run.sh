@@ -11,9 +11,9 @@ set -euo pipefail
 # 4. --config-name (default: derived from accelerator type, e.g., v6e_8)
 
 # Defaults
-ACCELERATOR_TYPE="v6e-8"
+ACCELERATOR_TYPE="v6e-16"
 ZONE="us-east5-a"
-PROJECT="tpu-prod-env-one-vm"
+PROJECT="keras-team-gcp"
 USER_CONFIG_NAME=""
 
 # ==============================================================================
@@ -55,7 +55,7 @@ fi
 # ==============================================================================
 # Environment Variables
 # ==============================================================================
-export TPU_NAME="abheesht-mlperf-${ACCELERATOR_TYPE}"
+export TPU_NAME="${USER}-mlperf-${ACCELERATOR_TYPE}"
 export ZONE
 export PROJECT
 
@@ -101,7 +101,7 @@ gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} \
   --project ${PROJECT} \
   --zone ${ZONE} \
   --worker=all \
-  --command="sudo apt-get update && sudo apt install -y python3.10-venv && if [ ! -d '.keras-env' ]; then echo '>>> Creating .keras-env...'; python3 -m venv .keras-env; else echo '>>> .keras-env already exists.'; fi"
+  --command="sudo apt-get update && sudo apt install -y python3.12-venv && if [ ! -d '.keras-env' ]; then echo '>>> Creating .keras-env...'; python3.12 -m venv .keras-env; else echo '>>> .keras-env already exists.'; fi"
 
 
 # ==============================================================================
@@ -118,21 +118,17 @@ gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} \
 
     if [ ! -d 'keras-rs' ]; then
       echo '>>> Cloning keras-rs repository...'
-      git clone https://github.com/abheesht17/keras-rs.git
+      git clone https://github.com/keras-team/keras-rs.git
       cd keras-rs
-      git checkout ml-perf
     else
       echo '>>> keras-rs repository exists. Pulling latest changes...'
       cd keras-rs
-      git checkout ml-perf # Ensure we are on the correct branch
       git pull
     fi
 
     echo '>>> Installing/updating dependencies...'
     pip install -e .
-    pip uninstall -y tensorflow keras
-    pip install git+https://github.com/keras-team/keras.git
-    pip install jax-tpu-embedding tensorflow-cpu
+    pip install -U jax-tpu-embedding tensorflow-cpu keras
   "
 
 
@@ -144,8 +140,24 @@ gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} \
   --project ${PROJECT} \
   --zone ${ZONE} \
   --worker=all \
-  --command="source .keras-env/bin/activate && pip uninstall -y jax jaxlib && pip install -U 'jax[tpu]' -f https://storage.googleapis.com/jax-releases/libtpu_releases.html"
+  --command="source .keras-env/bin/activate && pip install -U 'jax[tpu]' -f https://storage.googleapis.com/jax-releases/libtpu_releases.html"
 
+# ==============================================================================
+# Kill Previous Training Processes
+# ==============================================================================
+# echo ">>> Listing matching processes..."
+# gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} \
+#   --project ${PROJECT} \
+#   --zone ${ZONE} \
+#   --worker=all \
+#   --command="ps aux | grep '[e]xamples.ml_perf.main' || true"
+
+# echo ">>> Terminating any existing training processes..."
+# gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} \
+#   --project ${PROJECT} \
+#   --zone ${ZONE} \
+#   --worker=all \
+#   --command="pkill -9 -f 'python3.12 -m examples.ml_perf.[m]ain.*' || true"
 
 # ==============================================================================
 # Verify Installation
@@ -155,7 +167,7 @@ gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} \
   --project ${PROJECT} \
   --zone ${ZONE} \
   --worker=all \
-  --command="source .keras-env/bin/activate && echo 'import jax; print(jax.devices())' > script.py && python script.py"
+  --command="source .keras-env/bin/activate && python3.12 -c 'import jax; print(jax.devices())'"
 
 
 # ==============================================================================
@@ -166,6 +178,6 @@ gcloud alpha compute tpus tpu-vm ssh ${TPU_NAME} \
   --project ${PROJECT} \
   --zone ${ZONE} \
   --worker=all \
-  --command="source .keras-env/bin/activate && cd keras-rs && python3 -m examples.ml_perf.main --config_name ${CONFIG_NAME}"
+  --command="source .keras-env/bin/activate && cd keras-rs && python3.12 -m examples.ml_perf.main --config_name ${CONFIG_NAME}"
 
 echo ">>> Script finished."

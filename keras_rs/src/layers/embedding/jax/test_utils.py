@@ -7,11 +7,12 @@ import jax
 import keras
 import numpy as np
 from jax import numpy as jnp
+from jax_tpu_embedding.sparsecore.lib.nn import embedding
 from jax_tpu_embedding.sparsecore.lib.nn import embedding_spec
+from jax_tpu_embedding.sparsecore.lib.nn import table_stacking
 from jax_tpu_embedding.sparsecore.lib.nn.embedding_spec import FeatureSpec
 from jax_tpu_embedding.sparsecore.lib.nn.embedding_spec import TableSpec
 
-from keras_rs.src.layers.embedding.jax import embedding_utils
 from keras_rs.src.layers.embedding.jax.embedding_utils import FeatureSamples
 from keras_rs.src.types import Nested
 
@@ -142,7 +143,7 @@ def create_tables(
 def create_table_and_slot_variables(
     table_specs: Nested[TableSpec],
     keys: Nested[ArrayLike] | None = None,
-) -> Nested[ArrayLike]:
+) -> Nested[embedding.EmbeddingVariables]:
     """Creates and initializes embedding tables and slot variables.
 
     Args:
@@ -164,7 +165,7 @@ def create_table_and_slot_variables(
     def _create_table_and_slot_variables(
         table_spec: TableSpec,
         key: ArrayLike,
-    ) -> tuple[jax.Array, tuple[jax.Array, ...]]:
+    ) -> embedding.EmbeddingVariables:
         slot_initializers = table_spec.optimizer.slot_variables_initializers()
         num_slot_variables = len(keras.tree.flatten(slot_initializers))
         slot_keys = jnp.unstack(jax.random.split(key, num_slot_variables))
@@ -178,10 +179,10 @@ def create_table_and_slot_variables(
             slot_initializers,
             slot_keys,
         )
-        return (table, slot_variables)
+        return embedding.EmbeddingVariables(table, slot_variables)
 
     # Initialize tables.
-    output: Nested[ArrayLike] = jax.tree.map(
+    output: Nested[embedding.EmbeddingVariables] = jax.tree.map(
         _create_table_and_slot_variables,
         table_specs,
         keys,
@@ -311,14 +312,14 @@ def generate_feature_samples(
 
 def stack_shard_and_put_tables(
     table_specs: Nested[TableSpec],
-    tables: Nested[jax.Array],
+    tables: Nested[embedding.EmbeddingVariables],
     num_shards: int,
     sharding: jax.sharding.Sharding,
-) -> dict[str, Nested[jax.Array]]:
-    sharded_tables = embedding_utils.stack_and_shard_tables(
+) -> dict[str, embedding.EmbeddingVariables]:
+    sharded_tables = table_stacking.stack_and_shard_tables(
         table_specs, tables, num_shards
     )
-    output: dict[str, Nested[jax.Array]] = jax.device_put(
+    output: dict[str, embedding.EmbeddingVariables] = jax.device_put(
         jax.tree.map(
             # Flatten shard dimension to allow auto-sharding to split the array.
             lambda table: table.reshape((-1, table.shape[-1])),
@@ -335,8 +336,11 @@ def get_unshard_and_unstack_tables(
     num_shards: int,
 ) -> Nested[jax.Array]:
     sharded_tables = jax.device_get(sharded_tables)
-    return embedding_utils.unshard_and_unstack_tables(
-        table_specs, sharded_tables, num_shards
+    return typing.cast(
+        Nested[jax.Array],
+        table_stacking.unshard_and_unstack_tables(
+            table_specs, sharded_tables, num_shards
+        ),
     )
 
 
@@ -348,7 +352,12 @@ def _compute_expected_lookup(
     batch_size = len(samples.tokens)
     out = jnp.zeros(shape=(batch_size, table.shape[1]), dtype=table.dtype)
     for i in range(len(samples.tokens)):
-        out = out.at[i, :].add(samples.weights[i] @ table[samples.tokens[i], :])
+        weights = (
+            samples.weights[i]
+            if samples.weights is not None
+            else jnp.ones(samples.tokens[i].shape[0], dtype=jnp.float32)
+        )
+        out = out.at[i, :].add(weights @ table[samples.tokens[i], :])
 
     return out
 
@@ -401,8 +410,11 @@ def _compute_expected_lookup_grad(
     embedding_dim = activation_gradients.shape[1]
     sample_lengths = jnp.array([len(sample) for sample in samples.tokens])
     rows = jnp.repeat(jnp.arange(batch_size), sample_lengths)
-    cols = jnp.concatenate(np.unstack(samples.tokens))  # type: ignore[attr-defined]
-    vals = jnp.concatenate(np.unstack(samples.weights)).reshape(-1, 1)  # type: ignore[attr-defined]
+    cols = jnp.concatenate(list(samples.tokens))
+    if samples.weights is None:
+        vals = jnp.ones((rows.shape[0], 1), dtype=jnp.float32)
+    else:
+        vals = jnp.concatenate(list(samples.weights)).reshape(-1, 1)
 
     # Compute: grad = samples^T * activation_gradients.
     grad = jnp.zeros(shape=(vocabulary_size, embedding_dim))
@@ -469,27 +481,24 @@ def compute_expected_lookup_grad(
 def _update_table_and_slot_variables(
     table_spec: TableSpec,
     grad: jax.Array,
-    table_and_slot_variables: tuple[jax.Array, tuple[jax.Array, ...]],
-) -> tuple[
-    jax.Array,
-    embedding_spec.SGDSlotVariables | embedding_spec.AdagradSlotVariables,
-]:
+    table_and_slot_variables: embedding.EmbeddingVariables,
+) -> embedding.EmbeddingVariables:
     """Updates a table and its slot variables based on the gradient."""
-    table = table_and_slot_variables[0]
+    table = table_and_slot_variables.table
     optimizer = table_spec.optimizer
 
     # Adagrad, update and apply gradient accumulator.
     if isinstance(optimizer, embedding_spec.AdagradOptimizerSpec):
-        accumulator = table_and_slot_variables[1][0]
+        accumulator = table_and_slot_variables.slot.accumulator
         accumulator = accumulator + grad * grad
         learning_rate = optimizer.get_learning_rate(0) / jnp.sqrt(accumulator)
-        return (
+        return embedding.EmbeddingVariables(
             table - learning_rate * grad,
             embedding_spec.AdagradSlotVariables(accumulator=accumulator),
         )
 
     # SGD
-    return (
+    return embedding.EmbeddingVariables(
         table - optimizer.get_learning_rate(0) * grad,
         embedding_spec.SGDSlotVariables(),
     )
@@ -500,8 +509,8 @@ def compute_expected_updates(
     feature_samples: Nested[FeatureSamples],
     activation_gradients: Nested[jax.Array],
     table_specs: Nested[TableSpec],
-    table_and_slot_variables: Nested[jax.Array],
-) -> Nested[jax.Array]:
+    table_and_slot_variables: Nested[embedding.EmbeddingVariables],
+) -> Nested[embedding.EmbeddingVariables]:
     """Computes the expected updates for a given embedding lookup.
 
     Args:
@@ -522,7 +531,7 @@ def compute_expected_updates(
     )
 
     # Apply updates per table.
-    output: Nested[jax.Array] = jax.tree.map(
+    output: Nested[embedding.EmbeddingVariables] = jax.tree.map(
         _update_table_and_slot_variables,
         table_specs,
         table_grads,
