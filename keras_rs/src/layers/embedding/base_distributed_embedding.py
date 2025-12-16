@@ -471,7 +471,7 @@ class DistributedEmbedding(keras.layers.Layer):
         table_stacking: (
             str | Sequence[str] | Sequence[Sequence[str]]
         ) = "auto",
-        update_stats=False,
+        update_stats: bool = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -490,7 +490,7 @@ class DistributedEmbedding(keras.layers.Layer):
                 self._placement_to_path_to_feature_config["default_device"],
                 table_stacking,
             )
-        
+
         self.update_stats = update_stats
 
     @keras_utils.no_automatic_dependency_tracking
