@@ -37,6 +37,12 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         ) = "auto",
         **kwargs: Any,
     ) -> None:
+        # `'update_stats'` is supported only on JAX.
+        if kwargs.pop("update_stats"):
+            raise ValueError(
+                "`'update_stats'` cannot be True for the TensorFlow backend."
+            )
+
         # Intercept arguments that are supported only on TensorFlow.
         self._optimizer = kwargs.pop("optimizer", None)
         self._pipeline_execution_with_tensor_core = kwargs.pop(
