@@ -457,6 +457,10 @@ class DistributedEmbedding(keras.layers.Layer):
             tables in the inner lists together. Note that table stacking is not
             supported on older TPUs, in which case the default value of `"auto"`
             will be interpreted as no table stacking.
+        update_stats: If True, `'max_ids_per_partition'`,
+            `'max_unique_ids_per_partition'` and
+            `'suggested_coo_buffer_size_per_device'` are updated during
+            training. This argument can be set to True only for the JAX backend.
         **kwargs: Additional arguments to pass to the layer base class.
     """
 
@@ -467,6 +471,7 @@ class DistributedEmbedding(keras.layers.Layer):
         table_stacking: (
             str | Sequence[str] | Sequence[Sequence[str]]
         ) = "auto",
+        update_stats: bool = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -485,6 +490,8 @@ class DistributedEmbedding(keras.layers.Layer):
                 self._placement_to_path_to_feature_config["default_device"],
                 table_stacking,
             )
+
+        self.update_stats = update_stats
 
     @keras_utils.no_automatic_dependency_tracking
     def _init_feature_configs_structures(

@@ -644,7 +644,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             num_sc_per_device,
         )
 
-        if training:
+        if training and self.update_stats:
             # Synchronize input statistics across all devices and update the
             # underlying stacked tables specs in the feature specs.
 
