@@ -754,6 +754,19 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
         ):
             self.assertAllClose(before, after)
 
+    def test_update_stats_init(self):
+        feature_configs = self.get_embedding_config("dense", self.placement)
+
+        if keras.backend.backend() == "jax":
+            distributed_embedding.DistributedEmbedding(
+                feature_configs, update_stats=True
+            )
+        elif keras.backend.backend() == "tensorflow":
+            with self.assertRaises(ValueError):
+                distributed_embedding.DistributedEmbedding(
+                    feature_configs, update_stats=True
+                )
+
 
 if __name__ == "__main__":
     absltest.main()
