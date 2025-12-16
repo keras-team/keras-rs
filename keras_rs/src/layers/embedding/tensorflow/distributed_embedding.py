@@ -38,10 +38,10 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         update_stats: bool = False,
         **kwargs: Any,
     ) -> None:
-        # `'update_stats'` is supported only on JAX.
+        # `update_stats` is supported only on JAX.
         if update_stats:
             raise ValueError(
-                "`'update_stats'` cannot be True for the TensorFlow backend."
+                "`update_stats` cannot be True for the TensorFlow backend."
             )
 
         # Intercept arguments that are supported only on TensorFlow.
