@@ -490,6 +490,8 @@ class DistributedEmbedding(keras.layers.Layer):
                 self._placement_to_path_to_feature_config["default_device"],
                 table_stacking,
             )
+        
+        self.update_stats = update_stats
 
     @keras_utils.no_automatic_dependency_tracking
     def _init_feature_configs_structures(
