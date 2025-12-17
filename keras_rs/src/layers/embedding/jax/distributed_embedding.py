@@ -407,7 +407,9 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             if isinstance(table_stacking, str):
                 if table_stacking == "auto":
                     jte_table_stacking.auto_stack_tables(
-                        feature_specs, global_device_count, num_sc_per_device
+                        feature_specs,
+                        global_device_count,
+                        num_sc_per_device,
                     )
                 else:
                     raise ValueError(
