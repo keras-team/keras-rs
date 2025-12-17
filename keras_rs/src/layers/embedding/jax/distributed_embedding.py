@@ -9,6 +9,7 @@ import keras
 import numpy as np
 from jax import numpy as jnp
 from jax.experimental import layout as jax_layout
+from jax.experimental import multihost_utils
 from jax_tpu_embedding.sparsecore.lib.nn import embedding
 from jax_tpu_embedding.sparsecore.lib.nn import embedding_spec
 from jax_tpu_embedding.sparsecore.lib.nn import (
@@ -668,7 +669,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                 for stack_name, spec in stacked_table_specs.items()
             )
 
-            # # Update configuration and repeat preprocessing if stats changed.
+            # Update configuration and repeat preprocessing if stats changed.
             if changed:
                 for stack_name, spec in stacked_table_specs.items():
                     all_stats.max_ids_per_partition[stack_name] = np.max(
