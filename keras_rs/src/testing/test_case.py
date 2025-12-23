@@ -136,3 +136,8 @@ class TestCase(unittest.TestCase):
         # # Check that output matches.
         restored_output = restored_model(input_data)
         self.assertAllClose(model_output, restored_output, atol=atol, rtol=rtol)
+
+
+def uses_gpu() -> bool:
+    devices = keras.distribution.list_devices()
+    return any(d.startswith("gpu") for d in devices)
