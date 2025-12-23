@@ -238,14 +238,18 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
         ("sparse_weights", "sparse", True),
     )
     def test_model_fit(self, input_type, use_weights):
-        if keras.backend.backend() == "jax":
-            if input_type == "sparse":
-                self.skipTest("TODO sparse inputs on JAX.")
-        elif keras.backend.backend() != "tensorflow":
-            if input_type in ("ragged", "sparse"):
-                self.skipTest(
-                    f"{input_type} not supported on {keras.backend.backend()}"
-                )
+        if keras.backend.backend() == "tensorflow":
+            if testing.uses_gpu():
+                if input_type == "sparse":
+                    self.skipTest("sparse not XLA compilable on tensorflow")
+                if input_type == "ragged" and use_weights:
+                    self.skipTest(
+                        "ragged weights not XLA compilable on tensorflow"
+                    )
+        elif input_type in ("ragged", "sparse"):
+            self.skipTest(
+                f"{input_type} not supported on {keras.backend.backend()}"
+            )
 
         feature_configs = self.get_embedding_config(input_type, self.placement)
         train_inputs, train_weights, train_labels = (

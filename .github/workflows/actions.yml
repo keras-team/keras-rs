@@ -11,26 +11,32 @@ permissions:
   contents: read
 
 jobs:
-  run_tests:
-    name: Test the code
+  run_cpu_tests:
+    name: Test the code on CPU
+    runs-on: ubuntu-latest
+
     strategy:
       fail-fast: false
       matrix:
         backend: [tensorflow, jax, torch]
-    runs-on: ubuntu-latest
+
     env:
       KERAS_BACKEND: ${{ matrix.backend }}
+
     steps:
     - uses: actions/checkout@v4
+
     - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
         python-version: "3.11"
+
     - name: Get pip cache dir
       id: pip-cache
       run: |
         python -m pip install --upgrade pip setuptools
         echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
+
     - name: pip cache
       uses: actions/cache@v4
       with:
@@ -38,15 +44,56 @@ jobs:
         key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
         restore-keys: |
           ${{ runner.os }}-pip-
+
     - name: Install dependencies
       run: |
           pip install -r requirements.txt --progress-bar off
           pip install --no-deps -e "." --progress-bar off
-    - name: Test with pytest
-      run: |
-        pytest keras_rs/
 
-  run_tests_in_container:
+    - name: Test with pytest
+      run: pytest keras_rs/
+
+  run_gpu_tests:
+    name: Test the code on GPU
+    runs-on: linux-x86-g2-16-l4-1gpu
+
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [tensorflow, jax, torch]
+
+    container:
+      image: python:3.11-slim
+      options: --privileged --network host
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Dependencies
+      run: |
+        pip install --no-cache-dir -U pip && \
+        pip install --no-cache-dir -r requirements-${{ matrix.backend }}-cuda.txt
+
+    - name: Set Keras Backend
+      run: echo "KERAS_BACKEND=${{ matrix.backend }}" >> $GITHUB_ENV
+
+    - name: Verify TF Installation
+      if: ${{ matrix.backend == 'tensorflow'}}
+      run: python3 -c "import tensorflow as tf; print('Tensorflow devices:', tf.config.list_logical_devices())"
+
+    - name: Verify JAX Installation
+      if: ${{ matrix.backend == 'jax'}}
+      run: python3 -c "import jax; print('JAX devices:', jax.devices())"
+
+    - name: Verify Torch Installation
+      if: ${{ matrix.backend == 'torch'}}
+      run: python3 -c "import torch; print('Torch devices:', [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())])"
+
+    - name: Test with pytest
+      run: pytest keras_rs/ --ignore=keras_rs/src/layers/embedding/jax
+
+  run_tpu_tests:
     name: Test the code on TPU
     runs-on: linux-x86-ct6e-44-1tpu
 
