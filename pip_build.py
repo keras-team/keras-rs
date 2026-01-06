@@ -21,6 +21,7 @@ import os
 import pathlib
 import re
 import shutil
+import subprocess
 
 package = "keras_rs"
 build_directory = "tmp_build_dir"
@@ -131,7 +132,16 @@ def build(root_path: pathlib.Path, is_nightly: bool) -> pathlib.Path:
 
 def install_whl(whl_fpath: pathlib.Path) -> None:
     print(f"Installing wheel file: {whl_fpath}")
-    os.system(f"pip3 install {whl_fpath} --force-reinstall --no-dependencies")
+    subprocess.run(
+        [
+            "pip3",
+            "install",
+            whl_fpath,
+            "--force-reinstall",
+            "--no-dependencies",
+        ],
+        check=True,
+    )
 
 
 if __name__ == "__main__":
