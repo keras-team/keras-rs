@@ -1,5 +1,5 @@
 # Tensorflow cpu-only version.
-tensorflow-cpu>=2.20.0
+tensorflow-cpu
 
 # Jax with TPU support.
 jax[tpu]
