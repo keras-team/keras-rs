@@ -60,17 +60,9 @@ def _create_sparsecore_layout(
     return sparsecore_layout
 
 
-def _num_sparsecores_per_device() -> int:
-    if test_utils.has_sparsecores():
-        return jte_utils.num_sparsecores_per_device()
-
-    # Default to one for non-sparsecore tests.
-    return 1
-
-
 @pytest.mark.skipif(
-    keras.backend.backend() != "jax",
-    reason="Backend specific test",
+    not jax_distributed_embedding.DistributedEmbedding.has_sparsecores(),
+    reason="Requires SparseCores",
 )
 class ShardedInitializerTest(parameterized.TestCase):
     @parameterized.product(
@@ -103,8 +95,8 @@ class ShardedInitializerTest(parameterized.TestCase):
 
 
 @pytest.mark.skipif(
-    keras.backend.backend() != "jax",
-    reason="Backend specific test",
+    not jax_distributed_embedding.DistributedEmbedding.has_sparsecores(),
+    reason="Requires SparseCores",
 )
 class StackedTableInitializerTest(parameterized.TestCase):
     def test_sharded_matches_unsharded(self):
@@ -130,7 +122,7 @@ class StackedTableInitializerTest(parameterized.TestCase):
         )
 
         device_count = jax.device_count()
-        num_sc_per_device = _num_sparsecores_per_device()
+        num_sc_per_device = jte_utils.num_sparsecores_per_device()
         num_table_shards = device_count * num_sc_per_device
 
         # Convert to JAX and stack tables.
@@ -208,7 +200,7 @@ class StackedTableInitializerTest(parameterized.TestCase):
         }
 
         device_count = jax.device_count()
-        num_sc_per_device = _num_sparsecores_per_device()
+        num_sc_per_device = jte_utils.num_sparsecores_per_device()
         num_table_shards = device_count * num_sc_per_device
 
         table_stacking_lib.stack_tables(
@@ -267,7 +259,7 @@ class StackedTableInitializerTest(parameterized.TestCase):
         }
 
         device_count = jax.device_count()
-        num_sc_per_device = _num_sparsecores_per_device()
+        num_sc_per_device = jte_utils.num_sparsecores_per_device()
         num_table_shards = device_count * num_sc_per_device
 
         table_stacking_lib.stack_tables(
@@ -305,8 +297,8 @@ class StackedTableInitializerTest(parameterized.TestCase):
 
 
 @pytest.mark.skipif(
-    keras.backend.backend() != "jax",
-    reason="Backend specific test",
+    not jax_distributed_embedding.DistributedEmbedding.has_sparsecores(),
+    reason="Requires SparseCores",
 )
 class DistributedEmbeddingLayerTest(parameterized.TestCase):
     @parameterized.product(

@@ -21,7 +21,7 @@ if jax.__version_info__ >= (0, 8, 0):
 else:
     from jax.experimental.shard_map import shard_map as exp_shard_map
 
-    def shard_map(  # type: ignore[misc]
+    def shard_map(  # type: ignore[misc, no-redef]
         f: Any = None,
         /,
         *,

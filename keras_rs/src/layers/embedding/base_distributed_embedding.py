@@ -2,6 +2,7 @@ import collections
 import dataclasses
 import importlib.util
 import typing
+import warnings
 from typing import Any, Sequence
 
 import keras
@@ -552,17 +553,17 @@ class DistributedEmbedding(keras.layers.Layer):
         ] = {}
 
         # Lazily initialized.
-        has_sparsecore = None
+        has_sparsecores = None
 
         for path, feature_config in paths_and_feature_configs:
             if isinstance(feature_config, FeatureConfig):
                 placement = feature_config.table.placement
                 # Resolve "auto" to an actual placement.
                 if placement == "auto":
-                    if has_sparsecore is None:
-                        has_sparsecore = self._has_sparsecore()
+                    if has_sparsecores is None:
+                        has_sparsecores = self.has_sparsecores()
                     placement = (
-                        "sparsecore" if has_sparsecore else "default_device"
+                        "sparsecore" if has_sparsecores else "default_device"
                     )
             else:
                 # It's a `tf.tpu.experimental.embedding.FeatureConfig`.
@@ -936,24 +937,53 @@ class DistributedEmbedding(keras.layers.Layer):
             )
         return tables
 
-    def _has_sparsecore(self) -> bool:
+    @classmethod
+    def has_sparsecores(cls) -> bool:
+        """Return whether the current devices are TPUs with SparseCore chips.
+
+        This is a class method and can be invoked before instantiating a
+        `DistributedEmbedding`.
+
+        Returns:
+            True if devices are TPUs with SparseCore chips.
+
+        Example:
+
+        ```python
+        if keras_rs.layers.DistributedEmbedding.has_sparsecores():
+            print("We have SparseCores")
+        ```
+        """
         # Explicitly check for SparseCore availability.
         # We need this check here rather than in jax/distributed_embedding.py
         # so that we can warn the user about missing dependencies.
         if keras.backend.backend() == "jax":
             # Check if SparseCores are available.
-            try:
-                import jax
+            import jax
 
-                tpu_devices = jax.devices("tpu")
-            except RuntimeError:
+            if jax.default_backend() != "tpu":
                 # No TPUs available.
                 return False
 
-            if len(tpu_devices) > 0:
-                device_kind = tpu_devices[0].device_kind
-                if device_kind in ["TPU v5", "TPU v6 lite"]:
-                    return True
+            if importlib.util.find_spec("jax_tpu_embedding") is None:
+                # jax-tpu-embedding is missing and we're on TPU, warn.
+                warnings.warn(
+                    "Using DistributedEmbedding on TPU without the "
+                    "jax-tpu-embedding module installed. The SparseCores will "
+                    "not be detected and a placement of `auto` will place the "
+                    "tables on TensorCore, which can affect performance. "
+                    "Install the module via `pip install jax-tpu-embedding`"
+                )
+                return False
+
+            # Rely on jax_tpu_embedding's `num_sparsecores_per_device`.
+            from jax_tpu_embedding.sparsecore.utils import utils as jte_utils
+
+            try:
+                return jte_utils.num_sparsecores_per_device() > 0  # type: ignore[no-any-return]
+            except ValueError:
+                # `num_sparsecores_per_device` raises if there is no SparseCore.
+                return False
 
         return False
 
@@ -965,13 +995,19 @@ class DistributedEmbedding(keras.layers.Layer):
         del feature_configs, table_stacking
 
         if keras.backend.backend() == "jax":
-            jax_tpu_embedding_spec = importlib.util.find_spec(
-                "jax_tpu_embedding"
-            )
-            if jax_tpu_embedding_spec is None:
+            import jax
+
+            if jax.default_backend() != "tpu":
+                raise ValueError(
+                    "The `sparsecore` placement is not available on "
+                    f"{jax.default_backend()}"
+                )
+
+            if importlib.util.find_spec("jax_tpu_embedding") is None:
                 raise ImportError(
-                    "Please install jax-tpu-embedding to use "
-                    "DistributedEmbedding on sparsecore devices."
+                    "DistributedEmbedding on TPU with SparseCore chips "
+                    "requires the jax-tpu-embedding module. You can install it "
+                    "via `pip install jax-tpu-embedding`"
                 )
 
         raise self._unsupported_placement_error("sparsecore")

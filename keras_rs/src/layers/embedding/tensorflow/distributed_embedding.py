@@ -61,15 +61,17 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             feature_configs, table_stacking=table_stacking, **kwargs
         )
 
-    def _is_tpu_strategy(self, strategy: tf.distribute.Strategy) -> bool:
+    @classmethod
+    def _is_tpu_strategy(cls, strategy: tf.distribute.Strategy) -> bool:
         return isinstance(
             strategy,
             (tf.distribute.TPUStrategy, tf.distribute.experimental.TPUStrategy),
         )
 
-    def _has_sparsecore(self) -> bool:
+    @classmethod
+    def has_sparsecores(cls) -> bool:
         strategy = tf.distribute.get_strategy()
-        if self._is_tpu_strategy(strategy):
+        if cls._is_tpu_strategy(strategy):
             tpu_embedding_feature = (
                 strategy.extended.tpu_hardware_feature.embedding_feature
             )

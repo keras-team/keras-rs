@@ -20,13 +20,6 @@ ArrayLike: TypeAlias = Union[jax.Array, np.ndarray[Any, Any]]
 Shape: TypeAlias = tuple[int, ...]
 
 
-def has_sparsecores() -> bool:
-    device_kind = jax.devices()[0].device_kind
-    if device_kind in ["TPU v5", "TPU v6 lite"]:
-        return True
-    return False
-
-
 def _round_up_to_multiple(value: int, multiple: int) -> int:
     return ((value + multiple - 1) // multiple) * multiple
 
