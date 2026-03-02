@@ -31,7 +31,9 @@ from keras_rs.src.utils import keras_utils
 if jax.__version_info__ >= (0, 8, 0):
     from jax import shard_map
 else:
-    from jax.experimental.shard_map import shard_map  # type: ignore[assignment]
+    from jax.experimental.shard_map import (  # type: ignore[assignment, no-redef]
+        shard_map,
+    )
 
 
 ArrayLike = Union[np.ndarray[Any, Any], jax.Array]
@@ -348,9 +350,16 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         feature_configs: dict[str, FeatureConfig],
         table_stacking: str | Sequence[str] | Sequence[Sequence[str]],
     ) -> None:
-        if not self._has_sparsecore():
+        if not self.has_sparsecores():
+            if jax.default_backend() != "tpu":
+                # If jax-tpu-embedding is installed, but running on GPU or CPU.
+                raise ValueError(
+                    "The `sparsecore` placement is not available on "
+                    f"{jax.default_backend()}"
+                )
+
             raise ValueError(
-                "Not sparse cores available, cannot use explicit sparsecore"
+                "No SparseCores available, cannot use explicit `sparsecore`"
                 " placement."
             )
 

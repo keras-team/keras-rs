@@ -14,6 +14,7 @@ from jax_tpu_embedding.sparsecore.lib.nn import embedding_spec
 from jax_tpu_embedding.sparsecore.lib.nn import table_stacking
 from jax_tpu_embedding.sparsecore.utils import utils as jte_utils
 
+from keras_rs.src.layers.embedding.jax import distributed_embedding
 from keras_rs.src.layers.embedding.jax import embedding_lookup
 from keras_rs.src.layers.embedding.jax import embedding_utils
 from keras_rs.src.layers.embedding.jax import test_utils
@@ -133,7 +134,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
         stacked=[True, False],
     )
     def test_forward_pass(self, ragged: bool, stacked: bool):
-        if not test_utils.has_sparsecores():
+        if not distributed_embedding.DistributedEmbedding.has_sparsecores():
             self.skipTest("Test requires sparsecores.")
 
         devices = jax.devices()
@@ -215,7 +216,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
     def test_model_sharding(
         self, ragged: bool, stacked: bool, num_model_shards: int
     ):
-        if not test_utils.has_sparsecores():
+        if not distributed_embedding.DistributedEmbedding.has_sparsecores():
             self.skipTest("Test requires sparsecores.")
 
         if num_model_shards > jax.device_count():
@@ -319,7 +320,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
         stacked: bool,
         optimizer: embedding_spec.OptimizerSpec,
     ):
-        if not test_utils.has_sparsecores():
+        if not distributed_embedding.DistributedEmbedding.has_sparsecores():
             self.skipTest("Test requires sparsecores.")
 
         devices = jax.devices()
@@ -426,7 +427,7 @@ class EmbeddingLookupTest(parameterized.TestCase):
         stacked: bool,
         optimizer: embedding_spec.OptimizerSpec,
     ):
-        if not test_utils.has_sparsecores():
+        if not distributed_embedding.DistributedEmbedding.has_sparsecores():
             self.skipTest("Test requires sparsecores.")
 
         devices = jax.devices()
