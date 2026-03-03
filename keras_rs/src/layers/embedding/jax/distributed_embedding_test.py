@@ -60,11 +60,13 @@ def _create_sparsecore_layout(
     return sparsecore_layout
 
 
-@pytest.mark.skipif(
-    not jax_distributed_embedding.DistributedEmbedding.has_sparsecores(),
-    reason="Requires SparseCores",
-)
+@pytest.mark.skipif(keras.backend.backend() != "jax", reason="JAX only.")
 class ShardedInitializerTest(parameterized.TestCase):
+    def setUp(self):
+        super().setUp()
+        if not jax_distributed_embedding.DistributedEmbedding.has_sparsecores():
+            self.skipTest("Requires SparseCores")
+
     @parameterized.product(
         initializer=[
             keras.initializers.RandomUniform(
@@ -94,11 +96,13 @@ class ShardedInitializerTest(parameterized.TestCase):
         self.assertEqual(actual.sharding, layout.backend_layout.sharding)
 
 
-@pytest.mark.skipif(
-    not jax_distributed_embedding.DistributedEmbedding.has_sparsecores(),
-    reason="Requires SparseCores",
-)
+@pytest.mark.skipif(keras.backend.backend() != "jax", reason="JAX only.")
 class StackedTableInitializerTest(parameterized.TestCase):
+    def setUp(self):
+        super().setUp()
+        if not jax_distributed_embedding.DistributedEmbedding.has_sparsecores():
+            self.skipTest("Requires SparseCores")
+
     def test_sharded_matches_unsharded(self):
         table_configs = (
             keras_test_utils.create_random_table_configs(
@@ -296,11 +300,13 @@ class StackedTableInitializerTest(parameterized.TestCase):
         np.testing.assert_array_equal(jit_table, table)
 
 
-@pytest.mark.skipif(
-    not jax_distributed_embedding.DistributedEmbedding.has_sparsecores(),
-    reason="Requires SparseCores",
-)
+@pytest.mark.skipif(keras.backend.backend() != "jax", reason="JAX only.")
 class DistributedEmbeddingLayerTest(parameterized.TestCase):
+    def setUp(self):
+        super().setUp()
+        if not jax_distributed_embedding.DistributedEmbedding.has_sparsecores():
+            self.skipTest("Requires SparseCores")
+
     @parameterized.product(
         ragged=[True, False],
         combiner=["sum", "mean", "sqrtn"],
