@@ -16,7 +16,7 @@ jobs:
       has_recent_commits: ${{ steps.check.outputs.has_recent_commits }}
     steps:
       - name: Checkout ${{ github.ref }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - id: check
         run: |
           # Check for commits in the last 25 hours (use a 1 hour margin)
@@ -28,13 +28,13 @@ jobs:
 
   run-test-for-nightly:
     needs: [check_commits]
-    if: ${{needs.check_commits.outputs.has_recent_commits == true}}
+    if: ${{needs.check_commits.outputs.has_recent_commits == 'true'}}
     uses: ./.github/workflows/actions.yml
 
   nightly:
     name: Build Wheel file and upload
     needs: [check_commits, run-test-for-nightly]
-    if: ${{needs.check_commits.outputs.has_recent_commits == true}}
+    if: ${{needs.check_commits.outputs.has_recent_commits == 'true'}}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
