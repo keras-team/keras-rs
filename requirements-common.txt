@@ -3,6 +3,7 @@ namex>=0.0.8
 
 # formatting and linting
 mypy
+pre-commit
 ruff
 
 # testing
