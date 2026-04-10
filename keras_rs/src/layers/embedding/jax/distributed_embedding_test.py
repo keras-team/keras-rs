@@ -1,4 +1,3 @@
-import dataclasses
 import os
 import tempfile
 import typing
@@ -18,8 +17,8 @@ from jax_tpu_embedding.sparsecore.lib.nn import (
 )
 from jax_tpu_embedding.sparsecore.utils import utils as jte_utils
 
+from keras_rs.src.layers.embedding import distributed_embedding
 from keras_rs.src.layers.embedding import test_utils as keras_test_utils
-from keras_rs.src.layers.embedding.jax import checkpoint_utils
 from keras_rs.src.layers.embedding.jax import config_conversion
 from keras_rs.src.layers.embedding.jax import (
     distributed_embedding as jax_distributed_embedding,
@@ -64,7 +63,7 @@ def _create_sparsecore_layout(
 class ShardedInitializerTest(parameterized.TestCase):
     def setUp(self):
         super().setUp()
-        if not jax_distributed_embedding.DistributedEmbedding.has_sparsecores():
+        if not distributed_embedding.DistributedEmbedding.has_sparsecores():
             self.skipTest("Requires SparseCores")
 
     @parameterized.product(
@@ -100,7 +99,7 @@ class ShardedInitializerTest(parameterized.TestCase):
 class StackedTableInitializerTest(parameterized.TestCase):
     def setUp(self):
         super().setUp()
-        if not jax_distributed_embedding.DistributedEmbedding.has_sparsecores():
+        if not distributed_embedding.DistributedEmbedding.has_sparsecores():
             self.skipTest("Requires SparseCores")
 
     def test_sharded_matches_unsharded(self):
@@ -304,7 +303,7 @@ class StackedTableInitializerTest(parameterized.TestCase):
 class DistributedEmbeddingLayerTest(parameterized.TestCase):
     def setUp(self):
         super().setUp()
-        if not jax_distributed_embedding.DistributedEmbedding.has_sparsecores():
+        if not distributed_embedding.DistributedEmbedding.has_sparsecores():
             self.skipTest("Requires SparseCores")
 
     @parameterized.product(
@@ -330,7 +329,7 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         feature_configs = keras_test_utils.create_random_feature_configs(
             table_configs=table_configs, seed=20
         )
-        layer = jax_distributed_embedding.DistributedEmbedding(
+        layer = distributed_embedding.DistributedEmbedding(
             feature_configs, table_stacking=table_stacking
         )
 
@@ -426,7 +425,7 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         def loss_fn(y_true, y_pred):
             return jnp.mean(jnp.square(y_true - y_pred))
 
-        layer = jax_distributed_embedding.DistributedEmbedding(
+        layer = distributed_embedding.DistributedEmbedding(
             feature_configs, table_stacking=table_stacking
         )
         model = keras.Sequential([layer])
@@ -516,17 +515,14 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         }
 
         # Fit and evaluate.
-        def loss_fn(y_true, y_pred):
-            return jnp.mean(jnp.square(y_true - y_pred))
-
         embedding_layer_name = "distributed_embedding_chkpt_test"
-        layer = jax_distributed_embedding.DistributedEmbedding(
+        layer = distributed_embedding.DistributedEmbedding(
             feature_configs_dict,
             table_stacking=target_stacking,
             name=embedding_layer_name,
         )
         model = keras.Sequential([layer])
-        model.compile(jit_compile=True, loss=loss_fn)
+        model.compile(jit_compile=True, loss="mse")
 
         # Fit model to different dataset.
         training_dataset = keras_test_utils.RandomInputSampleDataset(
@@ -542,62 +538,18 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             chkpt_path = os.path.join(tmp_dir, "checkpoint")
 
-        model.fit(
-            training_dataset,
-            epochs=2,
-            steps_per_epoch=1,
-            callbacks=[
-                checkpoint_utils.JaxKeras3CheckpointCallback(
-                    model,
-                    chkpt_path,
-                    max_to_keep=1,
-                    steps_per_epoch=1,
-                )
-            ],
-        )
-        # Setup a model with a zero initializer but otherwise the same
-        # feature configs to test restore. Keep the same embedding layer name to
-        # ensure the correct weights are restored.
-        table_config_id_to_table_config_with_zero_init = {
-            id(table_config): dataclasses.replace(
-                table_config, initializer="zeros"
+            model.fit(
+                training_dataset,
+                epochs=2,
+                steps_per_epoch=1,
+                callbacks=[keras.callbacks.OrbaxCheckpoint(chkpt_path)],
             )
-            for table_config in table_configs
-        }
-        feature_configs_with_zero_init = {
-            feature_config.name: dataclasses.replace(
-                feature_config,
-                table=table_config_id_to_table_config_with_zero_init[
-                    id(feature_config.table)
-                ],
-            )
-            for feature_config in feature_configs
-        }
-        layer_for_restore = jax_distributed_embedding.DistributedEmbedding(
-            feature_configs_with_zero_init,
-            table_stacking=target_stacking,
-            name=embedding_layer_name,
-        )
-        input_shapes = jax.tree.map(
-            lambda f: f.input_shape, feature_configs_with_zero_init
-        )
-        layer_for_restore.build(input_shapes)
-        model_for_restore = keras.Sequential([layer_for_restore])
-        manager_for_restore = checkpoint_utils.JaxKeras3CheckpointManager(
-            model_for_restore,
-            chkpt_path,
-            max_to_keep=1,
-            steps_per_epoch=1,
-        )
-        model_for_restore.compile(jit_compile=True, loss=loss_fn)
-        model_for_restore.build()
-        model_for_restore.optimizer.build(model_for_restore.trainable_variables)
-        manager_for_restore.restore_state()
-        jax.tree.map(
-            np.testing.assert_array_equal,
-            model.trainable_variables,
-            model_for_restore.trainable_variables,
-        )
+
+            restored_model = keras.models.load_model(chkpt_path)
+            for var, restored_var in zip(
+                model.trainable_variables, restored_model.trainable_variables
+            ):
+                np.testing.assert_array_equal(var, restored_var)
 
 
 if __name__ == "__main__":
