@@ -95,7 +95,13 @@ class ConfigConversionTest(parameterized.TestCase):
             optimizer_b, keras.optimizers.Optimizer
         ):
             # For Keras optimizers, check their configs.
-            self.assertEqual(optimizer_a.get_config(), optimizer_b.get_config())
+            # Remove names as JTE optimizers don't have a name so it gets lost
+            # in the conversion.
+            config_a = optimizer_a.get_config()
+            config_b = optimizer_b.get_config()
+            del config_a["name"]
+            del config_b["name"]
+            self.assertEqual(config_a, config_b)
             return
 
         raise ValueError(
