@@ -53,7 +53,7 @@ if [[ "${ACCELERATOR_TYPE}" != "v6e-8" && "${ACCELERATOR_TYPE}" != "v6e-16" ]]; 
 fi
 
 # Validate the provided zone
-if [[ ! "${ZONE}" =~ ^[a-zA-Z0-9-]+$ ]]; then
+if [[ ! "${ZONE}" =~ ^[a-z0-9-]+$ ]]; then
     echo "Error: Invalid zone '${ZONE}'." >&2
     show_help
     exit 1
