@@ -60,7 +60,7 @@ if [[ ! "${ZONE}" =~ ^[a-z0-9-]+$ ]]; then
 fi
 
 # Validate the provided project
-if [[ ! "${PROJECT}" =~ ^[a-zA-Z0-9-]+$ ]]; then
+if [[ ! "${PROJECT}" =~ ^[a-z0-9-]+$ ]]; then
     echo "Error: Invalid project '${PROJECT}'." >&2
     show_help
     exit 1
