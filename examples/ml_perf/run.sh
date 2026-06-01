@@ -52,6 +52,20 @@ if [[ "${ACCELERATOR_TYPE}" != "v6e-8" && "${ACCELERATOR_TYPE}" != "v6e-16" ]]; 
     exit 1
 fi
 
+# Validate the provided zone
+if [[ ! "${ZONE}" =~ ^[a-zA-Z0-9-]+$ ]]; then
+    echo "Error: Invalid zone '${ZONE}'." >&2
+    show_help
+    exit 1
+fi
+
+# Validate the provided project
+if [[ ! "${PROJECT}" =~ ^[a-zA-Z0-9-]+$ ]]; then
+    echo "Error: Invalid project '${PROJECT}'." >&2
+    show_help
+    exit 1
+fi
+
 # ==============================================================================
 # Environment Variables
 # ==============================================================================
@@ -61,6 +75,11 @@ export PROJECT
 
 # Use the user-provided config name if it exists, otherwise derive it.
 if [[ -n "${USER_CONFIG_NAME}" ]]; then
+  if [[ ! "${USER_CONFIG_NAME}" =~ ^[a-zA-Z0-9_]+$ ]]; then
+      echo "Error: Invalid config name '${USER_CONFIG_NAME}'." >&2
+      show_help
+      exit 1
+  fi
   export CONFIG_NAME=${USER_CONFIG_NAME}
 else
   export CONFIG_NAME=${ACCELERATOR_TYPE//-/_}
