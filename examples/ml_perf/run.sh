@@ -75,7 +75,7 @@ export PROJECT
 
 # Use the user-provided config name if it exists, otherwise derive it.
 if [[ -n "${USER_CONFIG_NAME}" ]]; then
-  if [[ ! "${USER_CONFIG_NAME}" =~ ^[a-zA-Z0-9_]+$ ]]; then
+  if [[ ! "${USER_CONFIG_NAME}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
       echo "Error: Invalid config name '${USER_CONFIG_NAME}'." >&2
       show_help
       exit 1
