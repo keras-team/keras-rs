@@ -33,7 +33,9 @@ jobs:
 
     steps:
     - name: Checkout ${{ github.ref }}
-      uses: actions/checkout@v6
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
 
     - name: Install Dependencies
       run: pip install --no-cache-dir -r requirements.txt
@@ -59,7 +61,9 @@ jobs:
 
     steps:
     - name: Checkout ${{ github.ref }}
-      uses: actions/checkout@v6
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
 
     - name: Check CUDA Version
       run: nvidia-smi
@@ -101,11 +105,13 @@ jobs:
 
     steps:
     - name: Checkout ${{ github.ref }}
-      uses: actions/checkout@v6
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
 
     - name: Install Dependencies
       run: pip install --no-cache-dir -r requirements-${{ matrix.backend }}-tpu.txt
-    
+
     - name: Set TF Specific Environment Variables
       if: ${{ matrix.backend == 'tensorflow'}}
       run: |
@@ -136,10 +142,12 @@ jobs:
 
     steps:
       - name: Checkout ${{ github.ref }}
-        uses: actions/checkout@v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.11"
 
@@ -150,7 +158,8 @@ jobs:
           echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
 
       - name: pip cache
-        uses: actions/cache@v5
+        # zizmor: ignore[cache-poisoning]
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pip-cache.outputs.dir }}
           key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('requirements.txt') }}
