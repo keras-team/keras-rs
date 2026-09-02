@@ -38,6 +38,9 @@ jobs:
     needs: [check_commits, run-test-for-nightly]
     if: ${{needs.check_commits.outputs.has_recent_commits == 'true'}}
     runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -68,7 +71,6 @@ jobs:
         run: |
           python pip_build.py --nightly
       - name: Publish KerasRS Nightly to PyPI
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2 # zizmor: ignore[use-trusted-publishing]
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
-          password: ${{ secrets.PYPI_NIGHTLY_API_TOKEN }}
           verbose: true
