@@ -31,7 +31,7 @@ jobs:
   run-test-for-nightly:
     needs: [check_commits]
     if: ${{needs.check_commits.outputs.has_recent_commits == 'true'}}
-    uses: ./.github/workflows/actions.yml
+    uses: $/.github/workflows/actions.yml
 
   nightly:
     name: Build Wheel file and upload
