@@ -1,5 +1,7 @@
 import keras
 from absl.testing import parameterized
+from keras.layers import deserialize
+from keras.layers import serialize
 
 from keras_rs.src import testing
 from keras_rs.src.layers.retrieval import brute_force_retrieval
@@ -62,3 +64,29 @@ class BruteForceRetrievalTest(testing.TestCase, parameterized.TestCase):
 
             self.assertEqual(top_indices.shape, expected_top_indices.shape)
             self.assertAllClose(top_indices, expected_top_indices)
+
+    @parameterized.named_parameters(
+        ("return_scores", True),
+        ("no_return_scores", False),
+    )
+    def test_serialization(self, return_scores):
+        layer = brute_force_retrieval.BruteForceRetrieval(
+            k=5, return_scores=return_scores
+        )
+        restored = deserialize(serialize(layer))
+        self.assertDictEqual(layer.get_config(), restored.get_config())
+        self.assertEqual(restored.k, 5)
+        self.assertEqual(restored.return_scores, return_scores)
+
+        # Candidates are not in the config, set them on the restored layer.
+        rng = keras.random.SeedGenerator(42)
+        candidates = keras.random.normal((10, 4), dtype="float32", seed=rng)
+        query = keras.random.normal((3, 4), dtype="float32", seed=rng)
+        restored.update_candidates(candidates)
+        if return_scores:
+            top_scores, top_indices = restored(query)
+            self.assertEqual(tuple(top_scores.shape), (3, 5))
+            self.assertEqual(tuple(top_indices.shape), (3, 5))
+        else:
+            top_indices = restored(query)
+            self.assertEqual(tuple(top_indices.shape), (3, 5))

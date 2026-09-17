@@ -35,7 +35,7 @@ class RetrievalTest(testing.TestCase, parameterized.TestCase):
             "embeddings_ids_shape",
             keras.random.normal(shape=(6, 10)),
             keras.random.randint(shape=(4,), minval=0, maxval=3),
-            "The `candidate_embeddings` and `candidate_is` tensors must have "
+            "The `candidate_embeddings` and `candidate_ids` tensors must have "
             "the same number of rows",
         ),
     )
