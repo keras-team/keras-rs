@@ -26,7 +26,7 @@ def pairwise_comparison(
     pairwise_labels_diff = apply_pairwise_op(labels, ops.subtract)
     pairwise_logits = apply_pairwise_op(logits, logits_op)
 
-    # Keep only those cases where `l_i < l_j`.
+    # Keep only those cases where `l_i > l_j`.
     pairwise_labels = ops.cast(
         ops.greater(pairwise_labels_diff, 0), dtype=labels.dtype
     )

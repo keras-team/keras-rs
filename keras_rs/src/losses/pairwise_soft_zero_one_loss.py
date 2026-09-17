@@ -18,6 +18,8 @@ class PairwiseSoftZeroOneLoss(PairwiseLoss):
 
 formula = "loss = sum_{i} sum_{j} I(y_i > y_j) * (1 - sigmoid(s_i - s_j))"
 explanation = """
+    - `I(y_i > y_j)` is an indicator function that equals 1 if `y_i > y_j`,
+      and 0 otherwise.
     - `(1 - sigmoid(s_i - s_j))` represents the soft zero-one loss, which
       approximates the ideal zero-one loss (which would be 1 if `s_i < s_j`
       and 0 otherwise) with a smooth, differentiable function. This makes it

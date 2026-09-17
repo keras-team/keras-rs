@@ -55,11 +55,12 @@ class PairwiseMeanSquaredError(PairwiseLoss):
         return pairwise_mse, pairwise_weights
 
 
-formula = "loss = sum_{i} sum_{j} I(y_i > y_j) * (s_i - s_j)^2"
+formula = "loss = sum_{i} sum_{j != i} ((y_i - y_j) - (s_i - s_j))^2"
 explanation = """
-    - `(s_i - s_j)^2` is the squared difference between the predicted scores
-      of items `i` and `j`, which penalizes discrepancies between the predicted
-      order of items relative to their true order.
+    - `((y_i - y_j) - (s_i - s_j))^2` is the squared difference between the
+      label gap and the score gap of items `i` and `j`. Unlike the other
+      pairwise losses, every pair of distinct valid items contributes to the
+      loss, not only the pairs with `y_i > y_j`.
 """
 extra_args = ""
 example = """
@@ -78,7 +79,7 @@ example = """
     >>> y_pred = np.array([1.0, 3.0, 2.0, 4.0, 0.8])
     >>> pairwise_mse = keras_rs.losses.PairwiseMeanSquaredError()
     >>> pairwise_mse(y_true=y_true, y_pred=y_pred)
-    >>> 19.10400
+    19.10400
 
     With batched inputs using default 'auto'/'sum_over_batch_size' reduction:
 
@@ -87,7 +88,7 @@ example = """
     >>> pairwise_mse = keras_rs.losses.PairwiseMeanSquaredError()
     >>> pairwise_mse(y_true=y_true, y_pred=y_pred)
     5.57999
-    
+
     With masked inputs (useful for ragged inputs):
 
     >>> y_true = {
