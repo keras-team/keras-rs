@@ -6,25 +6,27 @@ from keras_rs.src import types
 from keras_rs.src.api_export import keras_rs_export
 from keras_rs.src.utils import keras_utils
 
-SMALLEST_FLOAT = ml_dtypes.finfo("float32").smallest_normal / 100.0
+MIN_FLOAT = ml_dtypes.finfo("float32").min / 100.0
 
 
 @keras_rs_export("keras_rs.layers.RemoveAccidentalHits")
 class RemoveAccidentalHits(keras.layers.Layer):
-    """Zeroes the logits of accidental negatives.
+    """Masks the logits of accidental negatives.
 
-    Zeroes the logits of negative candidates that have the same ID as the
-    positive candidate in that row.
+    Sets the logits of negative candidates that have the same ID as the
+    positive candidate in that row to a very large negative value, so that
+    they get a probability of zero after a softmax and do not act as
+    negatives in the loss.
 
     Example:
 
     ```python
-    # Create layer with the configured number of hard negatives to mine.
+    # Create the layer.
     remove_accidental_hits = keras_rs.layers.RemoveAccidentalHits()
 
-    # This will zero the logits of negative candidates that have the same ID as
-    # the positive candidate from `labels` so as to not negatively impact the
-    # true positive.
+    # This masks the logits of negative candidates that have the same ID as
+    # the positive candidate from `labels`, so that the true positive is not
+    # penalized by its own duplicates.
     logits = remove_accidental_hits(logits, labels, candidate_ids)
     ```
     """
@@ -35,10 +37,12 @@ class RemoveAccidentalHits(keras.layers.Layer):
         labels: types.Tensor,
         candidate_ids: types.Tensor,
     ) -> types.Tensor:
-        """Zeroes selected logits.
+        """Masks the logits of accidental hits.
 
-        For each row in the batch, zeroes the logits of negative candidates that
-        have the same ID as the positive candidate in that row.
+        For each row in the batch, sets the logits of negative candidates that
+        have the same ID as the positive candidate in that row to a very large
+        negative value. The logit of the positive candidate itself is left
+        unchanged.
 
         Args:
             logits: The logits tensor, typically `[batch_size, num_candidates]`
@@ -56,7 +60,7 @@ class RemoveAccidentalHits(keras.layers.Layer):
         # A more principled way is to implement
         # `softmax_cross_entropy_with_logits` with a input mask. Here we
         # approximate so by letting accidental hits have extremely small logits
-        # (SMALLEST_FLOAT) for ease-of-implementation.
+        # (MIN_FLOAT) for ease-of-implementation.
 
         labels_shape = ops.shape(labels)
         labels_rank = len(labels_shape)
@@ -86,12 +90,16 @@ class RemoveAccidentalHits(keras.layers.Layer):
             candidate_ids = ops.expand_dims(
                 candidate_ids, list(range(labels_rank - candidate_ids_rank))
             )
+        # Take the ID of the positive candidate along the last axis so that
+        # each row uses its own IDs when `candidate_ids` has leading dimensions.
         positive_indices = ops.expand_dims(ops.argmax(labels, axis=-1), -1)
-        positive_candidate_ids = ops.take(candidate_ids, positive_indices)
+        positive_candidate_ids = ops.take_along_axis(
+            candidate_ids, positive_indices, axis=-1
+        )
 
         duplicate = ops.cast(
             ops.equal(positive_candidate_ids, candidate_ids), labels.dtype
         )
         duplicate = ops.subtract(duplicate, labels)
 
-        return ops.add(logits, ops.multiply(duplicate, SMALLEST_FLOAT))
+        return ops.add(logits, ops.multiply(duplicate, MIN_FLOAT))
