@@ -810,8 +810,9 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         # Assign stacked table variables to the device values.
         keras.tree.map_structure_up_to(
             device_tables,
-            lambda embedding_variables,
-            table_value: embedding_variables.table.assign(table_value),
+            lambda embedding_variables, table_value: (
+                embedding_variables.table.assign(table_value)
+            ),
             self._table_and_slot_variables,
             device_tables,
         )

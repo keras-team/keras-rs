@@ -7,7 +7,6 @@ from typing import Any, Sequence
 
 import keras
 import numpy as np
-from keras.src import backend
 
 from keras_rs.src import types
 from keras_rs.src.layers.embedding import distributed_embedding_config
@@ -660,8 +659,7 @@ class DistributedEmbedding(keras.layers.Layer):
 
         if not self.built:
             input_shapes = keras.tree.map_structure(
-                lambda array: backend.standardize_shape(array.shape),
-                inputs,
+                lambda array: tuple(array.shape), inputs
             )
             self.build(input_shapes)
 
