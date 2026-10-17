@@ -71,6 +71,6 @@ def check_rank(
 ) -> None:
     if x_rank not in allowed_ranks:
         raise ValueError(
-            f"`{tensor_name}` should have a rank from `{allowed_ranks}`."
+            f"`{tensor_name}` should have a rank from `{allowed_ranks}`. "
             f"Received: `{x_rank}`."
         )
