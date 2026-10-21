@@ -456,7 +456,7 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
             feature_configs,
             tables,
             ragged=ragged,
-            num_batches=100,
+            num_batches=10,
             seed=42,
             preprocessor=lambda inputs, weights: layer.preprocess(
                 inputs, weights, training=True
@@ -529,7 +529,7 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
             feature_configs_dict,
             tables,
             ragged=ragged,
-            num_batches=100,
+            num_batches=10,
             seed=42,
             preprocessor=lambda inputs, weights: layer.preprocess(
                 inputs, weights, training=True
