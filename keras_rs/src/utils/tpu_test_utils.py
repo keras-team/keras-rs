@@ -118,3 +118,20 @@ def run_with_strategy(
     else:
         assert not jit_compile
         return fn(*args, **kwargs)
+
+
+def is_variable_on_sparsecore(variable: keras.Variable | tf.Variable) -> bool:
+    value = (
+        variable._value if isinstance(variable, keras.Variable) else variable
+    )
+
+    if keras.backend.backend() == "tensorflow":
+        # One Tensorflow, inspect the class of the variable.
+        cn: str = value.__class__.__name__
+        return cn.startswith("TPUEmbedding") and cn.endswith("Variable")
+    else:
+        # On JAX, inspect the tiling of the layout. It's supposed to be 1D.
+        if not hasattr(value, "format"):
+            return False
+        tiling = value.format.layout.tiling
+        return tiling is not None and len(tiling) > 0 and len(tiling[0]) == 1

@@ -37,7 +37,10 @@ jobs:
         persist-credentials: false
 
     - name: Install Dependencies
-      run: pip install --no-cache-dir -r requirements-${{ matrix.backend }}-tpu.txt
+      run: |
+        pip install --no-cache-dir -r requirements-${{ matrix.backend }}-tpu.txt
+        pip uninstall -y keras
+        pip install -U keras-nightly
 
     - name: Set TF Specific Environment Variables
       if: ${{ matrix.backend == 'tensorflow'}}

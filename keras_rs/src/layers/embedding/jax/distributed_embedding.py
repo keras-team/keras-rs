@@ -1,6 +1,7 @@
 """JAX implementation of the TPU embedding layer."""
 
 import math
+import re
 import typing
 from typing import Any, Mapping, Sequence, Union
 
@@ -244,11 +245,12 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             ),
         )
         layout_map = keras.distribution.LayoutMap(device_mesh=device_mesh)
-        path = self.path
-        if path is None:
+        if self.path:
+            regex = f"{re.escape(self.path)}"
+        else:
             # Layer hasn't been properly built yet.  Use current layer name.
-            path = self.name
-        layout_map[path + "/var"] = sparsecore_layout
+            regex = f"(?:.*/)?{re.escape(self.name)}"
+        layout_map[regex + "/var:.*"] = sparsecore_layout
         sparsecore_distribution = keras.distribution.ModelParallel(
             layout_map=layout_map
         )
