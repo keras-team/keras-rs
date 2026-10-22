@@ -62,7 +62,7 @@ class Retrieval(keras.layers.Layer, abc.ABC):
             and candidate_ids.shape[0] != candidate_embeddings.shape[0]
         ):
             raise ValueError(
-                "The `candidate_embeddings` and `candidate_is` tensors must "
+                "The `candidate_embeddings` and `candidate_ids` tensors must "
                 "have the same number of rows, got tensors of shape "
                 f"{candidate_embeddings.shape} and {candidate_ids.shape}."
             )
@@ -93,7 +93,7 @@ class Retrieval(keras.layers.Layer, abc.ABC):
 
         Returns:
             A tuple with the top scores and the top identifiers if
-            `returns_scores` is True, otherwise a tensor with the top
+            `return_scores` is True, otherwise a tensor with the top
             identifiers.
         """
         pass
@@ -121,7 +121,7 @@ class Retrieval(keras.layers.Layer, abc.ABC):
         config.update(
             {
                 "k": self.k,
-                "return_scores": self.compute_score,
+                "return_scores": self.return_scores,
             }
         )
         return config
