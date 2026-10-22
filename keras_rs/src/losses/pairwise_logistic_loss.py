@@ -22,6 +22,8 @@ class PairwiseLogisticLoss(PairwiseLoss):
 
 formula = "loss = sum_{i} sum_{j} I(y_i > y_j) * log(1 + exp(-(s_i - s_j)))"
 explanation = """
+    - `I(y_i > y_j)` is an indicator function that equals 1 if `y_i > y_j`,
+      and 0 otherwise.
     - `log(1 + exp(-(s_i - s_j)))` is the logistic loss, which penalizes
       cases where the score difference `s_i - s_j` is not sufficiently large
       when `y_i > y_j`. This function provides a smooth approximation of the
@@ -44,7 +46,7 @@ example = """
     >>> y_pred = np.array([1.0, 3.0, 2.0, 4.0, 0.8])
     >>> pairwise_logistic_loss = keras_rs.losses.PairwiseLogisticLoss()
     >>> pairwise_logistic_loss(y_true=y_true, y_pred=y_pred)
-    >>> 1.70708
+    1.70708
 
     With batched inputs using default 'auto'/'sum_over_batch_size' reduction:
 
@@ -77,7 +79,7 @@ example = """
     >>> pairwise_logistic_loss(
     ...     y_true=y_true, y_pred=y_pred, sample_weight=sample_weight
     ... )
-    >>> 0.80337
+    0.80337
 
     Using `'none'` reduction:
 
@@ -87,7 +89,10 @@ example = """
     ...     reduction="none"
     ... )
     >>> pairwise_logistic_loss(y_true=y_true, y_pred=y_pred)
-    [[2.126928, 0., 1.3132616, 0.48877698], [0., 0.20000005, 0.79999995, 0.]]
+    [
+        [2.126928, 0., 1.3132616, 0.48877698],
+        [0., 0.37110072, 0.9114005, 0.7034721]
+    ]
 """
 
 PairwiseLogisticLoss.__doc__ = pairwise_loss_subclass_doc_string.format(
