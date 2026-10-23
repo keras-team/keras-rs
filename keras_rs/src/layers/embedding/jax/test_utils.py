@@ -14,7 +14,8 @@ from jax_tpu_embedding.sparsecore.lib.nn.embedding_spec import FeatureSpec
 from jax_tpu_embedding.sparsecore.lib.nn.embedding_spec import TableSpec
 
 from keras_rs.src.layers.embedding.jax.embedding_utils import FeatureSamples
-from keras_rs.src.types import Nested
+
+Nested = embedding.Nested
 
 ArrayLike: TypeAlias = Union[jax.Array, np.ndarray[Any, Any]]
 Shape: TypeAlias = tuple[int, ...]
@@ -157,14 +158,16 @@ def create_table_and_slot_variables(
 
     def _create_table_and_slot_variables(
         table_spec: TableSpec,
-        key: ArrayLike,
+        key: jax.Array,
     ) -> embedding.EmbeddingVariables:
         slot_initializers = table_spec.optimizer.slot_variables_initializers()
         num_slot_variables = len(keras.tree.flatten(slot_initializers))
         slot_keys = jnp.unstack(jax.random.split(key, num_slot_variables))
         slot_keys = keras.tree.pack_sequence_as(slot_initializers, slot_keys)
         table_shape = (table_spec.vocabulary_size, table_spec.embedding_dim)
-        table = table_spec.initializer(key, table_shape, dtype=jnp.float32)
+        table = jnp.asarray(
+            table_spec.initializer(key, table_shape, dtype=jnp.float32)
+        )
         slot_variables = keras.tree.map_structure(
             lambda initializer, key: initializer(
                 key, table_shape, dtype=jnp.float32
@@ -310,7 +313,9 @@ def stack_shard_and_put_tables(
     sharding: jax.sharding.Sharding,
 ) -> dict[str, embedding.EmbeddingVariables]:
     sharded_tables = table_stacking.stack_and_shard_tables(
-        table_specs, tables, num_shards
+        table_specs,
+        tables,  # pyrefly: ignore[bad-argument-type]
+        num_shards,
     )
     output: dict[str, embedding.EmbeddingVariables] = jax.device_put(
         jax.tree.map(
@@ -482,7 +487,9 @@ def _update_table_and_slot_variables(
 
     # Adagrad, update and apply gradient accumulator.
     if isinstance(optimizer, embedding_spec.AdagradOptimizerSpec):
-        accumulator = table_and_slot_variables.slot.accumulator
+        accumulator = (
+            table_and_slot_variables.slot.accumulator  # pyrefly: ignore[missing-attribute]
+        )
         accumulator = accumulator + grad * grad
         learning_rate = optimizer.get_learning_rate(0) / jnp.sqrt(accumulator)
         return embedding.EmbeddingVariables(

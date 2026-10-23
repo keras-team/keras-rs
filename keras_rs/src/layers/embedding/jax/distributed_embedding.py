@@ -31,9 +31,7 @@ from keras_rs.src.utils import keras_utils
 if jax.__version_info__ >= (0, 8, 0):
     from jax import shard_map
 else:
-    from jax.experimental.shard_map import (  # type: ignore[assignment, no-redef]
-        shard_map,
-    )
+    from jax.experimental.shard_map import shard_map
 
 
 ArrayLike = Union[np.ndarray[Any, Any], jax.Array]
@@ -53,10 +51,13 @@ def _get_partition_spec(
         layout = layout.backend_layout
 
     if isinstance(layout, jax_layout.Format):
-        layout = layout.sharding
+        sharding = layout.sharding
+        if isinstance(sharding, jax.sharding.NamedSharding):
+            return sharding.spec
+        return sharding
 
     if isinstance(layout, jax.sharding.NamedSharding):
-        layout = layout.spec
+        return layout.spec
 
     return layout
 
@@ -190,21 +191,22 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         LayoutClass = (
             jax_layout.Layout
             if jax.__version_info__ >= (0, 6, 3)
-            else jax_layout.DeviceLocalLayout  # type: ignore
+            else jax_layout.DeviceLocalLayout  # pyrefly: ignore[missing-attribute]
         )
         layout = (
-            LayoutClass(major_to_minor=(0, 1), tiling=((8,),))  # type: ignore
+            LayoutClass(major_to_minor=(0, 1), tiling=((8,),))
             if jax.__version_info__ >= (0, 7, 1)
-            else LayoutClass(major_to_minor=(0, 1), _tiling=((8,),))  # type: ignore
+            else LayoutClass(
+                major_to_minor=(0, 1),
+                _tiling=((8,),),  # pyrefly: ignore[unexpected-keyword]
+            )
         )
         # pylint: disable-next=protected-access
         sparsecore_layout._backend_layout = jax_layout.Format(
-            layout,  # type: ignore
+            layout,
             jax.sharding.NamedSharding(
                 device_mesh.backend_mesh,
-                jax.sharding.PartitionSpec(
-                    axes  # type: ignore[no-untyped-call]
-                ),
+                jax.sharding.PartitionSpec(axes),
             ),
         )
         return sparsecore_layout
@@ -213,7 +215,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         self,
         name: str,
         shape: tuple[int, int],
-        initializer: jax.nn.initializers.Initializer,
+        initializer: keras.initializers.Initializer,
         dtype: str,
         layout: keras.distribution.TensorLayout,
         overwrite_with_gradient: bool,
@@ -223,7 +225,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             shape=shape,
             initializer=initializer,
             dtype=dtype,
-            layout=layout,
+            layout=layout,  # pyrefly: ignore[unexpected-keyword]
         )
         var.overwrite_with_gradient = overwrite_with_gradient
         return var
@@ -273,7 +275,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             overwrite_with_gradient=True,
         )
 
-        slot_variables = None
+        slot_variables: Any = None
         if add_slot_variables:
             # All optimizers for a given stacked table are guaranteed to be the
             # same, so we can use a single sharded initializer for the entire
@@ -351,8 +353,11 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         if self._sparsecore_built:
             return
 
-        feature_specs = config_conversion.keras_to_jte_feature_configs(
-            self._sc_feature_configs
+        feature_specs = typing.cast(
+            dict[str, embedding_spec.FeatureSpec],
+            config_conversion.keras_to_jte_feature_configs(
+                self._sc_feature_configs
+            ),
         )
 
         # Layout for sparsecore operations.
@@ -398,7 +403,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                     elif isinstance(elem, str):
                         jte_table_stacking.stack_tables(
                             feature_specs,
-                            table_stacking,
+                            typing.cast(Sequence[str], table_stacking),
                             global_device_count,
                             num_sc_per_device,
                         )
@@ -482,7 +487,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             initializer="zeros",
             dtype="float32",
             trainable=True,
-            layout=keras.distribution.TensorLayout(
+            layout=keras.distribution.TensorLayout(  # pyrefly: ignore[unexpected-keyword]
                 [], sparsecore_layout.device_mesh
             ),
         )
@@ -779,7 +784,9 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
 
         # Extract only the table variables, not the gradient slot variables.
         table_variables = {
-            name: jax.device_get(embedding_variables.table.value)
+            name: jax.device_get(
+                embedding_variables.table.value  # pyrefly: ignore[missing-attribute]
+            )
             for name, embedding_variables in (
                 self._table_and_slot_variables.items()
             )
