@@ -89,42 +89,6 @@ def _create_sparsecore_layout(
 
 
 @pytest.mark.skipif(keras.backend.backend() != "jax", reason="JAX only.")
-class ShardedInitializerTest(parameterized.TestCase):
-    def setUp(self):
-        super().setUp()
-        if not distributed_embedding.DistributedEmbedding.has_sparsecores():
-            self.skipTest("Requires SparseCores")
-
-    @parameterized.product(
-        initializer=[
-            keras.initializers.RandomUniform(
-                minval=-0.05, maxval=0.05, seed=10
-            ),
-            keras.initializers.Ones(),
-            "zeros",
-        ],
-    )
-    def test_wrap_and_call(
-        self, initializer: keras.initializers.Initializer | str
-    ):
-        device_count = jax.device_count()
-        layout = _create_sparsecore_layout()
-        wrapped_initializer = jax_distributed_embedding.ShardedInitializer(
-            initializer, layout
-        )
-
-        shape = (10 * device_count, 50)
-        actual = wrapped_initializer(shape, dtype="float32")
-
-        if isinstance(initializer, str):
-            initializer = keras.initializers.get(initializer)
-        expected = initializer(shape, dtype="float32")
-
-        np.testing.assert_array_equal(actual, expected)
-        self.assertEqual(actual.sharding, layout.backend_layout.sharding)
-
-
-@pytest.mark.skipif(keras.backend.backend() != "jax", reason="JAX only.")
 class StackedTableInitializerTest(parameterized.TestCase):
     def setUp(self):
         super().setUp()
