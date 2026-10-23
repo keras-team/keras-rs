@@ -21,7 +21,7 @@ if jax.__version_info__ >= (0, 8, 0):
 else:
     from jax.experimental.shard_map import shard_map as exp_shard_map
 
-    def shard_map(  # type: ignore[misc, no-redef]
+    def shard_map(
         f: Any = None,
         /,
         *,
@@ -36,7 +36,7 @@ else:
             in_specs=in_specs,
             out_specs=out_specs,
             check_rep=check_vma,
-        )  # type: ignore[no-untyped-call]
+        )
 
 
 ShardedCooMatrix = embedding_utils.ShardedCooMatrix
@@ -76,17 +76,14 @@ class EmbeddingLookupConfiguration:
             else jte_utils.num_sparsecores_per_device()
         )
         self.samples_partition = (
-            samples_partition
-            or jax.sharding.PartitionSpec(
-                sharding_axis  # type: ignore[no-untyped-call]
-            )
+            samples_partition or jax.sharding.PartitionSpec(sharding_axis)
         )
         self.samples_layout = samples_layout or jax.sharding.NamedSharding(
             self.mesh, self.samples_partition
         )
         self.table_partition = table_partition or jax.sharding.PartitionSpec(
             sharding_axis,
-            None,  # type: ignore[no-untyped-call]
+            None,
         )
         self.table_layout = table_layout or jax.sharding.NamedSharding(
             self.mesh, self.table_partition
@@ -213,7 +210,7 @@ def embedding_lookup_bwd(
     pt = config.table_partition
     pd = config.samples_partition
     # Replicate step count.
-    preplicate = jax.sharding.PartitionSpec()  # type: ignore[no-untyped-call]
+    preplicate = jax.sharding.PartitionSpec()
 
     def grad_func(
         gradients: Nested[jax.Array],

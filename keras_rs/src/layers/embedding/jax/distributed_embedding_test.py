@@ -42,16 +42,16 @@ def _create_sparsecore_layout(
     LayoutClass = (
         jax_layout.Layout
         if jax.__version_info__ >= (0, 6, 3)
-        else jax_layout.DeviceLocalLayout  # type: ignore
+        else jax_layout.DeviceLocalLayout
     )
     layout = (
-        LayoutClass(major_to_minor=(0, 1), tiling=((8,),))  # type: ignore
+        LayoutClass(major_to_minor=(0, 1), tiling=((8,),))
         if jax.__version_info__ >= (0, 7, 1)
-        else LayoutClass(major_to_minor=(0, 1), _tiling=((8,),))  # type: ignore
+        else LayoutClass(major_to_minor=(0, 1), _tiling=((8,),))
     )
     # pylint: disable-next=protected-access
     sparsecore_layout._backend_layout = jax_layout.Format(
-        layout,  # type: ignore
+        layout,
         jax.sharding.NamedSharding(
             device_mesh.backend_mesh, jax.sharding.PartitionSpec(axes)
         ),

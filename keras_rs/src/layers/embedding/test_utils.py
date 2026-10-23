@@ -260,7 +260,7 @@ def _compute_expected_lookup(
 
         np.add.at(
             out,
-            np.s_[i, :],  # type: ignore[arg-type]
+            np.s_[i, :],
             weights @ table[sample_ids[i], :],
         )
 

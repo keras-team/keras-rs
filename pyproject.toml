@@ -62,8 +62,8 @@ single-line-exclusions = ["typing"]
 known-first-party = ["keras_rs"]
 
 [tool.mypy]
-python_version = "3.10"
-strict = "True"
+python_version = "3.11"
+strict = true
 exclude = ["_test\\.py$", "^examples/", "venv/"]
 untyped_calls_exclude = ["ml_dtypes"]
 disable_error_code = ["import-untyped", "unused-ignore"]
@@ -76,3 +76,41 @@ ignore_errors = true
 [tool.pytest.ini_options]
 filterwarnings = ["ignore::DeprecationWarning"]
 addopts = "-vv"
+
+[tool.pyrefly]
+project-excludes = [
+    "**/*_test.py",
+    "examples/",
+    "venv/",
+    "keras_rs/src/layers/embedding/jax/",
+]
+python-version = "3.11.0"
+infer-with-first-use = false
+check-unannotated-defs = true
+infer-return-types = "never"
+
+# preset = "legacy"
+# check-unannotated-defs = true
+# infer-return-types = "never"
+
+[tool.pyrefly.errors]
+implicit-import = false
+unused-coroutine = false
+protocol-implicitly-defined-attribute = false
+redundant-condition = false
+unreachable = false
+unsafe-overlap = false
+redefinition = false
+bad-dunder-all = false
+bad-override-mutable-attribute = false
+bad-override-param-name = false
+abstract-method-call = false
+
+
+# untyped-import = "ignore"
+# no-any-return = "error"
+# unannotated-return = "error"
+# implicit-any = "error"
+# implicit-any-parameter = "error"
+# method-assign = "error"
+# redundant-cast = "warn"

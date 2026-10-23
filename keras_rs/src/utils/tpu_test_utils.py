@@ -106,7 +106,7 @@ def run_with_strategy(
     if keras.backend.backend() == "tensorflow":
         all_inputs = (args, kwargs)
 
-        @tf.function(jit_compile=jit_compile)  # type: ignore[untyped-decorator]
+        @tf.function(jit_compile=jit_compile)
         def tf_function_wrapper(input_tuple: Tuple[Any, Any]) -> Any:
             core_args, core_kwargs = input_tuple
             if core_kwargs:

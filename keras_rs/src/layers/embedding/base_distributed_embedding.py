@@ -978,7 +978,7 @@ class DistributedEmbedding(keras.layers.Layer):
             from jax_tpu_embedding.sparsecore.utils import utils as jte_utils
 
             try:
-                return jte_utils.num_sparsecores_per_device() > 0  # type: ignore[no-any-return]
+                return jte_utils.num_sparsecores_per_device() > 0
             except ValueError:
                 # `num_sparsecores_per_device` raises if there is no SparseCore.
                 return False
