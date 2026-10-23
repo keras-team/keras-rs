@@ -118,3 +118,21 @@ def run_with_strategy(
     else:
         assert not jit_compile
         return fn(*args, **kwargs)
+
+
+def is_variable_on_sparsecore(variable: keras.Variable | tf.Variable) -> bool:
+    value = (
+        variable._value if isinstance(variable, keras.Variable) else variable
+    )
+
+    if keras.backend.backend() == "tensorflow":
+        # One Tensorflow, inspect the class of the variable.
+        cn: str = value.__class__.__name__
+        return cn.startswith("TPUEmbedding") and cn.endswith("Variable")
+    else:
+        # On JAX, the SparseCore Format uses a ((8,),) tiling.
+        # (see `_create_sparsecore_distribution`). The default TPU tiling is 2D.
+        if not hasattr(value, "format"):
+            return False
+        tiling: tuple[tuple[int, ...], ...] | None = value.format.layout.tiling
+        return tiling == ((8,),)

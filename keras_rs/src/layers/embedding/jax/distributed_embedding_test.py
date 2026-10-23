@@ -24,6 +24,7 @@ from keras_rs.src.layers.embedding.jax import (
     distributed_embedding as jax_distributed_embedding,
 )
 from keras_rs.src.layers.embedding.jax import test_utils
+from keras_rs.src.utils import tpu_test_utils
 
 keras.config.disable_traceback_filtering()
 
@@ -306,6 +307,17 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         if not distributed_embedding.DistributedEmbedding.has_sparsecores():
             self.skipTest("Requires SparseCores")
 
+    def verify_tables_on_sparsecore(
+        self, layer: distributed_embedding.DistributedEmbedding
+    ) -> None:
+        variables = keras.tree.flatten(layer._table_and_slot_variables)
+        self.assertNotEmpty(variables)
+        for variable in variables:
+            self.assertTrue(
+                tpu_test_utils.is_variable_on_sparsecore(variable),
+                f"Variable {variable.name} is not on SparseCore.",
+            )
+
     @parameterized.product(
         ragged=[True, False],
         combiner=["sum", "mean", "sqrtn"],
@@ -356,6 +368,7 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
             for table_config in table_configs
         }
         layer.set_embedding_tables(tables)
+        self.verify_tables_on_sparsecore(layer)
 
         # Generate random inputs.
         sample_ids, sample_weights = keras_test_utils.create_random_samples(
@@ -467,6 +480,7 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         # Evaluate final loss.
         loss_after = model.evaluate(evaluation_dataset)
         np.testing.assert_array_less(loss_after, loss_before)
+        self.verify_tables_on_sparsecore(layer)
 
     @parameterized.product(
         ragged=[False, True],
@@ -544,12 +558,16 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
                 steps_per_epoch=1,
                 callbacks=[keras.callbacks.OrbaxCheckpoint(chkpt_path)],
             )
+            self.verify_tables_on_sparsecore(layer)
 
             restored_model = keras.models.load_model(chkpt_path)
             for var, restored_var in zip(
                 model.trainable_variables, restored_model.trainable_variables
             ):
                 np.testing.assert_array_equal(var, restored_var)
+
+            restored_layer = restored_model.get_layer(embedding_layer_name)
+            self.verify_tables_on_sparsecore(restored_layer)
 
 
 if __name__ == "__main__":
