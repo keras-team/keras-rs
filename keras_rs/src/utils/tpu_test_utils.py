@@ -130,8 +130,9 @@ def is_variable_on_sparsecore(variable: keras.Variable | tf.Variable) -> bool:
         cn: str = value.__class__.__name__
         return cn.startswith("TPUEmbedding") and cn.endswith("Variable")
     else:
-        # On JAX, inspect the tiling of the layout. It's supposed to be 1D.
+        # On JAX, the SparseCore Format uses a ((8,),) tiling.
+        # (see `_create_sparsecore_distribution`). The default TPU tiling is 2D.
         if not hasattr(value, "format"):
             return False
-        tiling = value.format.layout.tiling
-        return tiling is not None and len(tiling) > 0 and len(tiling[0]) == 1
+        tiling: tuple[tuple[int, ...], ...] | None = value.format.layout.tiling
+        return tiling == ((8,),)

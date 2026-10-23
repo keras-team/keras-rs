@@ -246,7 +246,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         )
         layout_map = keras.distribution.LayoutMap(device_mesh=device_mesh)
         if self.path:
-            regex = f"{re.escape(self.path)}"
+            regex = re.escape(self.path)
         else:
             # Layer hasn't been properly built yet.  Use current layer name.
             regex = f"(?:.*/)?{re.escape(self.name)}"

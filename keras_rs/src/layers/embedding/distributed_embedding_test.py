@@ -56,7 +56,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             BATCH_SIZE_PER_CORE * self.strategy.num_replicas_in_sync
         )
 
-    def verify_variables_on_sparsecore(
+    def verify_tables_on_sparsecore(
         self, layer: distributed_embedding.DistributedEmbedding
     ) -> None:
         if self.placement != "sparsecore":
@@ -65,7 +65,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
         if keras.backend.backend() == "tensorflow":
             variables = list(layer._tpu_embedding.embedding_tables.values())
         else:
-            variables = layer.variables
+            variables = keras.tree.flatten(layer._table_and_slot_variables)
 
         self.assertNotEmpty(variables)
 
@@ -239,7 +239,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
                 (VOCABULARY_SIZE, FEATURE2_EMBEDDING_OUTPUT_DIM),
             )
         else:
-            self.verify_variables_on_sparsecore(layer)
+            self.verify_tables_on_sparsecore(layer)
 
         self.assertEqual(
             res["feature_group"]["feature1"].shape,
@@ -397,7 +397,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             self.strategy, model.__call__, model_inputs
         )
 
-        self.verify_variables_on_sparsecore(layer)
+        self.verify_tables_on_sparsecore(layer)
         # Verify that the embedding has actually trained.
         for before, after in zip(
             keras.tree.flatten(test_output_before),
@@ -589,7 +589,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
 
         self.assertEqual(res.shape, (self.batch_size, EMBEDDING_OUTPUT_DIM))
 
-        self.verify_variables_on_sparsecore(layer)
+        self.verify_tables_on_sparsecore(layer)
         tables = layer.get_embedding_tables()
 
         emb = tables["table"]
@@ -664,7 +664,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             self.assertLen(layer._flatten_layers(include_self=False), 1)
             self.assertLen(layer.trainable_variables, 1)
 
-        self.verify_variables_on_sparsecore(layer)
+        self.verify_tables_on_sparsecore(layer)
         self.assertEqual(
             res["feature1"].shape, (self.batch_size, EMBEDDING_OUTPUT_DIM)
         )
@@ -767,7 +767,7 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
             output_before = tpu_test_utils.run_with_strategy(
                 self.strategy, model.__call__, inputs
             )
-            self.verify_variables_on_sparsecore(layer)
+            self.verify_tables_on_sparsecore(layer)
             model.save(path)
 
             reloaded_model = keras.models.load_model(path)

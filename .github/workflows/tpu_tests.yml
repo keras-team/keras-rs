@@ -37,6 +37,8 @@ jobs:
         persist-credentials: false
 
     - name: Install Dependencies
+      # TODO: keras-nightly is to get https://github.com/keras-team/keras/pull/24042
+      # Remove once keras > 3.15.1 is released
       run: |
         pip install --no-cache-dir -r requirements-${{ matrix.backend }}-tpu.txt
         pip uninstall -y keras
