@@ -14,7 +14,7 @@ permissions:
 jobs:
   cpu_tests:
     name: CPU Tests (${{ matrix.backend }})
-    runs-on: linux-x86-n2-16
+    runs-on: linux-x86-n4-16
     timeout-minutes: ${{ inputs.timeout }}
 
     strategy:
