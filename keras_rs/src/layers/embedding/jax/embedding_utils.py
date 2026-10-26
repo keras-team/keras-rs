@@ -14,7 +14,7 @@ from keras_rs.src.types import Nested
 T = TypeVar("T")
 
 # Any to support tf.Ragged without needing an explicit TF dependency.
-ArrayLike: TypeAlias = jax.Array | np.ndarray | Any  # type: ignore
+ArrayLike: TypeAlias = jax.Array | np.ndarray | Any
 Shape: TypeAlias = tuple[int, ...]
 
 
@@ -111,7 +111,7 @@ def create_feature_samples(
     )
 
     if feature_weights is None:
-        return jax.tree.map(  # type: ignore[no-any-return]
+        return jax.tree.map(
             lambda _, ids: FeatureSamples(ids, None),
             feature_structure,
             feature_ids,
@@ -200,10 +200,10 @@ def stack_and_shard_samples(
     tables_names = preprocessed_inputs.lhs_row_pointers.keys()
     for table_name in tables_names:
         shard_ends = preprocessed_inputs.lhs_row_pointers[table_name]
-        shard_starts = np.concatenate(
+        shard_starts = np.array(
             [
-                np.asarray([0]),
-                table_stacking._next_largest_multiple(shard_ends[:-1], 8),
+                0,
+                table_stacking._next_largest_multiple(int(shard_ends[-1]), 8),
             ]
         )
         out[table_name] = ShardedCooMatrix(

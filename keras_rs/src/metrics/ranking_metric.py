@@ -69,7 +69,7 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
         """Abstract method, should be implemented by subclasses."""
         pass
 
-    def update_state(
+    def update_state(  # pyrefly: ignore[bad-override]
         self,
         y_true: types.Tensor,
         y_pred: types.Tensor,

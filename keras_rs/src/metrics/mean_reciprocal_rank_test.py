@@ -43,7 +43,7 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
         with self.assertRaisesRegex(
             ValueError, "`k` should be a positive integer"
         ):
-            MeanReciprocalRank(k=3.5)  # type: ignore
+            MeanReciprocalRank(k=3.5)
 
     @parameterized.named_parameters(
         (

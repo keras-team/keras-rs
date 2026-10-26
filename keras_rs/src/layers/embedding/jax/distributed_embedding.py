@@ -32,9 +32,7 @@ from keras_rs.src.utils import keras_utils
 if jax.__version_info__ >= (0, 8, 0):
     from jax import shard_map
 else:
-    from jax.experimental.shard_map import (  # type: ignore[assignment, no-redef]
-        shard_map,
-    )
+    from jax.experimental.shard_map import shard_map
 
 
 ArrayLike = Union[np.ndarray[Any, Any], jax.Array]
@@ -227,21 +225,19 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         LayoutClass = (
             jax_layout.Layout
             if jax.__version_info__ >= (0, 6, 3)
-            else jax_layout.DeviceLocalLayout  # type: ignore
+            else jax_layout.DeviceLocalLayout
         )
         layout = (
-            LayoutClass(major_to_minor=(0, 1), tiling=((8,),))  # type: ignore
+            LayoutClass(major_to_minor=(0, 1), tiling=((8,),))
             if jax.__version_info__ >= (0, 7, 1)
-            else LayoutClass(major_to_minor=(0, 1), _tiling=((8,),))  # type: ignore
+            else LayoutClass(major_to_minor=(0, 1), _tiling=((8,),))
         )
         # pylint: disable-next=protected-access
         sparsecore_layout._backend_layout = jax_layout.Format(
-            layout,  # type: ignore
+            layout,
             jax.sharding.NamedSharding(
                 device_mesh.backend_mesh,
-                jax.sharding.PartitionSpec(
-                    axes  # type: ignore[no-untyped-call]
-                ),
+                jax.sharding.PartitionSpec(axes),
             ),
         )
         layout_map = keras.distribution.LayoutMap(device_mesh=device_mesh)

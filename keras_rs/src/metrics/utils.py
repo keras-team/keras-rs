@@ -35,28 +35,26 @@ def standardize_call_inputs_ranks(
     y_true_rank = len(y_true_shape)
     y_pred_shape = ops.shape(y_pred)
     y_pred_rank = len(y_pred_shape)
-    if mask is not None:
-        mask_shape = ops.shape(mask)
-        mask_rank = len(mask_shape)
 
     if check_y_true_rank:
         check_rank(y_true_rank, allowed_ranks=(1, 2), tensor_name="y_true")
     check_rank(y_pred_rank, allowed_ranks=(1, 2), tensor_name="y_pred")
-    if mask is not None:
-        check_rank(mask_rank, allowed_ranks=(1, 2), tensor_name="mask")
     if not check_shapes_compatible(y_true_shape, y_pred_shape):
         raise ValueError(
             "`y_true` and `y_pred` should have the same shape. Received: "
             f"`y_true.shape` = {y_true_shape}, `y_pred.shape` = {y_pred_shape}."
         )
-    if mask is not None and not check_shapes_compatible(
-        y_true_shape, mask_shape
-    ):
-        raise ValueError(
-            "`y_true['labels']` and `y_true['mask']` should have the same "
-            f"shape. Received: `y_true['labels'].shape` = {y_true_shape}, "
-            f"`y_true['mask'].shape` = {mask_shape}."
-        )
+
+    if mask is not None:
+        mask_shape = ops.shape(mask)
+        mask_rank = len(mask_shape)
+        check_rank(mask_rank, allowed_ranks=(1, 2), tensor_name="mask")
+        if not check_shapes_compatible(y_true_shape, mask_shape):
+            raise ValueError(
+                "`y_true['labels']` and `y_true['mask']` should have the same "
+                f"shape. Received: `y_true['labels'].shape` = {y_true_shape}, "
+                f"`y_true['mask'].shape` = {mask_shape}."
+            )
 
     batched = True
     if y_true_rank == 1:

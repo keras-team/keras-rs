@@ -16,18 +16,17 @@ if (
     and jax_tpu_embedding_spec is not None
 ):
     from keras_rs.src.layers.embedding.jax.distributed_embedding import (
-        DistributedEmbedding as BackendDistributedEmbedding,
+        DistributedEmbedding,
     )
 elif keras.backend.backend() == "tensorflow":
     from keras_rs.src.layers.embedding.tensorflow.distributed_embedding import (
-        DistributedEmbedding as BackendDistributedEmbedding,
+        DistributedEmbedding,
     )
 else:
     from keras_rs.src.layers.embedding.base_distributed_embedding import (
-        DistributedEmbedding as BackendDistributedEmbedding,
+        DistributedEmbedding,
     )
 
 
-@keras_rs_export("keras_rs.layers.DistributedEmbedding")
-class DistributedEmbedding(BackendDistributedEmbedding):
-    pass
+DistributedEmbedding.__module__ = __name__
+keras_rs_export("keras_rs.layers.DistributedEmbedding")(DistributedEmbedding)
