@@ -368,18 +368,29 @@ class DistributedEmbedding(keras.layers.Layer):
 
     #### Usage in a Keras model
 
+    Because of the preprocessing step, the `DistributedEmbedding` layer can only
+    be used in a subclass `Model`.
+    ```python
+    class EmbeddingModel(keras.Model):
+        def __init__(self, feature_configs, **kwargs):
+            super().__init__(**kwargs)
+            self.embedding_layer = keras_rs.layers.DistributedEmbedding(
+                feature_configs=feature_configs
+            )
+            self.tower = keras.Sequential([...])
+
+        def call(self, preprocessed_features):
+            embedding = self.embedding_layer(preprocessed_features)
+            return self.tower(
+                keras.ops.concatenate(keras.tree.flatten(embedding), axis=1)
+            )
+    ```
+
     Once the global distribution is set and the input preprocessing pipeline
     is defined, model training can proceed as normal.  For example:
     ```python
     # Construct, compile, and fit the model using the preprocessed data.
-    model = keras.Sequential(
-      [
-        embedding_layer,
-        keras.layers.Dense(2),
-        keras.layers.Dense(3),
-        keras.layers.Dense(4),
-      ]
-    )
+    model = EmbeddingModel(feature_configs)
     model.compile(optimizer="adam", loss="mse", jit_compile=True)
     model.fit(preprocessed_train_dataset, epochs=10)
     ```
