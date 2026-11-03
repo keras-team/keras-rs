@@ -1,7 +1,6 @@
 """JAX implementation of the TPU embedding layer."""
 
 import math
-import re
 import typing
 from typing import Any, Mapping, Sequence, Union
 
@@ -60,40 +59,6 @@ def _get_partition_spec(
         layout = layout.spec
 
     return layout
-
-
-class ShardedInitializer(keras.initializers.Initializer):
-    """Wraps an initializer to prepare for use with embedding tables.
-
-    Jit-compiles the function and applies optimal output sharding to
-    allow initialization on device.
-    """
-
-    def __init__(
-        self,
-        initializer: keras.initializers.Initializer | str,
-        layout: keras.distribution.TensorLayout | None,
-    ):
-        if isinstance(initializer, str):
-            initializer = keras.initializers.get(initializer)
-
-        self._initializer = initializer
-        self._layout = layout
-
-    def __call__(
-        self, shape: types.Shape, dtype: types.DType | None = None
-    ) -> jax.Array:
-        if self._layout is not None:
-            compiled_initializer = jax.jit(
-                self._initializer,
-                out_shardings=self._layout.backend_layout,
-                static_argnames=["shape", "dtype"],
-            )
-            output: jax.Array = compiled_initializer(shape, dtype)
-            return output
-
-        output = self._initializer(shape, dtype)
-        return output
 
 
 class StackedTableInitializer(keras.initializers.Initializer):
@@ -201,11 +166,9 @@ class StackedTableInitializer(keras.initializers.Initializer):
 class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
     """JAX implementation of the TPU embedding layer."""
 
-    def _create_sparsecore_distribution(
+    def _create_sparsecore_layout(
         self, sparsecore_axis_name: str = "sparsecore"
-    ) -> tuple[
-        keras.distribution.ModelParallel, keras.distribution.TensorLayout
-    ]:
+    ) -> keras.distribution.TensorLayout:
         """SparseCore requires a specific layout.
 
         The mesh must be 1D, must use all TPUs available, and must shard all
@@ -215,7 +178,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             sparsecore_axis_name: The name of the sparsecore axis.
 
         Returns:
-            A Keras distribution to use for all sparsecore operations.
+            A Keras `TensorLayout` to use for all sparsecore operations.
         """
         all_devices = jax.devices()
         axes = [sparsecore_axis_name]
@@ -244,28 +207,23 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                 ),
             ),
         )
-        layout_map = keras.distribution.LayoutMap(device_mesh=device_mesh)
-        if self.path:
-            regex = re.escape(self.path)
-        else:
-            # Layer hasn't been properly built yet.  Use current layer name.
-            regex = f"(?:.*/)?{re.escape(self.name)}"
-        layout_map[regex + "/var:.*"] = sparsecore_layout
-        sparsecore_distribution = keras.distribution.ModelParallel(
-            layout_map=layout_map
-        )
-        return sparsecore_distribution, sparsecore_layout
+        return sparsecore_layout
 
     def _add_sparsecore_weight(
         self,
         name: str,
         shape: tuple[int, int],
         initializer: jax.nn.initializers.Initializer,
-        dtype: Any,
+        dtype: str,
+        layout: keras.distribution.TensorLayout,
         overwrite_with_gradient: bool,
     ) -> keras.Variable:
         var = self.add_weight(
-            name=name, shape=shape, initializer=initializer, dtype=dtype
+            name=name,
+            shape=shape,
+            initializer=initializer,
+            dtype=dtype,
+            layout=layout,
         )
         var.overwrite_with_gradient = overwrite_with_gradient
         return var
@@ -295,13 +253,12 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         # initializer. Otherwise, we need to interleave individual stacked table
         # shards.
         sparsecore_layout = self._sparsecore_layout
-        stacked_table_initializer = ShardedInitializer(
-            table_initializers[0], sparsecore_layout
-        )
-        if not all(
+        if all(
             initializer == table_initializers[0]
             for initializer in table_initializers
         ):
+            stacked_table_initializer = table_initializers[0]
+        else:
             stacked_table_initializer = StackedTableInitializer(
                 table_specs, num_shards, sparsecore_layout
             )
@@ -312,6 +269,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             shape=table_shape,
             initializer=stacked_table_initializer,
             dtype="float32",
+            layout=sparsecore_layout,
             overwrite_with_gradient=True,
         )
 
@@ -331,11 +289,11 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                 self._add_sparsecore_weight(
                     name=f"{variable_name}:slot:{slot_name}",
                     shape=table_shape,
-                    initializer=ShardedInitializer(
-                        config_conversion.jax_to_keras_initializer(initializer),
-                        sparsecore_layout,
+                    initializer=config_conversion.jax_to_keras_initializer(
+                        initializer
                     ),
-                    dtype=jnp.float32,
+                    dtype="float32",
+                    layout=sparsecore_layout,
                     overwrite_with_gradient=True,
                 )
                 for slot_name, initializer in zip(slot_names, slot_initializers)
@@ -376,7 +334,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                 )
 
         # Actual stacking of tables is done in build() to ensure the
-        # distribution is set up correctly.
+        # layout is set up correctly.
         self._table_stacking = table_stacking
 
     def _sparsecore_build(
@@ -397,14 +355,11 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             self._sc_feature_configs
         )
 
-        # Distribution for sparsecore operations.
-        sparsecore_distribution, sparsecore_layout = (
-            self._create_sparsecore_distribution()
-        )
+        # Layout for sparsecore operations.
+        sparsecore_layout = self._create_sparsecore_layout()
         self._sparsecore_layout = sparsecore_layout
-        self._sparsecore_distribution = sparsecore_distribution
 
-        mesh = sparsecore_distribution.device_mesh.backend_mesh
+        mesh = sparsecore_layout.device_mesh.backend_mesh
         global_device_count = mesh.devices.size
         num_sc_per_device = jte_utils.num_sparsecores_per_device(
             mesh.devices.item(0)
@@ -507,35 +462,31 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         )
 
         # Create variables for all stacked tables and slot variables.
-        with sparsecore_distribution.scope():
-            self._table_and_slot_variables = {
-                table_name: self._add_table_variable(
-                    table_stack,
-                    add_slot_variables=self.trainable,
-                    num_shards=num_variable_shards,
-                )
-                for table_name, table_stack in table_stacks.items()
-            }
+        self._table_and_slot_variables = {
+            table_name: self._add_table_variable(
+                table_stack,
+                add_slot_variables=self.trainable,
+                num_shards=num_variable_shards,
+            )
+            for table_name, table_stack in table_stacks.items()
+        }
 
-            # Create a step-counter variable for use in custom table gradients.
-            # This must be a floating-point type so we can get a real gradient
-            # for it. It will automatically be updated with each application of
-            # the optimizer, since the next iteration is returned in the
-            # gradient.
-            sharded_zero_initializer = ShardedInitializer(
-                "zeros",
-                keras.distribution.TensorLayout(
-                    [], sparsecore_layout.device_mesh
-                ),
-            )
-            self._iterations = self.add_weight(
-                shape=(),
-                name="iteration",
-                initializer=sharded_zero_initializer,
-                dtype="float32",
-                trainable=True,
-            )
-            self._iterations.overwrite_with_gradient = True
+        # Create a step-counter variable for use in custom table gradients.
+        # This must be a floating-point type so we can get a real gradient
+        # for it. It will automatically be updated with each application of
+        # the optimizer, since the next iteration is returned in the
+        # gradient.
+        self._iterations = self.add_weight(
+            shape=(),
+            name="iteration",
+            initializer="zeros",
+            dtype="float32",
+            trainable=True,
+            layout=keras.distribution.TensorLayout(
+                [], sparsecore_layout.device_mesh
+            ),
+        )
+        self._iterations.overwrite_with_gradient = True
 
         self._config = jte_embedding_lookup.EmbeddingLookupConfiguration(
             feature_specs,
@@ -736,14 +687,13 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         table_and_slots = keras.tree.map_structure(
             lambda var: var.value, self._table_and_slot_variables
         )
-        with self._sparsecore_distribution.scope():
-            lookup_func = jax.jit(
-                jte_embedding_lookup.embedding_lookup, static_argnames="config"
-            )
-            out: dict[str, types.Tensor] = lookup_func(
-                self._config, inputs, table_and_slots, self._iterations.value
-            )
-            return out
+        lookup_func = jax.jit(
+            jte_embedding_lookup.embedding_lookup, static_argnames="config"
+        )
+        out: dict[str, types.Tensor] = lookup_func(
+            self._config, inputs, table_and_slots, self._iterations.value
+        )
+        return out
 
     def set_embedding_tables(self, tables: Mapping[str, ArrayLike]) -> None:
         """Sets the embedding tables to specific (unsharded) values.
