@@ -13,14 +13,14 @@ permissions:
 
 jobs:
   tpu_tests:
-    name: TPU Tests (${{ matrix.backend }})
-    runs-on: linux-x86-ct6e-44-1tpu
-    timeout-minutes: ${{ inputs.timeout }}
-
     strategy:
       fail-fast: false
       matrix:
         backend: [tensorflow, jax]
+
+    name: TPU Tests (${{ matrix.backend }})
+    runs-on: linux-x86-ct6e-44-1tpu
+    timeout-minutes: ${{ inputs.timeout }}
 
     container:
       image: python:3.11-slim
@@ -29,6 +29,7 @@ jobs:
     env:
       KERAS_BACKEND: ${{ matrix.backend }}
       TPU_NAME: local
+      LIBTPU_INIT_ARGS: '--deepsea_chip_config_name=megachip_tccontrol'
 
     steps:
     - name: Checkout ${{ github.ref }}
@@ -66,4 +67,4 @@ jobs:
 
     - name: Test with pytest (JAX)
       if: ${{ matrix.backend == 'jax' }}
-      run: pytest keras_rs/ --ignore=keras_rs/src/layers/embedding/jax/distributed_embedding_test.py
+      run: pytest keras_rs/
