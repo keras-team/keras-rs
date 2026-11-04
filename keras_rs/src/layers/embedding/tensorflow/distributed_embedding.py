@@ -18,9 +18,15 @@ TfTpuOptimizer: TypeAlias = Any
 
 GRADIENT_TRAP_DUMMY_NAME = "_gradient_trap_dummy"
 
-EMBEDDING_FEATURE_V1 = tf.tpu.experimental.HardwareFeature.EmbeddingFeature.V1
-EMBEDDING_FEATURE_V2 = tf.tpu.experimental.HardwareFeature.EmbeddingFeature.V2
-UNSUPPORTED = tf.tpu.experimental.HardwareFeature.EmbeddingFeature.UNSUPPORTED
+EMBEDDING_FEATURE_V1 = (
+    tf.tpu.experimental.HardwareFeature.EmbeddingFeature.V1
+)  # pyrefly: ignore[missing-attribute]
+EMBEDDING_FEATURE_V2 = (
+    tf.tpu.experimental.HardwareFeature.EmbeddingFeature.V2
+)  # pyrefly: ignore[missing-attribute]
+UNSUPPORTED = (
+    tf.tpu.experimental.HardwareFeature.EmbeddingFeature.UNSUPPORTED
+)  # pyrefly: ignore[missing-attribute]
 
 
 class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
@@ -356,7 +362,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         # gradients with the same name.
         tpu_embedding.enqueue(inputs, weights, training=True, name=name)
 
-        @tf.custom_gradient  # type: ignore
+        @tf.custom_gradient
         def gradient_trap(
             dummy: types.Tensor,
         ) -> tuple[
@@ -395,7 +401,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         inputs: dict[str, types.Tensor],
         weights: dict[str, types.Tensor] | None = None,
     ) -> dict[str, types.Tensor]:
-        @tf.custom_gradient  # type: ignore
+        @tf.custom_gradient
         def gradient_trap(
             dummy: types.Tensor,
         ) -> tuple[

@@ -4,6 +4,7 @@ namex>=0.1.0
 # formatting and linting
 mypy
 pre-commit
+pyrefly
 ruff
 
 # testing
