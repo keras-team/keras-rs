@@ -29,6 +29,34 @@ from keras_rs.src.utils import tpu_test_utils
 keras.config.disable_traceback_filtering()
 
 
+@keras.saving.register_keras_serializable()
+class WrapperModel(keras.Model):
+    def __init__(self, layer: keras.layers.Layer, **kwargs):
+        super().__init__(**kwargs)
+        self._layer = layer
+
+    def build(self, input_shape):
+        self._layer.build(input_shape)
+        super().build(input_shape)
+
+    def call(self, inputs):
+        return self._layer(inputs)
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "layer": keras.saving.serialize_keras_object(self._layer),
+            }
+        )
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        config["layer"] = keras.saving.deserialize_keras_object(config["layer"])
+        return cls(**config)
+
+
 def _create_sparsecore_layout(
     sharding_axis: str = "sparsecore",
 ) -> keras.distribution.TensorLayout:
@@ -441,7 +469,7 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         layer = distributed_embedding.DistributedEmbedding(
             feature_configs, table_stacking=table_stacking
         )
-        model = keras.Sequential([layer])
+        model = WrapperModel(layer)
         model.compile(jit_compile=True, loss=loss_fn)
 
         # Dataset on which to evaluate the model.
@@ -535,8 +563,14 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
             table_stacking=target_stacking,
             name=embedding_layer_name,
         )
-        model = keras.Sequential([layer])
+        model = WrapperModel(layer)
         model.compile(jit_compile=True, loss="mse")
+
+        # Build model and DistributedEmbedding before preprocess is called.
+        sample_ids, _ = keras_test_utils.create_random_samples(
+            feature_configs_dict, ragged=ragged, seed=0
+        )
+        model.build(keras.tree.map_structure(lambda x: x.shape, sample_ids))
 
         # Fit model to different dataset.
         training_dataset = keras_test_utils.RandomInputSampleDataset(
