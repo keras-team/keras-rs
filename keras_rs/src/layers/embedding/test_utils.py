@@ -67,6 +67,9 @@ def create_random_table_configs(
     """
     # Convert to a SeedGenerator to get different tables.
     seed = _make_rng(seed)
+    kwargs = {}
+    if initializer is not None:
+        kwargs = {"initializer": initializer}
     return [
         TableConfig(
             name=f"{name_prefix}:{i}" if count > 1 else name_prefix,
@@ -76,12 +79,12 @@ def create_random_table_configs(
             embedding_dim=keras.random.randint(
                 shape=tuple(), minval=1, maxval=max_embedding_dim, seed=seed
             ).item(0),
-            initializer=initializer,
             optimizer=optimizer,
             combiner=combiner,
             placement=placement,
             max_ids_per_partition=max_ids_per_partition,
             max_unique_ids_per_partition=max_unique_ids_per_partition,
+            **kwargs,
         )
         for i in range(count)
     ]
@@ -260,7 +263,7 @@ def _compute_expected_lookup(
 
         np.add.at(
             out,
-            np.s_[i, :],  # type: ignore[arg-type]
+            np.s_[i, :],  # pyrefly: ignore[bad-argument-type]
             weights @ table[sample_ids[i], :],
         )
 

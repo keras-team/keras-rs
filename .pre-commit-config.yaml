@@ -14,8 +14,9 @@ repos:
         language: system
         stages: [pre-commit, manual]
         require_serial: true
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.2
+    rev: v0.17.3
     hooks:
       - id: ruff
         args: [--config, pyproject.toml, --fix, .]
@@ -30,11 +31,10 @@ repos:
         args: ["--check", --config, pyproject.toml, .]
         stages: [manual]
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.14.1
+  - repo: https://github.com/facebook/pyrefly-pre-commit
+    rev: 1.4.0
     hooks:
-      - id: mypy
-        args: [--config-file=pyproject.toml, .]
-        language: system
+      - id: pyrefly-check
+        name: Pyrefly (type checking)
         pass_filenames: false
-        stages: [pre-commit, manual]
+        language: system 
