@@ -13,17 +13,17 @@ permissions:
 
 jobs:
   tpu_tests:
-    name: TPU Tests (${{ matrix.backend }})
-    runs-on: linux-x86-ct6e-44-1tpu
-    timeout-minutes: ${{ inputs.timeout }}
-
     strategy:
       fail-fast: false
       matrix:
         backend: [tensorflow, jax]
 
+    name: TPU Tests (${{ matrix.backend }})
+    runs-on: linux-x86-ct6e-44-1tpu
+    timeout-minutes: ${{ inputs.timeout }}
+
     container:
-      image: python:3.11-slim
+      image: python:3.12-slim
       options: --privileged --network host
 
     env:
@@ -66,4 +66,4 @@ jobs:
 
     - name: Test with pytest (JAX)
       if: ${{ matrix.backend == 'jax' }}
-      run: pytest keras_rs/ --ignore=keras_rs/src/layers/embedding/jax/distributed_embedding_test.py
+      run: pytest keras_rs/

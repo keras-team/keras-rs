@@ -35,8 +35,8 @@ def create_random_table_configs(
     optimizer: str | keras.optimizers.Optimizer = "sgd",
     combiner: str = "mean",
     placement: str = "auto",
-    max_ids_per_partition: int = 256,
-    max_unique_ids_per_partition: int = 256,
+    max_ids_per_partition: int = 512,
+    max_unique_ids_per_partition: int = 512,
     seed: RandomSeed | None = None,
     name_prefix: str = "table",
 ) -> list[TableConfig]:
