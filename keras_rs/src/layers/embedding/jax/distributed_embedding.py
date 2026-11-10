@@ -31,9 +31,7 @@ from keras_rs.src.utils import keras_utils
 if jax.__version_info__ >= (0, 8, 0):
     from jax import shard_map
 else:
-    from jax.experimental.shard_map import (  # type: ignore[assignment, no-redef]
-        shard_map,
-    )
+    from jax.experimental.shard_map import shard_map  # type: ignore[assignment, no-redef]
 
 
 ArrayLike = Union[np.ndarray[Any, Any], jax.Array]

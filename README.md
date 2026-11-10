@@ -29,6 +29,7 @@ Choose a backend:
 
 ```python
 import os
+
 os.environ["KERAS_BACKEND"] = "jax"  # Or "tensorflow" or "torch"!
 ```
 
@@ -46,10 +47,9 @@ Define a simple model using the `FeatureCross` layer:
 vocabulary_size = 32
 embedding_dim = 6
 
-inputs = keras.Input(shape=(), name='indices', dtype="int32")
+inputs = keras.Input(shape=(), name="indices", dtype="int32")
 x0 = keras.layers.Embedding(
-    input_dim=vocabulary_size,
-    output_dim=embedding_dim
+    input_dim=vocabulary_size, output_dim=embedding_dim
 )(inputs)
 x1 = keras_rs.layers.FeatureCross()(x0, x0)
 x2 = keras_rs.layers.FeatureCross()(x0, x1)
@@ -62,7 +62,7 @@ Compile the model:
 ```python
 model.compile(
     loss=keras.losses.MeanSquaredError(),
-    optimizer=keras.optimizers.Adam(learning_rate=3e-4)
+    optimizer=keras.optimizers.Adam(learning_rate=3e-4),
 )
 ```
 
@@ -125,6 +125,7 @@ Or in Colab, with:
 
 ```python
 import os
+
 os.environ["KERAS_BACKEND"] = "jax"
 
 import keras_rs
