@@ -70,7 +70,7 @@ disable_error_code = ["import-untyped", "unused-ignore"]
 disallow_subclassing_any = "False"
 
 [[tool.mypy.overrides]]
-module = "keras_rs.api"
+module = "keras_rs.api.*"
 ignore_errors = true
 
 [tool.pytest.ini_options]
