@@ -90,9 +90,11 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
             y_pred: tensor. The predicted values, of shape `(list_size)` for
                 unbatched inputs or `(batch_size, list_size)` for batched
                 inputs. Should be of the same shape as `y_true`.
-            sample_weight: float/tensor. Can be float value, or tensor of
-                shape `(list_size)` or `(batch_size, list_size)`. Defaults to
-                `None`.
+            sample_weight: float/tensor. Can be a float value, a tensor of
+                shape `(list_size)` for unbatched inputs, or a tensor of shape
+                `(batch_size)` or `(batch_size, list_size)` for batched inputs.
+                A 1D tensor for batched inputs holds one weight per list.
+                Defaults to `None`.
         """
         # === Process `y_true`, if dict ===
         passed_mask = None
@@ -142,16 +144,28 @@ class RankingMetric(keras.metrics.Mean, abc.ABC):
             tensor_name="sample_weight",
         )
 
-        if y_true_rank == 2:
-            # If `sample_weight` rank is 1, it should be of shape
-            # `(batch_size,)`. Otherwise, it should be of shape
-            # `(batch_size, list_size)`.
-            if sample_weight_rank == 1:
-                check_shapes_compatible(sample_weight_shape, (y_true_shape[0],))
-                # Uprank this, so that we get per-list weights here.
-                sample_weight = ops.expand_dims(sample_weight, axis=1)
-            elif sample_weight_rank == 2:
-                check_shapes_compatible(sample_weight_shape, y_true_shape)
+        if y_true_rank == 2 and sample_weight_rank == 1:
+            # List-wise weights for batched inputs, of shape `(batch_size,)`.
+            if not check_shapes_compatible(
+                sample_weight_shape, (y_true_shape[0],)
+            ):
+                raise ValueError(
+                    "For batched inputs, a 1D `sample_weight` should have one "
+                    "weight per list, i.e., shape `(batch_size,)`. Received: "
+                    f"`sample_weight.shape` = {sample_weight_shape}, "
+                    f"`y_true.shape` = {y_true_shape}."
+                )
+            # Uprank this, so that we get per-list weights here.
+            sample_weight = ops.expand_dims(sample_weight, axis=1)
+        elif sample_weight_rank == y_true_rank:
+            # Item-wise weights, of shape `(list_size,)` for unbatched inputs
+            # and `(batch_size, list_size)` for batched inputs.
+            if not check_shapes_compatible(sample_weight_shape, y_true_shape):
+                raise ValueError(
+                    "Item-wise `sample_weight` should have the same shape as "
+                    "`y_true`. Received: `sample_weight.shape` = "
+                    f"{sample_weight_shape}, `y_true.shape` = {y_true_shape}."
+                )
 
         # Reshape `sample_weight` to the shape of `y_true`.
         sample_weight = ops.multiply(ops.ones_like(y_true), sample_weight)
