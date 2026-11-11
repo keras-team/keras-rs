@@ -18,7 +18,6 @@ TfTpuOptimizer: TypeAlias = Any
 
 GRADIENT_TRAP_DUMMY_NAME = "_gradient_trap_dummy"
 
-EMBEDDING_FEATURE_V1 = tf.tpu.experimental.HardwareFeature.EmbeddingFeature.V1
 EMBEDDING_FEATURE_V2 = tf.tpu.experimental.HardwareFeature.EmbeddingFeature.V2
 UNSUPPORTED = tf.tpu.experimental.HardwareFeature.EmbeddingFeature.UNSUPPORTED
 
@@ -75,10 +74,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             tpu_embedding_feature = (
                 strategy.extended.tpu_hardware_feature.embedding_feature
             )
-            return tpu_embedding_feature in (
-                EMBEDDING_FEATURE_V2,
-                EMBEDDING_FEATURE_V1,
-            )
+            return tpu_embedding_feature == EMBEDDING_FEATURE_V2  # type: ignore[no-any-return]
         return False
 
     @keras_utils.no_automatic_dependency_tracking
@@ -121,10 +117,6 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                     strategy.num_replicas_in_sync,
                 )
             )
-            if tpu_embedding_feature == EMBEDDING_FEATURE_V1:
-                # Remove auto-generated SparseCoreEmbeddingConfig, which is not
-                # used.
-                self._sparse_core_embedding_config = None
         else:
             if table_stacking != "auto":
                 raise ValueError(
@@ -135,14 +127,6 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                     "`tf.tpu.experimental.embedding.SparseCoreEmbeddingConfig` "
                     "to disable table stacking."
                 )
-            if (
-                tpu_embedding_feature == EMBEDDING_FEATURE_V1
-                and self._sparse_core_embedding_config is not None
-            ):
-                raise ValueError(
-                    "The `sparse_core_embedding_config` argument is not "
-                    "supported with this TPU generation."
-                )
             self._tpu_feature_configs = (
                 config_conversion.clone_tf_tpu_feature_configs(feature_configs)
             )
@@ -151,14 +135,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             self._optimizer
         )
 
-        if tpu_embedding_feature == EMBEDDING_FEATURE_V1:
-            self._tpu_embedding = tf.tpu.experimental.embedding.TPUEmbedding(
-                self._tpu_feature_configs,
-                self._tpu_optimizer,
-                self._pipeline_execution_with_tensor_core,
-            )
-            self._v1_call_id = 0
-        elif tpu_embedding_feature == EMBEDDING_FEATURE_V2:
+        if tpu_embedding_feature == EMBEDDING_FEATURE_V2:
             self._tpu_embedding = tf.tpu.experimental.embedding.TPUEmbeddingV2(
                 self._tpu_feature_configs,
                 self._tpu_optimizer,
@@ -269,23 +246,12 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                 f"called under strategy {strategy}. Please use `strategy.run` "
                 "when calling this layer."
             )
-        if isinstance(
-            self._tpu_embedding, tf.tpu.experimental.embedding.TPUEmbedding
-        ):
-            return self._tpu_embedding_lookup_v1(
-                self._tpu_embedding, inputs, weights
-            )
-        elif isinstance(
-            self._tpu_embedding, tf.tpu.experimental.embedding.TPUEmbeddingV2
-        ):
-            return self._tpu_embedding_lookup_v2(
-                self._tpu_embedding, inputs, weights
-            )
-        else:
+        if self._tpu_embedding is None:
             raise ValueError(
                 "DistributedEmbedding is receiving features to lookup on the "
                 "TPU embedding feature but no such feature was configured."
             )
+        return self._tpu_embedding_lookup(self._tpu_embedding, inputs, weights)
 
     def _sparsecore_get_embedding_tables(self) -> dict[str, types.Tensor]:
         tables: dict[str, types.Tensor] = {}
@@ -338,58 +304,7 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         # `tf.tpu.experimental.embedding.FeatureConfig` does not provide any
         # information about the input shape, so there is nothing to verify.
 
-    def _tpu_embedding_lookup_v1(
-        self,
-        tpu_embedding: tf.tpu.experimental.embedding.TPUEmbedding,
-        inputs: dict[str, types.Tensor],
-        weights: dict[str, types.Tensor] | None = None,
-    ) -> dict[str, types.Tensor]:
-        # Each call to this function increments the _v1_call_id by 1, this
-        # allows us to tag each of the main embedding ops with this call id so
-        # that we know during graph rewriting passes which ops correspond to the
-        # same layer call.
-        self._v1_call_id += 1
-        name = str(self._v1_call_id)
-
-        # Set training to true, even during eval. When name is set, this will
-        # trigger a pass that updates the training based on if there is a send
-        # gradients with the same name.
-        tpu_embedding.enqueue(inputs, weights, training=True, name=name)
-
-        @tf.custom_gradient  # type: ignore
-        def gradient_trap(
-            dummy: types.Tensor,
-        ) -> tuple[
-            list[types.Tensor], Callable[[tuple[types.Tensor]], types.Tensor]
-        ]:
-            """Register a gradient function for activation."""
-            activations = tpu_embedding.dequeue(name=name)
-
-            def grad(*grad_wrt_activations: types.Tensor) -> types.Tensor:
-                """Gradient function."""
-                # Since the output were flattened, the gradients are also
-                # flattened. Pack them back into the correct nested structure.
-                gradients = tf.nest.pack_sequence_as(
-                    self._placement_to_path_to_feature_config["sparsecore"],
-                    grad_wrt_activations,
-                )
-                tpu_embedding.apply_gradients(gradients, name=name)
-
-                # This is the gradient for the input variable.
-                return tf.zeros_like(dummy)
-
-            # Custom gradient functions don't like nested structures of tensors,
-            # so we flatten them here.
-            return tf.nest.flatten(activations), grad
-
-        activations_with_trap = gradient_trap(self._gradient_trap_dummy.value)
-        result: dict[str, types.Tensor] = tf.nest.pack_sequence_as(
-            self._placement_to_path_to_feature_config["sparsecore"],
-            activations_with_trap,
-        )
-        return result
-
-    def _tpu_embedding_lookup_v2(
+    def _tpu_embedding_lookup(
         self,
         tpu_embedding: tf.tpu.experimental.embedding.TPUEmbeddingV2,
         inputs: dict[str, types.Tensor],
