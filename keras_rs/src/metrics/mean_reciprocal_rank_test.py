@@ -223,6 +223,32 @@ class MeanReciprocalRankTest(testing.TestCase, parameterized.TestCase):
         result = mrr_metric.result()
         self.assertAllClose(result, expected_mrr)
 
+    def test_no_shuffle_ties_keeps_original_order(self):
+        # All scores are tied. With `shuffle_ties=False`, the original order
+        # is kept, so the relevant item stays at rank 3 on every call.
+        y_true = [[0.0, 0.0, 1.0, 0.0]]
+        y_pred = [[0.5, 0.5, 0.5, 0.5]]
+        for _ in range(5):
+            mrr_metric = MeanReciprocalRank(shuffle_ties=False)
+            mrr_metric.update_state(y_true, y_pred)
+            result = mrr_metric.result()
+            self.assertAllClose(result, 1 / 3)
+
+    def test_no_shuffle_ties_masked_items_last(self):
+        # The scores are large enough that subtracting `keras.config.epsilon()`
+        # from the masked item is lost to float32 rounding, so the masked item
+        # ties with the valid items. It has to be sorted after them.
+        y_true = {
+            "labels": [[0.0, 1.0, 1.0, 0.0]],
+            "mask": [[True, False, True, True]],
+        }
+        y_pred = [[10.0, 10.0, 10.0, 10.0]]
+        for _ in range(5):
+            mrr_metric = MeanReciprocalRank(shuffle_ties=False)
+            mrr_metric.update_state(y_true, y_pred)
+            result = mrr_metric.result()
+            self.assertAllClose(result, 1 / 2)
+
     def test_statefulness(self):
         mrr_metric = MeanReciprocalRank()
         # Batch 1: First two lists
