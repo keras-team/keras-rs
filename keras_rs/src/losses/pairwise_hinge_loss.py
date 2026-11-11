@@ -14,6 +14,8 @@ class PairwiseHingeLoss(PairwiseLoss):
 
 formula = "loss = sum_{i} sum_{j} I(y_i > y_j) * max(0, 1 - (s_i - s_j))"
 explanation = """
+    - `I(y_i > y_j)` is an indicator function that equals 1 if `y_i > y_j`,
+      and 0 otherwise.
     - `max(0, 1 - (s_i - s_j))` is the hinge loss, which penalizes cases where
       the score difference `s_i - s_j` is not sufficiently large when
       `y_i > y_j`.
