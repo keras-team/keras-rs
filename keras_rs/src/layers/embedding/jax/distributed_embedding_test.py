@@ -530,12 +530,6 @@ class DistributedEmbeddingLayerTest(parameterized.TestCase):
         model = WrapperModel(layer)
         model.compile(jit_compile=True, loss="mse")
 
-        # Build model and DistributedEmbedding before preprocess is called.
-        sample_ids, _ = keras_test_utils.create_random_samples(
-            feature_configs_dict, ragged=ragged, seed=0
-        )
-        model.build(keras.tree.map_structure(lambda x: x.shape, sample_ids))
-
         # Fit model to different dataset.
         training_dataset = keras_test_utils.RandomInputSampleDataset(
             feature_configs_dict,

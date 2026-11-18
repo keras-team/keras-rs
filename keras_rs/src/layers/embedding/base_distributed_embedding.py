@@ -598,12 +598,10 @@ class DistributedEmbedding(keras.layers.Layer):
             )
         )
 
-    def build(self, input_shapes: types.Nested[types.Shape]) -> None:
-        if self.built:
-            return
-
-        self._verify_input_shapes(input_shapes)
-
+    @keras_utils.no_automatic_dependency_tracking
+    def _populate_placement_to_path_to_input_shape(
+        self, input_shapes: types.Nested[types.Shape]
+    ) -> None:
         # Go from deeply nested structure to placement -> path -> input shape.
         placement_to_path_to_input_shape: collections.defaultdict[
             str, dict[str, types.Shape]
@@ -623,20 +621,33 @@ class DistributedEmbedding(keras.layers.Layer):
             input_shapes,
         )
 
+        self._placement_to_path_to_input_shape = dict(
+            placement_to_path_to_input_shape
+        )
+
+    def build(self, input_shapes: types.Nested[types.Shape]) -> None:
+        if self.built:
+            return
+
+        if not self._is_preprocessed(input_shapes):
+            self._verify_input_shapes(input_shapes)
+            self._populate_placement_to_path_to_input_shape(input_shapes)
+
         # Build for features placed on "sparsecore".
-        if "sparsecore" in placement_to_path_to_input_shape:
+        if "sparsecore" in self._placement_to_path_to_input_shape:
             self._sparsecore_build(
-                placement_to_path_to_input_shape["sparsecore"]
+                self._placement_to_path_to_input_shape["sparsecore"]
             )
 
         # Build for features placed on "default_device".
-        if "default_device" in placement_to_path_to_input_shape:
+        if "default_device" in self._placement_to_path_to_input_shape:
             self._default_device_build(
-                placement_to_path_to_input_shape["default_device"]
+                self._placement_to_path_to_input_shape["default_device"]
             )
 
         super().build(input_shapes)
 
+    @keras_utils.no_automatic_dependency_tracking
     def preprocess(
         self,
         inputs: types.Nested[types.Tensor],
@@ -668,11 +679,13 @@ class DistributedEmbedding(keras.layers.Layer):
         if weights is not None:
             keras.tree.assert_same_structure(self._feature_configs, weights)
 
-        if not self.built:
-            input_shapes = keras.tree.map_structure(
-                lambda array: tuple(array.shape), inputs
+        if not hasattr(self, "_placement_to_path_to_input_shape"):
+            self._preprocess_shapes_dict = keras.tree.map_structure(
+                lambda x: tuple(x.shape), inputs
             )
-            self.build(input_shapes)
+            self._populate_placement_to_path_to_input_shape(
+                self._preprocess_shapes_dict
+            )
 
         # Go from deeply nested to nested dict placement -> path -> input.
         def to_placement_to_path(
@@ -1100,6 +1113,11 @@ class DistributedEmbedding(keras.layers.Layer):
         if hasattr(self, "_table_stacking"):
             config["table_stacking"] = self._table_stacking
         return config
+
+    def get_build_config(self) -> dict[str, Any]:
+        if hasattr(self, "_preprocess_shapes_dict"):
+            return {"input_shape": self._preprocess_shapes_dict}
+        return super().get_build_config()  # type: ignore[no-any-return]
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> "DistributedEmbedding":

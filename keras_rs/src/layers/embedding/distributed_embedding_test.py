@@ -538,6 +538,11 @@ class DistributedEmbeddingTest(testing.TestCase, parameterized.TestCase):
         if keras.backend.backend() == "jax":
             preprocessed = layer.preprocess(inputs, weights)
             if jit_compile:
+                layer.build(
+                    (self.batch_size,)
+                    if input_rank == 1
+                    else (self.batch_size, 4)
+                )
                 # Determine explicit shardings/layouts for jit compilation
                 # (required for sparsecore computations).
                 trainable_layouts = keras.tree.map_structure(
