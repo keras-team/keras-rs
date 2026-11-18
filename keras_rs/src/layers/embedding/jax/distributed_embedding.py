@@ -67,7 +67,7 @@ class StackedTableInitializer(keras.initializers.Initializer):
         table_specs: Nested[embedding_spec.TableSpec],
         num_shards: int,
         layout: keras.distribution.TensorLayout,
-        seed: int | keras.random.SeedGenerator | jax.Array = 0,
+        seed: int = 0,
     ):
         # Sort table specs so we can simply concatenate them when assembling the
         # stacked table.
@@ -79,7 +79,7 @@ class StackedTableInitializer(keras.initializers.Initializer):
         )
         self._num_shards = num_shards
         self._layout = layout
-        self._key = keras.src.backend.jax.random.jax_draw_seed(seed)
+        self._key = keras.random.SeedGenerator(seed)
 
     def _initialize_shard(
         self,
@@ -143,8 +143,12 @@ class StackedTableInitializer(keras.initializers.Initializer):
             out_shardings=backend_layout,
         )
 
-        keys = jax.random.split(
-            self._key, (self._num_shards, len(self._table_specs))
+        keys = keras.random.randint(
+            (self._num_shards, len(self._table_specs), 2),
+            0,
+            2**31 - 1,
+            dtype="uint32",
+            seed=self._key,
         )
         # Try extracting seeds from the existing table initializers.
         for i, table_spec in enumerate(self._table_specs):
@@ -322,7 +326,6 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             )
 
         self._sc_feature_configs = feature_configs
-        self._sparsecore_built = False
         # Fill in any empty default settings.
         for feature_config in keras.tree.flatten(self._sc_feature_configs):
             if feature_config.table.initializer is None:
@@ -330,24 +333,6 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                 table.initializer = keras.initializers.TruncatedNormal(
                     mean=0.0, stddev=1.0 / math.sqrt(float(table.embedding_dim))
                 )
-
-        # Actual stacking of tables is done in build() to ensure the
-        # layout is set up correctly.
-        self._table_stacking = table_stacking
-
-    def _sparsecore_build(
-        self, input_shapes: Nested[types.Shape] | None = None
-    ) -> None:
-        self.sparsecore_build(input_shapes)
-
-    @keras_utils.no_automatic_dependency_tracking
-    def sparsecore_build(
-        self, input_shapes: Nested[types.Shape] | None = None
-    ) -> None:
-        del input_shapes  # Unused.
-
-        if self._sparsecore_built:
-            return
 
         feature_specs = config_conversion.keras_to_jte_feature_configs(
             self._sc_feature_configs
@@ -362,11 +347,8 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         num_sc_per_device = jte_utils.num_sparsecores_per_device(
             mesh.devices.item(0)
         )
-        # One table shard per global sparsecore.
-        num_variable_shards = global_device_count * num_sc_per_device
 
         # Maybe stack tables.
-        table_stacking = self._table_stacking
         if table_stacking is not None:
             if isinstance(table_stacking, str):
                 if table_stacking == "auto":
@@ -459,6 +441,29 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             num_sc_per_device,
         )
 
+        self._config = jte_embedding_lookup.EmbeddingLookupConfiguration(
+            feature_specs,
+            mesh=mesh,
+            table_partition=_get_partition_spec(sparsecore_layout),
+            samples_partition=_get_partition_spec(sparsecore_layout),
+            table_layout=sparsecore_layout.backend_layout,
+        )
+
+    @keras_utils.no_automatic_dependency_tracking
+    def _sparsecore_build(
+        self, input_shapes: Nested[types.Shape] | None = None
+    ) -> None:
+        # One table shard per global sparsecore.
+        mesh = self._sparsecore_layout.device_mesh.backend_mesh
+        global_device_count = mesh.devices.size
+        num_sc_per_device = jte_utils.num_sparsecores_per_device(
+            mesh.devices.item(0)
+        )
+        num_variable_shards = global_device_count * num_sc_per_device
+
+        table_specs = embedding.get_table_specs(self._config.feature_specs)
+        table_stacks = jte_table_stacking.get_table_stacks(table_specs)
+
         # Create variables for all stacked tables and slot variables.
         self._table_and_slot_variables = {
             table_name: self._add_table_variable(
@@ -481,20 +486,10 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
             dtype="float32",
             trainable=True,
             layout=keras.distribution.TensorLayout(
-                [], sparsecore_layout.device_mesh
+                [], self._sparsecore_layout.device_mesh
             ),
         )
         self._iterations.overwrite_with_gradient = True
-
-        self._config = jte_embedding_lookup.EmbeddingLookupConfiguration(
-            feature_specs,
-            mesh=mesh,
-            table_partition=_get_partition_spec(sparsecore_layout),
-            samples_partition=_get_partition_spec(sparsecore_layout),
-            table_layout=sparsecore_layout.backend_layout,
-        )
-
-        self._sparsecore_built = True
 
     def _sparsecore_symbolic_preprocess(
         self,
@@ -574,9 +569,6 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                 "DistributedEmbedding.preprocess(...) does not support"
                 " jit-compilation"
             )
-
-        if not self._sparsecore_built:
-            self._sparsecore_build()
 
         # Support symbolic KerasTensors (i.e. keras.Input).
         if any(
@@ -679,9 +671,6 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
     ) -> dict[str, types.Tensor]:
         assert weights is None
 
-        if not self._sparsecore_built:
-            self._sparsecore_build()
-
         table_and_slots = keras.tree.map_structure(
             lambda var: var.value, self._table_and_slot_variables
         )
@@ -735,8 +724,8 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
                     embedding_layer._embeddings.assign(table_values)
 
     def _sparsecore_set_tables(self, tables: Mapping[str, ArrayLike]) -> None:
-        if not self._sparsecore_built:
-            self._sparsecore_build()
+        if not self.built:
+            raise ValueError("Layer must first be built before setting tables.")
 
         config = self._config
         num_table_shards = config.mesh.devices.size * config.num_sc_per_device
@@ -768,8 +757,8 @@ class DistributedEmbedding(base_distributed_embedding.DistributedEmbedding):
         )
 
     def _sparsecore_get_embedding_tables(self) -> dict[str, ArrayLike]:
-        if not self._sparsecore_built:
-            self.sparsecore_build()
+        if not self.built:
+            raise ValueError("Layer must first be built before getting tables.")
 
         config = self._config
         num_table_shards = config.mesh.devices.size * config.num_sc_per_device
