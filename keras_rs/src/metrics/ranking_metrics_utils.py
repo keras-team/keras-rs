@@ -58,7 +58,7 @@ def sort_by_scores(
     k: int | None = None,
     shuffle_ties: bool = True,
     seed: int | keras.random.SeedGenerator | None = None,
-) -> types.Tensor:
+) -> list[types.Tensor]:
     """
     Utility function for sorting tensors by scores.
 
@@ -68,10 +68,14 @@ def sort_by_scores(
             `scores`.
         scores: tensor. Of shape `(batch_size, list_size)`. The scores to sort
             by.
+        mask: optional boolean tensor. Of shape `(batch_size, list_size)`.
+            Items with `mask = False` lose ties against items with
+            `mask = True`, i.e., they are placed after them.
         k: int. The number of top-ranked items to consider (the 'k' in 'top-k').
             If `None`, `list_size` is used.
         shuffle_ties: bool. Whether to randomly shuffle scores before sorting.
-            This is done to break ties.
+            This is done to break ties. If `False`, ties keep their original
+            order.
         seed: int. Seed for shuffling.
 
     Returns:
@@ -85,38 +89,28 @@ def sort_by_scores(
     else:
         k = ops.minimum(k, max_possible_k)
 
-    # --- Work around for PyTorch instability ---
-    # Torch's `topk` is not stable with `sorted=True`, unlike JAX and TF.
-    # See:
-    #   - https://github.com/pytorch/pytorch/issues/27542
-    #   - https://github.com/pytorch/pytorch/issues/88227
-    #
-    # This small "stable offset" ensures deterministic tie-breaking for
-    # equal scores. We can remove this workaround once PyTorch adds a
-    # `stable=True` flag for topk.
-
-    if keras.backend.backend() == "torch" and not shuffle_ties:
-        list_size = ops.shape(scores)[1]
-        indices = ops.arange(list_size)
-        indices = ops.expand_dims(indices, axis=0)
-        indices = ops.broadcast_to(indices, ops.shape(scores))
-        stable_offset = ops.cast(indices, scores.dtype) * 1e-6
-        scores = ops.subtract(scores, stable_offset)
-    # --- End FIX ---
-
-    # Shuffle ties randomly, and push masked values to the beginning.
+    # Shuffle ties randomly if requested, and push masked values to the end.
     shuffled_indices = None
     if shuffle_ties or mask is not None:
         shuffled_indices = get_shuffled_indices(
             ops.shape(scores),
             mask=mask,
-            shuffle_ties=True,
+            shuffle_ties=shuffle_ties,
             seed=seed,
         )
         scores = ops.take_along_axis(scores, shuffled_indices, axis=1)
 
-    # Get top-k indices.
-    _, indices = ops.top_k(scores, k=k, sorted=True)
+    # Get top-k indices. Ties must keep the order given by `shuffled_indices`
+    # (or the original order when there is no shuffling and no mask), so a
+    # stable sort is required here. `top_k` is stable on JAX and TF, but not
+    # on torch. See:
+    #   - https://github.com/pytorch/pytorch/issues/27542
+    #   - https://github.com/pytorch/pytorch/issues/88227
+    # On torch, use `argsort` instead, which Keras runs with `stable=True`.
+    if keras.backend.backend() == "torch":
+        indices = ops.argsort(ops.negative(scores), axis=1)[:, :k]
+    else:
+        _, indices = ops.top_k(scores, k=k, sorted=True)
 
     # If we shuffled our `scores` tensor, we need to get the correct indices
     # by indexing into `shuffled_indices`.
