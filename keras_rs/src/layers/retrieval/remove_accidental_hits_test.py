@@ -1,4 +1,5 @@
 import keras
+import numpy as np
 from absl.testing import parameterized
 from keras import ops
 from keras.layers import deserialize
@@ -90,17 +91,20 @@ class RemoveAccidentalHitsTest(testing.TestCase, parameterized.TestCase):
         elif logits_rank == 3:
             indices = [(i, j) for i in range(shape[0]) for j in range(shape[1])]
 
+        # `candidate_ids` matches the last dimensions of `labels`, so only the
+        # last `candidate_ids_rank - 1` indices apply to it.
+        candidate_ids_offset = logits_rank - candidate_ids_rank
         for index_tuple in indices:
             sub_labels = labels
             sub_logits = logits
             sub_out_logits = out_logits
             sub_candidate_ids = candidate_ids
             # This loop applies multiple indices to go deep several dimensions.
-            for i in index_tuple:
+            for depth, i in enumerate(index_tuple):
                 sub_labels = sub_labels[i]
                 sub_logits = sub_logits[i]
                 sub_out_logits = sub_out_logits[i]
-                if len(ops.shape(sub_candidate_ids)) > 1:
+                if depth >= candidate_ids_offset:
                     sub_candidate_ids = sub_candidate_ids[i]
 
             row_positive_idx = ops.argmax(sub_labels)
@@ -120,7 +124,7 @@ class RemoveAccidentalHitsTest(testing.TestCase, parameterized.TestCase):
                         sub_out_logits[col_idx],
                         ops.add(
                             sub_logits[col_idx],
-                            remove_accidental_hits.SMALLEST_FLOAT,
+                            remove_accidental_hits.MIN_FLOAT,
                         ),
                     )
                 else:
@@ -129,6 +133,66 @@ class RemoveAccidentalHitsTest(testing.TestCase, parameterized.TestCase):
                         sub_out_logits[col_idx],
                         sub_logits[col_idx],
                     )
+
+    def test_call_1d_candidate_ids(self):
+        logits = ops.array(
+            [[1.0, 2.0, 3.0, 4.0], [1.0, 2.0, 3.0, 4.0]], dtype="float32"
+        )
+        labels = ops.array(
+            [[0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]], dtype="float32"
+        )
+        # In the first row, candidate 0 has the same ID as the positive
+        # candidate 2. The second row has no accidental hits.
+        candidate_ids = ops.array([7, 5, 7, 8], dtype="int32")
+
+        out_logits = remove_accidental_hits.RemoveAccidentalHits()(
+            logits, labels, candidate_ids
+        )
+
+        min_float = remove_accidental_hits.MIN_FLOAT
+        self.assertAllClose(
+            out_logits,
+            np.array(
+                [[1.0 + min_float, 2.0, 3.0, 4.0], [1.0, 2.0, 3.0, 4.0]],
+                dtype="float32",
+            ),
+        )
+        # The accidental hit gets a probability of zero.
+        probabilities = ops.softmax(out_logits, axis=-1)
+        self.assertAllClose(probabilities[0, 0], 0.0)
+        self.assertAllClose(probabilities[1], ops.softmax(logits[1]))
+
+    def test_call_2d_candidate_ids(self):
+        logits = ops.array(
+            [[1.0, 2.0, 3.0, 4.0], [1.0, 2.0, 3.0, 4.0]], dtype="float32"
+        )
+        labels = ops.array(
+            [[0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]], dtype="float32"
+        )
+        # Each row has its own candidate IDs. In the first row, candidate 0 has
+        # the same ID as the positive candidate 2. In the second row,
+        # candidates 1 and 2 have the same ID as the positive candidate 3.
+        candidate_ids = ops.array([[7, 5, 7, 6], [5, 8, 8, 8]], dtype="int32")
+
+        out_logits = remove_accidental_hits.RemoveAccidentalHits()(
+            logits, labels, candidate_ids
+        )
+
+        min_float = remove_accidental_hits.MIN_FLOAT
+        self.assertAllClose(
+            out_logits,
+            np.array(
+                [
+                    [1.0 + min_float, 2.0, 3.0, 4.0],
+                    [1.0, 2.0 + min_float, 3.0 + min_float, 4.0],
+                ],
+                dtype="float32",
+            ),
+        )
+        # The accidental hits get a probability of zero.
+        probabilities = ops.softmax(out_logits, axis=-1)
+        self.assertAllClose(probabilities[0, 0], 0.0)
+        self.assertAllClose(probabilities[1, 1:3], np.zeros((2,)))
 
     def test_mismatched_labels_logits_shapes(self):
         layer = remove_accidental_hits.RemoveAccidentalHits()
