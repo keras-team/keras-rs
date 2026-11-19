@@ -133,7 +133,7 @@ class BruteForceRetrieval(Retrieval):
 
         Returns:
             A tuple with the top scores and the top identifiers if
-            `returns_scores` is True, otherwise a tensor with the top
+            `return_scores` is True, otherwise a tensor with the top
             identifiers.
         """
         scores = self.compute_score(inputs, self.candidate_embeddings)
